@@ -93,20 +93,17 @@ export default function SkillRegistryPage() {
 
       // Auto-generate assessment
       const skillIds = ratingsList.map((r) => r.skill_id);
-      const relevantQuestions = questions.filter(
+      const publishedQuestions = questions.filter(
         (q) => skillIds.includes(q.skill_id) && q.status === 'published'
       );
-      const questionIds = relevantQuestions.map((q) => q.id);
 
       addAssessment({
         tenant_id: tenantId,
         employee_id: employeeId,
         submission_id: sub.id,
         domain_id: assignedDomain.id,
-        skill_ids: skillIds,
-        question_ids: questionIds,
-        status: 'pending',
-        duration_minutes: Math.max(30, questionIds.length * 10),
+        ratings: ratingsList,
+        publishedQuestions,
       });
 
       markAssessmentGenerated(sub.id);
