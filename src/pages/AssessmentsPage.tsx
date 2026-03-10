@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
@@ -15,11 +15,13 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function AssessmentsPage() {
-  const { assessments } = useAssessmentStore();
+  const { assessments, fetchAssessments } = useAssessmentStore();
   const { questions } = useQuestionStore();
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
   const { currentRole } = useAuth();
+
+  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
 
   const isAdmin = currentRole === 'admin' || currentRole === 'hr' || currentRole === 'manager' || currentRole === 'domain_lead';
 

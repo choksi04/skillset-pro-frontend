@@ -65,8 +65,10 @@ function parseMCQOptions(text: string): { prefix: string; body: string; optionLi
 }
 
 export default function AssessmentExecPage() {
-  const { assessments, updateAssessmentStatus } = useAssessmentStore();
-  const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment } = useAttemptStore();
+  const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
+  const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts } = useAttemptStore();
+
+  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
   const { questions } = useQuestionStore();
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
@@ -115,15 +117,15 @@ export default function AssessmentExecPage() {
     setQuestionStartTime(Date.now());
   }, [recordTimeSpent]);
 
-  const handleStartAssessment = (assessment: Assessment) => {
+  const handleStartAssessment = async (assessment: Assessment) => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (attempt && (attempt.status === 'evaluated' || attempt.status === 'submitted' || attempt.status === 'reviewed')) {
       toast.info('This assessment has already been submitted.');
       return;
     }
 
-    startAttempt(assessment.id, tenantId, employeeId);
-    updateAssessmentStatus(assessment.id, 'in_progress');
+    await startAttempt(assessment.id, tenantId, employeeId);
+    await updateAssessmentStatus(assessment.id, 'in_progress');
     setActiveAssessment(assessment);
     setCurrentIdx(0);
     setAnswers({});
@@ -139,7 +141,7 @@ export default function AssessmentExecPage() {
     doSubmit();
   };
 
-  const doSubmit = () => {
+  const doSubmit = async () => {
     if (!activeAssessment) return;
     recordTimeSpent();
 
@@ -148,20 +150,20 @@ export default function AssessmentExecPage() {
 
     // Save all answers
     for (const aq of currentQuestions) {
-      saveAnswer(attempt.id, {
+      await saveAnswer(attempt.id, {
         question_id: aq.question_id,
         answer_text: answers[aq.question_id] ?? '',
         time_spent_seconds: timeSpent[aq.question_id] ?? 0,
       });
     }
 
-    // Submit and trigger AI eval — pass full question objects
+    // Submit and trigger AI eval
     const qMap = new Map(currentQuestions.map((aq) => {
       const q = questionMap.get(aq.question_id);
       return [aq.question_id, q!] as const;
     }).filter(([, q]) => q != null));
-    submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
-    updateAssessmentStatus(activeAssessment.id, 'completed');
+    await submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
+    await updateAssessmentStatus(activeAssessment.id, 'completed');
 
     // Auto-create manager review
     const updatedAttempt = useAttemptStore.getState().getAttemptForAssessment(activeAssessment.id);
@@ -177,7 +179,7 @@ export default function AssessmentExecPage() {
         employee_id: employeeId,
         employee_name: user?.full_name ?? 'Employee',
         domain_id: activeAssessment.domain_id,
-        reviewer_id: 'user-001', // In production this would be the assigned manager
+        reviewer_id: 'user-001',
         skill_scores: updatedAttempt.skill_scores,
         self_ratings: selfRatings,
       });

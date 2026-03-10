@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useReviewStore, ManagerReview, ReviewAction, SkillReviewEntry } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
@@ -498,6 +498,10 @@ function NotificationPanel() {
 export default function ReviewsPage() {
   const { reviews } = useReviewStore();
   const { currentRole } = useAuth();
+  const { fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts } = useAttemptStore();
+
+  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
 
   const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'domain_lead';
 
