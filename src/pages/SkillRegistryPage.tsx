@@ -17,7 +17,9 @@ import { toast } from 'sonner';
 export default function SkillRegistryPage() {
   const { user, currentRole } = useAuth();
   const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated } = useRegistryStore();
-  const { addAssessment } = useAssessmentStore();
+  const { addAssessment, fetchAssessments } = useAssessmentStore();
+
+  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
   const { domains, mappings } = useDomainStore();
   const { skills } = useSkillStore();
   const { questions } = useQuestionStore();
