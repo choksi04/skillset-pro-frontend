@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const { currentRole, user } = useAuth();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="dashboard">
       <div>
         <h2 className="text-2xl font-semibold text-foreground">
           Welcome back, {user?.full_name?.split(' ')[0]}
