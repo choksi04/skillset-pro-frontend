@@ -45,16 +45,18 @@ export interface Notification {
 
 export interface OfficialSkillEntry {
   id: string;
-  tenant_id: string;
   employee_id: string;
+  tenant_id: string;
   skill_id: string;
+  final_level: number; // 1-5, manager-validated
+  assessment_reference: string; // assessment_id
+  manager_comments: string;
+  timestamp: string;
+  // Additional context (kept for analytics)
   cycle: string;
   self_rating: RatingLevel;
   ai_level: number;
-  final_level: number; // manager-approved
-  source: 'manager_review';
   review_id: string;
-  created_at: string;
 }
 
 interface ReviewStore {
