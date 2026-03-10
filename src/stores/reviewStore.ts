@@ -45,16 +45,18 @@ export interface Notification {
 
 export interface OfficialSkillEntry {
   id: string;
-  tenant_id: string;
   employee_id: string;
+  tenant_id: string;
   skill_id: string;
+  final_level: number; // 1-5, manager-validated
+  assessment_reference: string; // assessment_id
+  manager_comments: string;
+  timestamp: string;
+  // Additional context (kept for analytics)
   cycle: string;
   self_rating: RatingLevel;
   ai_level: number;
-  final_level: number; // manager-approved
-  source: 'manager_review';
   review_id: string;
-  created_at: string;
 }
 
 interface ReviewStore {
@@ -192,16 +194,17 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         .filter((sr) => sr.manager_action === 'approve' || sr.manager_action === 'adjust')
         .map((sr) => ({
           id: `entry-${Date.now()}-${sr.skill_id}`,
-          tenant_id: review.tenant_id,
           employee_id: review.employee_id,
+          tenant_id: review.tenant_id,
           skill_id: sr.skill_id,
+          final_level: sr.manager_action === 'adjust' ? (sr.manager_adjusted_level ?? sr.ai_calculated_level) : sr.ai_calculated_level,
+          assessment_reference: review.assessment_id,
+          manager_comments: sr.manager_comment || review.overall_comment || '',
+          timestamp: new Date().toISOString(),
           cycle,
           self_rating: sr.self_rating,
           ai_level: sr.ai_calculated_level,
-          final_level: sr.manager_action === 'adjust' ? (sr.manager_adjusted_level ?? sr.ai_calculated_level) : sr.ai_calculated_level,
-          source: 'manager_review' as const,
           review_id: reviewId,
-          created_at: new Date().toISOString(),
         }));
 
       return {
