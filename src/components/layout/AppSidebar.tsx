@@ -23,6 +23,7 @@ interface SidebarItem {
   href: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  tourId?: string;
 }
 
 const sidebarItems: SidebarItem[] = [
