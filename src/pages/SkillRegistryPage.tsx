@@ -81,25 +81,22 @@ export default function SkillRegistryPage() {
     setConfirmOpen(true);
   };
 
-  const confirmSubmit = () => {
+  const confirmSubmit = async () => {
     if (!assignedDomain) return;
 
-    // Save final ratings
     const ratingsList: SkillSelfRating[] = Object.entries(ratings).map(([skill_id, rating]) => ({ skill_id, rating }));
     createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
 
-    // Get the submission and lock it
     const sub = getSubmission(employeeId, currentCycle);
     if (sub) {
       submitRegistry(sub.id);
 
-      // Auto-generate assessment
       const skillIds = ratingsList.map((r) => r.skill_id);
       const publishedQuestions = questions.filter(
         (q) => skillIds.includes(q.skill_id) && q.status === 'published'
       );
 
-      addAssessment({
+      await addAssessment({
         tenant_id: tenantId,
         employee_id: employeeId,
         submission_id: sub.id,
