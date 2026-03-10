@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { BarChart3, Users, Brain, ClipboardCheck, TrendingUp, AlertCircle } from 'lucide-react';
+import QuickStartChecklist from '@/components/onboarding/QuickStartChecklist';
 
 const statCards = [
   { label: 'Total Employees', value: '248', icon: <Users size={20} />, change: '+12 this month' },
