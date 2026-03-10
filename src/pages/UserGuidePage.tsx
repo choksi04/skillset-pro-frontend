@@ -158,6 +158,8 @@ const guideSections: GuideSection[] = [
     ],
     roles: ['Employee (view own results)', 'Admin/HR/Manager (view in reviews)'],
     status: 'implemented',
+  },
+  {
     title: 'Manager Review Workflow',
     module: 'Reviews',
     description: 'Review AI-evaluated assessment results, adjust scores, and approve validations.',
