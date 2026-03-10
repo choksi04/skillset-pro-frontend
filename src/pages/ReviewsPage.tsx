@@ -496,12 +496,17 @@ function NotificationPanel() {
 }
 
 export default function ReviewsPage() {
-  const { reviews } = useReviewStore();
+  const { reviews, fetchReviews } = useReviewStore();
   const { currentRole } = useAuth();
   const { fetchAssessments } = useAssessmentStore();
   const { fetchAttempts } = useAttemptStore();
+  const { fetchSkills } = useSkillStore();
+  const { fetchDomains } = useDomainStore();
+  const { fetchRegistry } = useRegistryStore();
 
-  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
+  useEffect(() => {
+    fetchAssessments(); fetchAttempts(); fetchReviews(); fetchSkills(); fetchDomains(); fetchRegistry();
+  }, [fetchAssessments, fetchAttempts, fetchReviews, fetchSkills, fetchDomains, fetchRegistry]);
 
   const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'domain_lead';
 
