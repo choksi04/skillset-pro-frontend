@@ -495,15 +495,17 @@ function TrackingTab({
 // ── Main Page ──
 
 export default function HRDashboardPage() {
-  const { officialEntries, reviews } = useReviewStore();
-  const { skills } = useSkillStore();
-  const { domains, mappings } = useDomainStore();
+  const { officialEntries, reviews, fetchReviews } = useReviewStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { domains, mappings, fetchDomains } = useDomainStore();
   const { assessments, fetchAssessments } = useAssessmentStore();
   const { fetchAttempts } = useAttemptStore();
   const { currentRole } = useAuth();
   const [domainFilter, setDomainFilter] = useState('all');
 
-  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
+  useEffect(() => {
+    fetchAssessments(); fetchAttempts(); fetchReviews(); fetchSkills(); fetchDomains();
+  }, [fetchAssessments, fetchAttempts, fetchReviews, fetchSkills, fetchDomains]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
   const isHROrAdmin = currentRole === 'hr' || currentRole === 'admin';
