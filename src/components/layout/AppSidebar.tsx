@@ -95,6 +95,7 @@ export default function AppSidebar() {
           <NavLink
             key={item.href}
             to={item.href}
+            data-tour={item.tourId}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
                 isActive
