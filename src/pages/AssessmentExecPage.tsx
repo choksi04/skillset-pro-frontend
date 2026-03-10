@@ -84,6 +84,7 @@ export default function AssessmentExecPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const [viewResultsId, setViewResultsId] = useState<string | null>(null);
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [timeSpent, setTimeSpent] = useState<Record<string, number>>({});
 
