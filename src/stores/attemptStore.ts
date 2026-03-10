@@ -208,7 +208,7 @@ interface AttemptStore {
   attempts: AssessmentAttempt[];
   startAttempt: (assessmentId: string, tenantId: string, employeeId: string) => string;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => void;
-  submitAttempt: (attemptId: string, questionMap: Map<string, Question>) => void;
+  submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string }[]) => void;
   getAttemptForAssessment: (assessmentId: string) => AssessmentAttempt | undefined;
 }
 
