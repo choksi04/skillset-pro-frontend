@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AssessmentAttempt, AIEvaluation } from '@/stores/attemptStore';
+import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
@@ -69,6 +69,38 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
         </p>
         <Badge variant="outline" className="mt-2 text-xs">Pending Manager Review</Badge>
       </div>
+
+      {/* Skill Scores & Calculated Levels */}
+      {attempt.skill_scores.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-card-foreground mb-4">Skill Scores & Calculated Levels</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {attempt.skill_scores.map((ss) => {
+              const skill = skillMap.get(ss.skill_id);
+              return (
+                <div key={ss.skill_id} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-foreground">{skill?.skill_name ?? 'Unknown Skill'}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${scoreColor(ss.avg_score)}`}>{ss.avg_score}%</span>
+                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-bold">
+                        Level {ss.calculated_level}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${scoreBarColor(ss.avg_score)}`}
+                      style={{ width: `${ss.avg_score}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{ss.question_count} questions evaluated</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Dimension Breakdown */}
       <div className="rounded-xl border border-border bg-card p-5">

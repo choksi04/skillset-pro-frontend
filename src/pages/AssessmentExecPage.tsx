@@ -158,7 +158,7 @@ export default function AssessmentExecPage() {
       const q = questionMap.get(aq.question_id);
       return [aq.question_id, q!] as const;
     }).filter(([, q]) => q != null));
-    submitAttempt(attempt.id, qMap as Map<string, any>);
+    submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
     updateAssessmentStatus(activeAssessment.id, 'completed');
 
     setConfirmSubmitOpen(false);

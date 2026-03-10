@@ -21,6 +21,21 @@ export interface AIEvaluation {
   confidence: number; // 0-1
 }
 
+export interface SkillScore {
+  skill_id: string;
+  avg_score: number; // 0-100
+  calculated_level: number; // 1-5
+  question_count: number;
+}
+
+export function scoreToLevel(score: number): number {
+  if (score >= 90) return 5;
+  if (score >= 75) return 4;
+  if (score >= 60) return 3;
+  if (score >= 40) return 2;
+  return 1;
+}
+
 export interface AssessmentAttempt {
   id: string;
   assessment_id: string;
@@ -28,6 +43,7 @@ export interface AssessmentAttempt {
   employee_id: string;
   answers: AnswerEntry[];
   ai_evaluations: AIEvaluation[];
+  skill_scores: SkillScore[];
   total_ai_score: number | null;
   status: 'in_progress' | 'submitted' | 'evaluated' | 'reviewed';
   started_at: string;
@@ -192,7 +208,7 @@ interface AttemptStore {
   attempts: AssessmentAttempt[];
   startAttempt: (assessmentId: string, tenantId: string, employeeId: string) => string;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => void;
-  submitAttempt: (attemptId: string, questionMap: Map<string, Question>) => void;
+  submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string }[]) => void;
   getAttemptForAssessment: (assessmentId: string) => AssessmentAttempt | undefined;
 }
 
@@ -212,6 +228,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         employee_id: employeeId,
         answers: [],
         ai_evaluations: [],
+        skill_scores: [],
         total_ai_score: null,
         status: 'in_progress',
         started_at: new Date().toISOString(),
@@ -229,7 +246,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       }),
     })),
 
-  submitAttempt: (attemptId, questionMap) =>
+  submitAttempt: (attemptId, questionMap, assessmentQuestions) =>
     set((state) => ({
       attempts: state.attempts.map((a) => {
         if (a.id !== attemptId) return a;
@@ -237,9 +254,25 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         const totalScore = evaluations.length > 0
           ? Math.round(evaluations.reduce((sum, e) => sum + e.score, 0) / evaluations.length)
           : 0;
+
+        // Calculate per-skill scores
+        const skillScoreMap: Record<string, { total: number; count: number }> = {};
+        for (const ev of evaluations) {
+          const aq = assessmentQuestions.find((q) => q.question_id === ev.question_id);
+          const skillId = aq?.skill_id ?? 'unknown';
+          if (!skillScoreMap[skillId]) skillScoreMap[skillId] = { total: 0, count: 0 };
+          skillScoreMap[skillId].total += ev.score;
+          skillScoreMap[skillId].count += 1;
+        }
+        const skillScores: SkillScore[] = Object.entries(skillScoreMap).map(([skill_id, { total, count }]) => {
+          const avg_score = Math.round(total / count);
+          return { skill_id, avg_score, calculated_level: scoreToLevel(avg_score), question_count: count };
+        });
+
         return {
           ...a,
           ai_evaluations: evaluations,
+          skill_scores: skillScores,
           total_ai_score: totalScore,
           status: 'evaluated' as const,
           submitted_at: new Date().toISOString(),
