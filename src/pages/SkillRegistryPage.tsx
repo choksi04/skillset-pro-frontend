@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels } from '@/stores/registryStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useDomainStore } from '@/stores/domainStore';
