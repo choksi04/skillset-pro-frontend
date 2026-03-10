@@ -79,9 +79,10 @@ interface GeneratedPreview {
 }
 
 export default function AIGenerationPage() {
-  const { addQuestions } = useQuestionStore();
-  const { skills } = useSkillStore();
+  const { addQuestions, fetchQuestions } = useQuestionStore();
+  const { skills, fetchSkills } = useSkillStore();
   const { user } = useAuth();
+  useEffect(() => { fetchQuestions(); fetchSkills(); }, [fetchQuestions, fetchSkills]);
   const activeSkills = skills.filter((s) => s.status === 'active');
 
   const [skillId, setSkillId] = useState('');

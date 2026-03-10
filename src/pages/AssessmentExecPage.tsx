@@ -67,13 +67,15 @@ function parseMCQOptions(text: string): { prefix: string; body: string; optionLi
 export default function AssessmentExecPage() {
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts } = useAttemptStore();
-
-  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
-  const { questions } = useQuestionStore();
-  const { skills } = useSkillStore();
-  const { domains } = useDomainStore();
+  const { questions, fetchQuestions } = useQuestionStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains();
+  }, [fetchAssessments, fetchAttempts, fetchQuestions, fetchSkills, fetchDomains]);
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';

@@ -16,13 +16,15 @@ import { toast } from 'sonner';
 
 export default function SkillRegistryPage() {
   const { user, currentRole } = useAuth();
-  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated } = useRegistryStore();
+  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry } = useRegistryStore();
   const { addAssessment, fetchAssessments } = useAssessmentStore();
+  const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { questions, fetchQuestions } = useQuestionStore();
 
-  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
-  const { domains, mappings } = useDomainStore();
-  const { skills } = useSkillStore();
-  const { questions } = useQuestionStore();
+  useEffect(() => {
+    fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry();
+  }, [fetchAssessments, fetchDomains, fetchSkills, fetchQuestions, fetchRegistry]);
 
   const isEmployee = currentRole === 'employee';
   const employeeId = user?.id ?? '';
