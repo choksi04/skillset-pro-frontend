@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useDomainStore, Domain } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,10 +13,11 @@ import {
 import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Link2, Network } from 'lucide-react';
 
 export default function DomainsPage() {
-  const { domains, mappings, toggleDomainStatus } = useDomainStore();
-  const { skills } = useSkillStore();
+  const { domains, mappings, toggleDomainStatus, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);

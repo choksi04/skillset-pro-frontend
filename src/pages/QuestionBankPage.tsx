@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuestionStore, Question, competencyLevels, questionTypes, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,10 +24,11 @@ const typeIcons: Record<string, string> = {
 };
 
 export default function QuestionBankPage() {
-  const { questions, toggleQuestionStatus, publishQuestion } = useQuestionStore();
-  const { skills } = useSkillStore();
+  const { questions, toggleQuestionStatus, publishQuestion, fetchQuestions } = useQuestionStore();
+  const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  useEffect(() => { fetchQuestions(); fetchSkills(); }, [fetchQuestions, fetchSkills]);
 
   const [search, setSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('all');

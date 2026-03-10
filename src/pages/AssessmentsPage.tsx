@@ -16,12 +16,14 @@ const statusStyles: Record<string, string> = {
 
 export default function AssessmentsPage() {
   const { assessments, fetchAssessments } = useAssessmentStore();
-  const { questions } = useQuestionStore();
-  const { skills } = useSkillStore();
-  const { domains } = useDomainStore();
+  const { questions, fetchQuestions } = useQuestionStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { domains, fetchDomains } = useDomainStore();
   const { currentRole } = useAuth();
 
-  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
+  useEffect(() => {
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains();
+  }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains]);
 
   const isAdmin = currentRole === 'admin' || currentRole === 'hr' || currentRole === 'manager' || currentRole === 'domain_lead';
 

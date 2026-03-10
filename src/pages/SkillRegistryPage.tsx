@@ -16,13 +16,15 @@ import { toast } from 'sonner';
 
 export default function SkillRegistryPage() {
   const { user, currentRole } = useAuth();
-  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated } = useRegistryStore();
+  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry } = useRegistryStore();
   const { addAssessment, fetchAssessments } = useAssessmentStore();
+  const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { questions, fetchQuestions } = useQuestionStore();
 
-  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
-  const { domains, mappings } = useDomainStore();
-  const { skills } = useSkillStore();
-  const { questions } = useQuestionStore();
+  useEffect(() => {
+    fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry();
+  }, [fetchAssessments, fetchDomains, fetchSkills, fetchQuestions, fetchRegistry]);
 
   const isEmployee = currentRole === 'employee';
   const employeeId = user?.id ?? '';
@@ -85,11 +87,11 @@ export default function SkillRegistryPage() {
     if (!assignedDomain) return;
 
     const ratingsList: SkillSelfRating[] = Object.entries(ratings).map(([skill_id, rating]) => ({ skill_id, rating }));
-    createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
+    await createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
 
     const sub = getSubmission(employeeId, currentCycle);
     if (sub) {
-      submitRegistry(sub.id);
+      await submitRegistry(sub.id);
 
       const skillIds = ratingsList.map((r) => r.skill_id);
       const publishedQuestions = questions.filter(
@@ -105,7 +107,7 @@ export default function SkillRegistryPage() {
         publishedQuestions,
       });
 
-      markAssessmentGenerated(sub.id);
+      await markAssessmentGenerated(sub.id);
     }
 
     setConfirmOpen(false);

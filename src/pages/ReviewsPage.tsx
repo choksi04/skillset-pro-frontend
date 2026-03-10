@@ -292,6 +292,10 @@ function ReviewCard({ review }: { review: ManagerReview }) {
               {domain?.name ?? 'Unknown Domain'} · {review.skill_reviews.length} skills ·{' '}
               {attempt?.total_ai_score != null && `AI Score: ${attempt.total_ai_score}%`}
             </p>
+            <p className="text-xs text-muted-foreground">
+              Submitted: {attempt?.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : 'N/A'}
+              {review.completed_at && ` · Reviewed: ${new Date(review.completed_at).toLocaleString()}`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {statusBadge[review.status]}
@@ -496,12 +500,17 @@ function NotificationPanel() {
 }
 
 export default function ReviewsPage() {
-  const { reviews } = useReviewStore();
+  const { reviews, fetchReviews } = useReviewStore();
   const { currentRole } = useAuth();
   const { fetchAssessments } = useAssessmentStore();
   const { fetchAttempts } = useAttemptStore();
+  const { fetchSkills } = useSkillStore();
+  const { fetchDomains } = useDomainStore();
+  const { fetchRegistry } = useRegistryStore();
 
-  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
+  useEffect(() => {
+    fetchAssessments(); fetchAttempts(); fetchReviews(); fetchSkills(); fetchDomains(); fetchRegistry();
+  }, [fetchAssessments, fetchAttempts, fetchReviews, fetchSkills, fetchDomains, fetchRegistry]);
 
   const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'domain_lead';
 

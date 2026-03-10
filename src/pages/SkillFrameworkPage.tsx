@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import SkillFormDialog from '@/components/skills/SkillFormDialog';
@@ -23,9 +23,10 @@ import {
 import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain } from 'lucide-react';
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, toggleSkillStatus } = useSkillStore();
+  const { skills, categories, toggleSkillStatus, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  useEffect(() => { fetchSkills(); }, [fetchSkills]);
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');

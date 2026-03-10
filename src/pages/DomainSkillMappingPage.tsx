@@ -1,11 +1,13 @@
+import { useEffect } from 'react';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Badge } from '@/components/ui/badge';
 import { Link2 } from 'lucide-react';
 
 export default function DomainSkillMappingPage() {
-  const { domains, mappings } = useDomainStore();
-  const { skills } = useSkillStore();
+  const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
+  useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
   const activeDomains = domains.filter((d) => d.status === 'active');
 

@@ -52,15 +52,9 @@ export interface AssessmentAttempt {
   evaluated_at?: string;
 }
 
-// ---- Mock AI Evaluation (kept until real AI is enabled) ----
+// ---- Mock AI Evaluation ----
 
-const EVAL_DIMENSIONS = [
-  'Concept Understanding',
-  'Technical Correctness',
-  'Solution Practicality',
-  'Clarity',
-] as const;
-
+const EVAL_DIMENSIONS = ['Concept Understanding', 'Technical Correctness', 'Solution Practicality', 'Clarity'] as const;
 type EvalDimension = typeof EVAL_DIMENSIONS[number];
 
 function scoreDimension(answer: string, dimension: EvalDimension, questionType: string): { score: number; comment: string } {
@@ -114,11 +108,8 @@ function generateStructuredEvaluation(answers: AnswerEntry[], questionMap: Map<s
       const isCorrect = correctAnswer === userAnswer;
       const score = isCorrect ? 100 : 0;
       return {
-        question_id: a.question_id,
-        score,
-        feedback: isCorrect
-          ? 'Correct answer selected.'
-          : `Incorrect. Expected answer was ${correctAnswer ?? 'not determined'}.`,
+        question_id: a.question_id, score,
+        feedback: isCorrect ? 'Correct answer selected.' : `Incorrect. Expected answer was ${correctAnswer ?? 'not determined'}.`,
         dimensions: EVAL_DIMENSIONS.map((dim) => ({
           dimension: dim,
           score: isCorrect ? 85 + Math.floor(Math.random() * 15) : Math.floor(Math.random() * 25),
@@ -146,7 +137,7 @@ function generateStructuredEvaluation(answers: AnswerEntry[], questionMap: Map<s
       feedback = `Adequate response with reasonable ${strongDims[0] || 'coverage'}.`;
       feedback += weakDims.length > 0 ? ` Needs improvement in ${weakDims.join(' and ')}.` : ' More depth would help.';
     } else if (avgScore >= 25) {
-      feedback = `Basic response that touches on some relevant points but lacks depth.`;
+      feedback = 'Basic response that touches on some relevant points but lacks depth.';
       feedback += weakDims.length > 0 ? ` Key gaps in ${weakDims.join(', ')}.` : ' Needs more detail.';
     } else {
       feedback = 'Insufficient response. Key concepts were not addressed.';
@@ -211,19 +202,14 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         ai_evaluations: evalRows
           .filter((ev: any) => ev.attempt_id === a.id)
           .map((ev: any) => ({
-            question_id: ev.question_id,
-            score: ev.score,
-            feedback: ev.feedback,
-            dimensions: ev.dimensions as DimensionScore[],
-            confidence: Number(ev.confidence),
+            question_id: ev.question_id, score: ev.score, feedback: ev.feedback,
+            dimensions: ev.dimensions as DimensionScore[], confidence: Number(ev.confidence),
           })),
         skill_scores: scoreRows
           .filter((ss: any) => ss.attempt_id === a.id)
           .map((ss: any) => ({
-            skill_id: ss.skill_id,
-            avg_score: ss.avg_score,
-            calculated_level: ss.calculated_level,
-            question_count: ss.question_count,
+            skill_id: ss.skill_id, avg_score: ss.avg_score,
+            calculated_level: ss.calculated_level, question_count: ss.question_count,
           })),
         total_ai_score: a.total_ai_score,
         status: a.status,
@@ -255,16 +241,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     }
 
     const attempt: AssessmentAttempt = {
-      id: (row as any).id,
-      assessment_id: assessmentId,
-      tenant_id: tenantId,
-      employee_id: employeeId,
-      answers: [],
-      ai_evaluations: [],
-      skill_scores: [],
-      total_ai_score: null,
-      status: 'in_progress',
-      started_at: (row as any).started_at,
+      id: (row as any).id, assessment_id: assessmentId, tenant_id: tenantId,
+      employee_id: employeeId, answers: [], ai_evaluations: [], skill_scores: [],
+      total_ai_score: null, status: 'in_progress', started_at: (row as any).started_at,
     };
 
     set((state) => ({ attempts: [...state.attempts, attempt] }));
@@ -272,18 +251,12 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   },
 
   saveAnswer: async (attemptId, answer) => {
-    // Upsert: delete existing then insert
-    await supabase
-      .from('attempt_answers')
-      .delete()
-      .eq('attempt_id', attemptId)
-      .eq('question_id', answer.question_id);
+    await supabase.from('attempt_answers').delete()
+      .eq('attempt_id', attemptId).eq('question_id', answer.question_id);
 
     await supabase.from('attempt_answers').insert({
-      attempt_id: attemptId,
-      question_id: answer.question_id,
-      answer_text: answer.answer_text,
-      time_spent_seconds: answer.time_spent_seconds,
+      attempt_id: attemptId, question_id: answer.question_id,
+      answer_text: answer.answer_text, time_spent_seconds: answer.time_spent_seconds,
     });
 
     set((state) => ({
@@ -298,6 +271,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   submitAttempt: async (attemptId, questionMap, assessmentQuestions) => {
     const attempt = get().attempts.find((a) => a.id === attemptId);
     if (!attempt) return;
+
+    // Check if already evaluated (prevent duplicate submissions)
+    if (attempt.status === 'evaluated' || attempt.status === 'submitted') return;
 
     const evaluations = generateStructuredEvaluation(attempt.answers, questionMap);
     const totalScore = evaluations.length > 0
@@ -320,56 +296,44 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
 
     const now = new Date().toISOString();
 
-    // Persist to DB in parallel
+    // Delete existing evals/scores first (idempotent)
     await Promise.all([
-      // Update attempt status
+      supabase.from('ai_evaluations').delete().eq('attempt_id', attemptId),
+      supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId),
+    ]);
+
+    // Persist to DB
+    await Promise.all([
       supabase.from('assessment_attempts').update({
-        status: 'evaluated',
-        total_ai_score: totalScore,
-        submitted_at: now,
-        evaluated_at: now,
+        status: 'evaluated', total_ai_score: totalScore, submitted_at: now, evaluated_at: now,
       }).eq('id', attemptId),
 
-      // Insert evaluations
       evaluations.length > 0
         ? supabase.from('ai_evaluations').insert(
             evaluations.map((ev) => ({
-              attempt_id: attemptId,
-              question_id: ev.question_id,
-              score: ev.score,
-              feedback: ev.feedback,
-              dimensions: ev.dimensions as any,
-              confidence: ev.confidence,
+              attempt_id: attemptId, question_id: ev.question_id, score: ev.score,
+              feedback: ev.feedback, dimensions: ev.dimensions as any, confidence: ev.confidence,
             }))
           )
         : Promise.resolve(),
 
-      // Insert skill scores
       skillScores.length > 0
         ? supabase.from('attempt_skill_scores').insert(
             skillScores.map((ss) => ({
-              attempt_id: attemptId,
-              skill_id: ss.skill_id,
-              avg_score: ss.avg_score,
-              calculated_level: ss.calculated_level,
-              question_count: ss.question_count,
+              attempt_id: attemptId, skill_id: ss.skill_id, avg_score: ss.avg_score,
+              calculated_level: ss.calculated_level, question_count: ss.question_count,
             }))
           )
         : Promise.resolve(),
     ]);
 
-    // Update local state
     set((state) => ({
       attempts: state.attempts.map((a) => {
         if (a.id !== attemptId) return a;
         return {
-          ...a,
-          ai_evaluations: evaluations,
-          skill_scores: skillScores,
-          total_ai_score: totalScore,
-          status: 'evaluated' as const,
-          submitted_at: now,
-          evaluated_at: now,
+          ...a, ai_evaluations: evaluations, skill_scores: skillScores,
+          total_ai_score: totalScore, status: 'evaluated' as const,
+          submitted_at: now, evaluated_at: now,
         };
       }),
     }));
