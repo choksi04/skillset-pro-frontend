@@ -91,7 +91,7 @@ export default function SkillRegistryPage() {
 
     const sub = getSubmission(employeeId, currentCycle);
     if (sub) {
-      submitRegistry(sub.id);
+      await submitRegistry(sub.id);
 
       const skillIds = ratingsList.map((r) => r.skill_id);
       const publishedQuestions = questions.filter(
