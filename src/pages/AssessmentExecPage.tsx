@@ -65,8 +65,10 @@ function parseMCQOptions(text: string): { prefix: string; body: string; optionLi
 }
 
 export default function AssessmentExecPage() {
-  const { assessments, updateAssessmentStatus } = useAssessmentStore();
-  const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment } = useAttemptStore();
+  const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
+  const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts } = useAttemptStore();
+
+  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
   const { questions } = useQuestionStore();
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
