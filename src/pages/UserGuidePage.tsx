@@ -108,12 +108,18 @@ const guideSections: GuideSection[] = [
     status: 'implemented',
   },
   {
-    title: 'Assessment Management',
+    title: 'Assessment Management (Auto-Generated)',
     module: 'Assessments',
-    description: 'Create assessments by selecting skills, questions, and configuring assessment parameters.',
-    steps: ['Create new assessment', 'Select domain and skills', 'Choose questions from bank', 'Set duration and parameters', 'Publish assessment'],
-    roles: ['Admin', 'HR', 'Manager', 'Domain Lead'],
-    status: 'scaffolded',
+    description: 'Assessments are automatically generated when employees submit their skill registry. For each claimed skill, questions are selected from the bank at the employee\'s self-rated level, one level below, and optionally two levels below (e.g., claiming Level 4 pulls questions from Intermediate, Advanced levels). Questions are randomly selected and grouped by skill.',
+    steps: [
+      'Employee submits skill self-assessment from Skill Registry page',
+      'System auto-generates assessment with questions matching claimed levels',
+      'View generated assessments on the Assessments page',
+      'See question breakdown grouped by skill with competency level tags',
+      'If no questions match, a message prompts adding more to the Question Bank',
+    ],
+    roles: ['Admin/HR/Manager (view all assessments)', 'Employee (view own assessments)'],
+    status: 'implemented',
   },
   {
     title: 'Taking Assessments',
