@@ -246,7 +246,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       }),
     })),
 
-  submitAttempt: (attemptId, questionMap) =>
+  submitAttempt: (attemptId, questionMap, assessmentQuestions) =>
     set((state) => ({
       attempts: state.attempts.map((a) => {
         if (a.id !== attemptId) return a;
@@ -254,9 +254,25 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         const totalScore = evaluations.length > 0
           ? Math.round(evaluations.reduce((sum, e) => sum + e.score, 0) / evaluations.length)
           : 0;
+
+        // Calculate per-skill scores
+        const skillScoreMap: Record<string, { total: number; count: number }> = {};
+        for (const ev of evaluations) {
+          const aq = assessmentQuestions.find((q) => q.question_id === ev.question_id);
+          const skillId = aq?.skill_id ?? 'unknown';
+          if (!skillScoreMap[skillId]) skillScoreMap[skillId] = { total: 0, count: 0 };
+          skillScoreMap[skillId].total += ev.score;
+          skillScoreMap[skillId].count += 1;
+        }
+        const skillScores: SkillScore[] = Object.entries(skillScoreMap).map(([skill_id, { total, count }]) => {
+          const avg_score = Math.round(total / count);
+          return { skill_id, avg_score, calculated_level: scoreToLevel(avg_score), question_count: count };
+        });
+
         return {
           ...a,
           ai_evaluations: evaluations,
+          skill_scores: skillScores,
           total_ai_score: totalScore,
           status: 'evaluated' as const,
           submitted_at: new Date().toISOString(),
