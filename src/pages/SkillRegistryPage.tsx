@@ -87,7 +87,7 @@ export default function SkillRegistryPage() {
     if (!assignedDomain) return;
 
     const ratingsList: SkillSelfRating[] = Object.entries(ratings).map(([skill_id, rating]) => ({ skill_id, rating }));
-    createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
+    await createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
 
     const sub = getSubmission(employeeId, currentCycle);
     if (sub) {
