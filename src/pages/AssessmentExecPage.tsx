@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import { useReviewStore } from '@/stores/reviewStore';
+import { useRegistryStore } from '@/stores/registryStore';
 import { toast } from 'sonner';
 import {
   Clock, ChevronLeft, ChevronRight, Send, Play, BarChart3,
