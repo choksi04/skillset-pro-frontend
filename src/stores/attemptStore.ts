@@ -21,6 +21,21 @@ export interface AIEvaluation {
   confidence: number; // 0-1
 }
 
+export interface SkillScore {
+  skill_id: string;
+  avg_score: number; // 0-100
+  calculated_level: number; // 1-5
+  question_count: number;
+}
+
+export function scoreToLevel(score: number): number {
+  if (score >= 90) return 5;
+  if (score >= 75) return 4;
+  if (score >= 60) return 3;
+  if (score >= 40) return 2;
+  return 1;
+}
+
 export interface AssessmentAttempt {
   id: string;
   assessment_id: string;
@@ -28,6 +43,7 @@ export interface AssessmentAttempt {
   employee_id: string;
   answers: AnswerEntry[];
   ai_evaluations: AIEvaluation[];
+  skill_scores: SkillScore[];
   total_ai_score: number | null;
   status: 'in_progress' | 'submitted' | 'evaluated' | 'reviewed';
   started_at: string;
