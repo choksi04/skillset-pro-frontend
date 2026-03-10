@@ -24,10 +24,11 @@ const typeIcons: Record<string, string> = {
 };
 
 export default function QuestionBankPage() {
-  const { questions, toggleQuestionStatus, publishQuestion } = useQuestionStore();
-  const { skills } = useSkillStore();
+  const { questions, toggleQuestionStatus, publishQuestion, fetchQuestions } = useQuestionStore();
+  const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  useEffect(() => { fetchQuestions(); fetchSkills(); }, [fetchQuestions, fetchSkills]);
 
   const [search, setSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('all');
