@@ -6,6 +6,7 @@ import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
+import EvalResults from '@/components/assessment/EvalResults';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  Clock, ChevronLeft, ChevronRight, Send, Play,
+  Clock, ChevronLeft, ChevronRight, Send, Play, BarChart3,
   CheckCircle, Circle, AlertTriangle, ClipboardCheck,
 } from 'lucide-react';
 
