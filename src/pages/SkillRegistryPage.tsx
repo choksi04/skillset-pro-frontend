@@ -107,7 +107,7 @@ export default function SkillRegistryPage() {
         publishedQuestions,
       });
 
-      markAssessmentGenerated(sub.id);
+      await markAssessmentGenerated(sub.id);
     }
 
     setConfirmOpen(false);

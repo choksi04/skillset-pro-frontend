@@ -174,7 +174,7 @@ export default function AssessmentExecPage() {
       const submission = submissions.find((s) => s.employee_id === employeeId);
       const selfRatings = submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
 
-      useReviewStore.getState().createReview({
+      await useReviewStore.getState().createReview({
         tenant_id: tenantId,
         assessment_id: activeAssessment.id,
         attempt_id: updatedAttempt.id,
