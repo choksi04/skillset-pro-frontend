@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import { useReviewStore } from '@/stores/reviewStore';
+import { useRegistryStore } from '@/stores/registryStore';
 import { toast } from 'sonner';
 import {
   Clock, ChevronLeft, ChevronRight, Send, Play, BarChart3,
@@ -161,9 +163,29 @@ export default function AssessmentExecPage() {
     submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
     updateAssessmentStatus(activeAssessment.id, 'completed');
 
+    // Auto-create manager review
+    const updatedAttempt = useAttemptStore.getState().getAttemptForAssessment(activeAssessment.id);
+    if (updatedAttempt && updatedAttempt.skill_scores.length > 0) {
+      const { submissions } = useRegistryStore.getState();
+      const submission = submissions.find((s) => s.employee_id === employeeId);
+      const selfRatings = submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
+
+      useReviewStore.getState().createReview({
+        tenant_id: tenantId,
+        assessment_id: activeAssessment.id,
+        attempt_id: updatedAttempt.id,
+        employee_id: employeeId,
+        employee_name: user?.full_name ?? 'Employee',
+        domain_id: activeAssessment.domain_id,
+        reviewer_id: 'user-001', // In production this would be the assigned manager
+        skill_scores: updatedAttempt.skill_scores,
+        self_ratings: selfRatings,
+      });
+    }
+
     setConfirmSubmitOpen(false);
     setActiveAssessment(null);
-    toast.success('Assessment submitted! AI evaluation is processing...');
+    toast.success('Assessment submitted! AI evaluation complete. Manager review created.');
   };
 
   const handleTimeUp = useCallback(() => {
