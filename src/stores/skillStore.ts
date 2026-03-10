@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface SkillCategory {
   id: string;
@@ -17,56 +18,84 @@ export interface Skill {
   updated_at: string;
 }
 
-const defaultCategories: SkillCategory[] = [
-  { id: 'cat-1', name: 'Technology', description: 'Programming languages, frameworks, and tools' },
-  { id: 'cat-2', name: 'Core Engineering', description: 'Fundamental engineering practices' },
-  { id: 'cat-3', name: 'Architecture', description: 'System and software architecture' },
-  { id: 'cat-4', name: 'PMO', description: 'Project management and operations' },
-  { id: 'cat-5', name: 'Soft Skills', description: 'Communication and interpersonal skills' },
-];
-
-const defaultSkills: Skill[] = [
-  { id: 'skill-1', tenant_id: 'tenant-001', skill_name: 'React', skill_description: 'Building user interfaces with React library including hooks, state management, and component patterns.', skill_category: 'Technology', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'skill-2', tenant_id: 'tenant-001', skill_name: 'Node.js', skill_description: 'Server-side JavaScript runtime for building scalable backend services and APIs.', skill_category: 'Technology', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'skill-3', tenant_id: 'tenant-001', skill_name: 'Debugging', skill_description: 'Systematic approach to identifying and resolving software defects and issues.', skill_category: 'Core Engineering', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'skill-4', tenant_id: 'tenant-001', skill_name: 'System Design', skill_description: 'Designing scalable, reliable, and maintainable software systems and architectures.', skill_category: 'Architecture', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'skill-5', tenant_id: 'tenant-001', skill_name: 'Communication', skill_description: 'Effective verbal and written communication in professional settings.', skill_category: 'Soft Skills', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'skill-6', tenant_id: 'tenant-001', skill_name: 'Problem Solving', skill_description: 'Analytical thinking and structured approaches to solving complex problems.', skill_category: 'Soft Skills', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-];
-
 interface SkillStore {
   categories: SkillCategory[];
   skills: Skill[];
-  addCategory: (cat: Omit<SkillCategory, 'id'>) => void;
-  addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => void;
-  updateSkill: (id: string, updates: Partial<Skill>) => void;
-  toggleSkillStatus: (id: string) => void;
+  loading: boolean;
+  initialized: boolean;
+  fetchSkills: () => Promise<void>;
+  addCategory: (cat: Omit<SkillCategory, 'id'>) => Promise<void>;
+  addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateSkill: (id: string, updates: Partial<Skill>) => Promise<void>;
+  toggleSkillStatus: (id: string) => Promise<void>;
 }
 
-export const useSkillStore = create<SkillStore>((set) => ({
-  categories: defaultCategories,
-  skills: defaultSkills,
-  addCategory: (cat) =>
+export const useSkillStore = create<SkillStore>((set, get) => ({
+  categories: [],
+  skills: [],
+  loading: false,
+  initialized: false,
+
+  fetchSkills: async () => {
+    if (get().initialized) return;
+    set({ loading: true });
+    try {
+      const [skillsRes, catsRes] = await Promise.all([
+        supabase.from('skills').select('*').is('deleted_on', null).order('created_at'),
+        supabase.from('skill_categories').select('*'),
+      ]);
+      if (skillsRes.error) throw skillsRes.error;
+      if (catsRes.error) throw catsRes.error;
+
+      const skills: Skill[] = (skillsRes.data || []).map((s: any) => ({
+        id: s.id, tenant_id: s.tenant_id, skill_name: s.skill_name,
+        skill_description: s.skill_description || '', skill_category: s.skill_category || '',
+        status: s.status as 'active' | 'disabled', created_at: s.created_at, updated_at: s.updated_at,
+      }));
+      const categories: SkillCategory[] = (catsRes.data || []).map((c: any) => ({
+        id: c.id, name: c.name, description: c.description,
+      }));
+      set({ skills, categories, loading: false, initialized: true });
+    } catch (err) {
+      console.error('Failed to fetch skills:', err);
+      set({ loading: false, initialized: true });
+    }
+  },
+
+  addCategory: async (cat) => {
+    const id = `cat-${Date.now()}`;
+    const { error } = await supabase.from('skill_categories').insert({ id, ...cat });
+    if (error) { console.error('Failed to add category:', error); return; }
+    set((state) => ({ categories: [...state.categories, { ...cat, id }] }));
+  },
+
+  addSkill: async (skill) => {
+    const id = `skill-${Date.now()}`;
+    const { data, error } = await supabase.from('skills').insert({ id, ...skill }).select().single();
+    if (error) { console.error('Failed to add skill:', error); return; }
     set((state) => ({
-      categories: [...state.categories, { ...cat, id: `cat-${Date.now()}` }],
-    })),
-  addSkill: (skill) =>
-    set((state) => ({
-      skills: [
-        ...state.skills,
-        { ...skill, id: `skill-${Date.now()}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      ],
-    })),
-  updateSkill: (id, updates) =>
+      skills: [...state.skills, {
+        ...skill, id, created_at: (data as any).created_at, updated_at: (data as any).updated_at,
+      }],
+    }));
+  },
+
+  updateSkill: async (id, updates) => {
+    const { error } = await supabase.from('skills').update({
+      ...updates, updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) { console.error('Failed to update skill:', error); return; }
     set((state) => ({
       skills: state.skills.map((s) =>
         s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s
       ),
-    })),
-  toggleSkillStatus: (id) =>
-    set((state) => ({
-      skills: state.skills.map((s) =>
-        s.id === id ? { ...s, status: s.status === 'active' ? 'disabled' : 'active', updated_at: new Date().toISOString() } : s
-      ),
-    })),
+    }));
+  },
+
+  toggleSkillStatus: async (id) => {
+    const skill = get().skills.find((s) => s.id === id);
+    if (!skill) return;
+    const newStatus = skill.status === 'active' ? 'disabled' : 'active';
+    await get().updateSkill(id, { status: newStatus });
+  },
 }));
