@@ -117,15 +117,15 @@ export default function AssessmentExecPage() {
     setQuestionStartTime(Date.now());
   }, [recordTimeSpent]);
 
-  const handleStartAssessment = (assessment: Assessment) => {
+  const handleStartAssessment = async (assessment: Assessment) => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (attempt && (attempt.status === 'evaluated' || attempt.status === 'submitted' || attempt.status === 'reviewed')) {
       toast.info('This assessment has already been submitted.');
       return;
     }
 
-    startAttempt(assessment.id, tenantId, employeeId);
-    updateAssessmentStatus(assessment.id, 'in_progress');
+    await startAttempt(assessment.id, tenantId, employeeId);
+    await updateAssessmentStatus(assessment.id, 'in_progress');
     setActiveAssessment(assessment);
     setCurrentIdx(0);
     setAnswers({});
