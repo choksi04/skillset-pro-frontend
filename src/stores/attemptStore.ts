@@ -338,7 +338,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
               question_id: ev.question_id,
               score: ev.score,
               feedback: ev.feedback,
-              dimensions: ev.dimensions,
+              dimensions: ev.dimensions as any,
               confidence: ev.confidence,
             }))
           )
