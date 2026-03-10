@@ -29,10 +29,19 @@ const guideSections: GuideSection[] = [
   {
     title: 'Skill Framework Management',
     module: 'Skill Framework',
-    description: 'Define skill categories, individual skills, and proficiency level criteria for your organization.',
-    steps: ['Go to Skill Framework page', 'Create skill categories', 'Add skills under categories', 'Define proficiency levels (Novice → Expert)', 'Set criteria for each level'],
-    roles: ['Admin', 'HR', 'Manager', 'Domain Lead'],
-    status: 'scaffolded',
+    description: 'Manage reusable skills as independent entities with categories. Skills can be mapped to multiple domains. Admins can create, edit, disable skills and assign categories (Technology, Core Engineering, Architecture, PMO, Soft Skills). Includes search, filtering by category/status, and stat cards.',
+    steps: [
+      'Navigate to Skill Framework from the sidebar',
+      'View skill stats (total, active, disabled, categories)',
+      'Click "Add Skill" to create a new skill',
+      'Enter skill name, description, and select a category',
+      'Use search bar or category/status filters to find skills',
+      'Click the pencil icon to edit a skill',
+      'Click the toggle icon to disable/enable a skill',
+      'Use the category chips at the bottom to quick-filter by category',
+    ],
+    roles: ['Admin (full CRUD)', 'HR (full CRUD)', 'Manager (view only)', 'Domain Lead (view only)'],
+    status: 'implemented',
   },
   {
     title: 'Domain Management',
