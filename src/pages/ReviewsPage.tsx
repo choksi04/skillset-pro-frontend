@@ -292,6 +292,10 @@ function ReviewCard({ review }: { review: ManagerReview }) {
               {domain?.name ?? 'Unknown Domain'} · {review.skill_reviews.length} skills ·{' '}
               {attempt?.total_ai_score != null && `AI Score: ${attempt.total_ai_score}%`}
             </p>
+            <p className="text-xs text-muted-foreground">
+              Submitted: {attempt?.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : 'N/A'}
+              {review.completed_at && ` · Reviewed: ${new Date(review.completed_at).toLocaleString()}`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {statusBadge[review.status]}
