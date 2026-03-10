@@ -498,6 +498,10 @@ function NotificationPanel() {
 export default function ReviewsPage() {
   const { reviews } = useReviewStore();
   const { currentRole } = useAuth();
+  const { fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts } = useAttemptStore();
+
+  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
 
   const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'domain_lead';
 

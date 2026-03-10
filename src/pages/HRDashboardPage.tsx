@@ -498,9 +498,12 @@ export default function HRDashboardPage() {
   const { officialEntries, reviews } = useReviewStore();
   const { skills } = useSkillStore();
   const { domains, mappings } = useDomainStore();
-  const { assessments } = useAssessmentStore();
+  const { assessments, fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts } = useAttemptStore();
   const { currentRole } = useAuth();
   const [domainFilter, setDomainFilter] = useState('all');
+
+  useEffect(() => { fetchAssessments(); fetchAttempts(); }, [fetchAssessments, fetchAttempts]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
   const isHROrAdmin = currentRole === 'hr' || currentRole === 'admin';
