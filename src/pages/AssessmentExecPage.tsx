@@ -208,9 +208,14 @@ export default function AssessmentExecPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {isCompleted ? (
-                        <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs">
-                          <CheckCircle size={12} /> Completed
-                        </Badge>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => setViewResultsId(viewResultsId === assessment.id ? null : assessment.id)} className="gap-1.5">
+                            <BarChart3 size={14} /> {viewResultsId === assessment.id ? 'Hide Results' : 'View Results'}
+                          </Button>
+                          <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs">
+                            <CheckCircle size={12} /> Completed
+                          </Badge>
+                        </>
                       ) : (
                         <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5">
                           <Play size={14} /> Start Assessment
@@ -218,7 +223,7 @@ export default function AssessmentExecPage() {
                       )}
                     </div>
                   </div>
-                  {attempt?.total_ai_score != null && (
+                  {attempt?.total_ai_score != null && viewResultsId !== assessment.id && (
                     <div className="mt-3 rounded-lg bg-muted/30 px-3 py-2 flex items-center gap-3">
                       <span className="text-xs text-muted-foreground">AI Score:</span>
                       <span className={`text-lg font-semibold ${
@@ -228,6 +233,11 @@ export default function AssessmentExecPage() {
                         {attempt.total_ai_score}%
                       </span>
                       <Badge variant="outline" className="text-xs ml-auto">Pending Manager Review</Badge>
+                    </div>
+                  )}
+                  {viewResultsId === assessment.id && attempt && (
+                    <div className="mt-4 border-t border-border pt-4">
+                      <EvalResults attempt={attempt} assessment={assessment} />
                     </div>
                   )}
                 </div>
