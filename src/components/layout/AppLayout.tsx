@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import PageHeader from './PageHeader';
+import WelcomeModal from '@/components/onboarding/WelcomeModal';
+import GuidedTour from '@/components/onboarding/GuidedTour';
 
 export default function AppLayout() {
   return (
@@ -12,6 +14,8 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <WelcomeModal />
+      <GuidedTour />
     </div>
   );
 }
