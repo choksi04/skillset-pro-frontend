@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AssessmentAttempt, AIEvaluation } from '@/stores/attemptStore';
+import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
