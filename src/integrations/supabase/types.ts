@@ -14,7 +14,223 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_evaluations: {
+        Row: {
+          attempt_id: string
+          confidence: number
+          dimensions: Json
+          feedback: string
+          id: string
+          question_id: string
+          score: number
+        }
+        Insert: {
+          attempt_id: string
+          confidence?: number
+          dimensions?: Json
+          feedback?: string
+          id?: string
+          question_id: string
+          score?: number
+        }
+        Update: {
+          attempt_id?: string
+          confidence?: number
+          dimensions?: Json
+          feedback?: string
+          id?: string
+          question_id?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_evaluations_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_attempts: {
+        Row: {
+          assessment_id: string
+          employee_id: string
+          evaluated_at: string | null
+          id: string
+          started_at: string
+          status: string
+          submitted_at: string | null
+          tenant_id: string
+          total_ai_score: number | null
+        }
+        Insert: {
+          assessment_id: string
+          employee_id: string
+          evaluated_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          submitted_at?: string | null
+          tenant_id: string
+          total_ai_score?: number | null
+        }
+        Update: {
+          assessment_id?: string
+          employee_id?: string
+          evaluated_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          submitted_at?: string | null
+          tenant_id?: string
+          total_ai_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_attempts_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_questions: {
+        Row: {
+          assessment_id: string
+          id: string
+          question_id: string
+          skill_id: string
+          target_level: string
+        }
+        Insert: {
+          assessment_id: string
+          id?: string
+          question_id: string
+          skill_id: string
+          target_level: string
+        }
+        Update: {
+          assessment_id?: string
+          id?: string
+          question_id?: string
+          skill_id?: string
+          target_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_questions_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          created_at: string
+          domain_id: string
+          duration_minutes: number
+          employee_id: string
+          id: string
+          status: string
+          submission_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain_id: string
+          duration_minutes?: number
+          employee_id: string
+          id?: string
+          status?: string
+          submission_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain_id?: string
+          duration_minutes?: number
+          employee_id?: string
+          id?: string
+          status?: string
+          submission_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      attempt_answers: {
+        Row: {
+          answer_text: string
+          attempt_id: string
+          id: string
+          question_id: string
+          time_spent_seconds: number
+        }
+        Insert: {
+          answer_text?: string
+          attempt_id: string
+          id?: string
+          question_id: string
+          time_spent_seconds?: number
+        }
+        Update: {
+          answer_text?: string
+          attempt_id?: string
+          id?: string
+          question_id?: string
+          time_spent_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_answers_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempt_skill_scores: {
+        Row: {
+          attempt_id: string
+          avg_score: number
+          calculated_level: number
+          id: string
+          question_count: number
+          skill_id: string
+        }
+        Insert: {
+          attempt_id: string
+          avg_score?: number
+          calculated_level?: number
+          id?: string
+          question_count?: number
+          skill_id: string
+        }
+        Update: {
+          attempt_id?: string
+          avg_score?: number
+          calculated_level?: number
+          id?: string
+          question_count?: number
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_skill_scores_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
