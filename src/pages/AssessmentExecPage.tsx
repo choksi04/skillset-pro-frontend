@@ -151,12 +151,12 @@ export default function AssessmentExecPage() {
       });
     }
 
-    // Submit and trigger AI eval
-    const qTexts = new Map(currentQuestions.map((aq) => {
+    // Submit and trigger AI eval — pass full question objects
+    const qMap = new Map(currentQuestions.map((aq) => {
       const q = questionMap.get(aq.question_id);
-      return [aq.question_id, q?.question_text ?? ''];
-    }));
-    submitAttempt(attempt.id, qTexts);
+      return [aq.question_id, q!] as const;
+    }).filter(([, q]) => q != null));
+    submitAttempt(attempt.id, qMap as Map<string, any>);
     updateAssessmentStatus(activeAssessment.id, 'completed');
 
     setConfirmSubmitOpen(false);
