@@ -15,7 +15,10 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function AssessmentsPage() {
-  const { assessments } = useAssessmentStore();
+  const { assessments, fetchAssessments } = useAssessmentStore();
+  const { questions } = useQuestionStore();
+
+  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
   const { questions } = useQuestionStore();
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
