@@ -39,45 +39,51 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick actions */}
+      {/* Main content + Checklist sidebar */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 grid grid-cols-1 gap-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-3">Recent Activity</h3>
-          <div className="space-y-3">
-            {[
-              { text: 'Assessment "React Advanced" completed by 8 employees', time: '2h ago' },
-              { text: 'New skill "Cloud Architecture" added to framework', time: '5h ago' },
-              { text: 'Manager review pending for 3 assessments', time: '1d ago' },
-            ].map((activity, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="mt-1 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-foreground">{activity.text}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h3 className="text-sm font-semibold text-card-foreground mb-3">Recent Activity</h3>
+            <div className="space-y-3">
+              {[
+                { text: 'Assessment "React Advanced" completed by 8 employees', time: '2h ago' },
+                { text: 'New skill "Cloud Architecture" added to framework', time: '5h ago' },
+                { text: 'Manager review pending for 3 assessments', time: '1d ago' },
+              ].map((activity, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="mt-1 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">{activity.text}</p>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h3 className="text-sm font-semibold text-card-foreground mb-3">Action Items</h3>
+            <div className="space-y-3">
+              {[
+                { text: 'Review pending assessment results', priority: 'high' },
+                { text: 'Map new skills to Engineering domain', priority: 'medium' },
+                { text: 'Generate questions for Python skill', priority: 'low' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5">
+                  <AlertCircle size={14} className={
+                    item.priority === 'high' ? 'text-destructive' :
+                    item.priority === 'medium' ? 'text-warning' : 'text-muted-foreground'
+                  } />
+                  <span className="text-sm text-foreground">{item.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-3">Action Items</h3>
-          <div className="space-y-3">
-            {[
-              { text: 'Review pending assessment results', priority: 'high' },
-              { text: 'Map new skills to Engineering domain', priority: 'medium' },
-              { text: 'Generate questions for Python skill', priority: 'low' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5">
-                <AlertCircle size={14} className={
-                  item.priority === 'high' ? 'text-destructive' :
-                  item.priority === 'medium' ? 'text-warning' : 'text-muted-foreground'
-                } />
-                <span className="text-sm text-foreground">{item.text}</span>
-              </div>
-            ))}
-          </div>
+        {/* Quick Start Checklist */}
+        <div className="space-y-4">
+          <QuickStartChecklist />
         </div>
       </div>
     </div>
