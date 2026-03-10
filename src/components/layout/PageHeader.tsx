@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { Bell, Search } from 'lucide-react';
+import HelpButton from '@/components/onboarding/HelpButton';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -24,10 +25,11 @@ export default function PageHeader() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
       <h1 className="text-lg font-semibold text-card-foreground">{title}</h1>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <button className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <Search size={16} />
         </button>
+        <HelpButton />
         <button className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors relative">
           <Bell size={16} />
           <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />

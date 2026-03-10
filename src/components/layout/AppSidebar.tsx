@@ -23,22 +23,23 @@ interface SidebarItem {
   href: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  tourId?: string;
 }
 
 const sidebarItems: SidebarItem[] = [
-  { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'] },
-  { title: 'Organization', href: '/organization', icon: <Building2 size={18} />, roles: ['admin', 'hr'] },
-  { title: 'Skill Framework', href: '/skills', icon: <Brain size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'] },
-  { title: 'Domains', href: '/domains', icon: <Network size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'] },
-  { title: 'Domain-Skill Map', href: '/domain-skills', icon: <Link2 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'] },
-  { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'] },
-  { title: 'AI Generation', href: '/ai-generate', icon: <FileText size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'] },
-  { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'] },
-  { title: 'Take Assessment', href: '/assessment-exec', icon: <Play size={18} />, roles: ['employee'] },
-  { title: 'Reviews', href: '/reviews', icon: <CheckCircle size={18} />, roles: ['manager', 'domain_lead'] },
-  { title: 'Skill Registry', href: '/registry', icon: <BarChart3 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'] },
-  { title: 'HR Dashboard', href: '/hr-dashboard', icon: <Shield size={18} />, roles: ['admin', 'hr'] },
-  { title: 'User Guide', href: '/guide', icon: <BookOpen size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'] },
+  { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'dashboard' },
+  { title: 'Organization', href: '/organization', icon: <Building2 size={18} />, roles: ['admin', 'hr'], tourId: 'organization' },
+  { title: 'Skill Framework', href: '/skills', icon: <Brain size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'skills' },
+  { title: 'Domains', href: '/domains', icon: <Network size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'domains' },
+  { title: 'Domain-Skill Map', href: '/domain-skills', icon: <Link2 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'domain-skills' },
+  { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'questions' },
+  { title: 'AI Generation', href: '/ai-generate', icon: <FileText size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'ai-generate' },
+  { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'assessments' },
+  { title: 'Take Assessment', href: '/assessment-exec', icon: <Play size={18} />, roles: ['employee'], tourId: 'assessment-exec' },
+  { title: 'Reviews', href: '/reviews', icon: <CheckCircle size={18} />, roles: ['manager', 'domain_lead'], tourId: 'reviews' },
+  { title: 'Skill Registry', href: '/registry', icon: <BarChart3 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'registry' },
+  { title: 'HR Dashboard', href: '/hr-dashboard', icon: <Shield size={18} />, roles: ['admin', 'hr'], tourId: 'hr-dashboard' },
+  { title: 'User Guide', href: '/guide', icon: <BookOpen size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'guide' },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -94,6 +95,7 @@ export default function AppSidebar() {
           <NavLink
             key={item.href}
             to={item.href}
+            data-tour={item.tourId}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
                 isActive
