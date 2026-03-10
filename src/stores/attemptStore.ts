@@ -228,6 +228,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         employee_id: employeeId,
         answers: [],
         ai_evaluations: [],
+        skill_scores: [],
         total_ai_score: null,
         status: 'in_progress',
         started_at: new Date().toISOString(),
