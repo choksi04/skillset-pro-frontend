@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
