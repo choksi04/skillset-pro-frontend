@@ -100,7 +100,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
     onOpenChange(false);
   };
 
-  const unusedSuggestions = SUGGESTED_TAGS.filter((t) => !tags.includes(t));
+  const unusedSuggestions = existingTags.filter((t) => !tags.includes(t));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
