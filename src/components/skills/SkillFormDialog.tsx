@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +21,7 @@ const skillSchema = z.object({
   skill_category: z.string().min(1, 'Category is required'),
 });
 
-const SUGGESTED_TAGS = ['frontend', 'backend', 'common', 'architecture', 'pmo', 'devops', 'testing', 'leadership'];
+// Derive tag suggestions from existing skills in the database instead of hardcoding
 
 interface SkillFormDialogProps {
   open: boolean;
@@ -30,9 +30,16 @@ interface SkillFormDialogProps {
 }
 
 export default function SkillFormDialog({ open, onOpenChange, editSkill }: SkillFormDialogProps) {
-  const { categories, addSkill, updateSkill } = useSkillStore();
+  const { categories, skills, addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
   const activeCategories = categories.filter((c) => c.status === 'active');
+
+  // Derive suggested tags from all existing skills in the database
+  const existingTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    skills.forEach((s) => (s.tags || []).forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [skills]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -93,7 +100,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
     onOpenChange(false);
   };
 
-  const unusedSuggestions = SUGGESTED_TAGS.filter((t) => !tags.includes(t));
+  const unusedSuggestions = existingTags.filter((t) => !tags.includes(t));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
