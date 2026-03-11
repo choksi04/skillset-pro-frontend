@@ -304,6 +304,23 @@ export default function SkillFrameworkPage() {
 
       <SkillFormDialog open={skillDialogOpen} onOpenChange={setSkillDialogOpen} editSkill={editingSkill} />
       <CategoryFormDialog open={catDialogOpen} onOpenChange={setCatDialogOpen} editCategory={editingCat} />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.type === 'category' ? 'Category' : 'Skill'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>? This action can be undone by an administrator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
