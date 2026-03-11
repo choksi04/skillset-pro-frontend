@@ -76,10 +76,30 @@ export default function SkillFrameworkPage() {
     categories: categories.length,
   }), [skills, categories]);
 
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'skill' | 'category'; id: string; name: string } | null>(null);
+
   const handleEditSkill = (skill: Skill) => { setEditingSkill(skill); setSkillDialogOpen(true); };
   const handleCreateSkill = () => { setEditingSkill(null); setSkillDialogOpen(true); };
   const handleEditCat = (cat: SkillCategory) => { setEditingCat(cat); setCatDialogOpen(true); };
   const handleCreateCat = () => { setEditingCat(null); setCatDialogOpen(true); };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'skill') {
+      await deleteSkill(deleteTarget.id);
+      toast.success(`Skill "${deleteTarget.name}" deleted`);
+    } else {
+      const skillsInCat = skills.filter((s) => s.skill_category === deleteTarget.name);
+      if (skillsInCat.length > 0) {
+        toast.error(`Cannot delete category with ${skillsInCat.length} skill(s). Remove or reassign them first.`);
+        setDeleteTarget(null);
+        return;
+      }
+      await deleteCategory(deleteTarget.id);
+      toast.success(`Category "${deleteTarget.name}" deleted`);
+    }
+    setDeleteTarget(null);
+  };
 
   return (
     <div className="space-y-6">
