@@ -709,19 +709,43 @@ export type Database = {
       }
       skill_categories: {
         Row: {
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
           description: string | null
           id: string
+          modified_at: string | null
+          modified_by: string | null
           name: string
+          status: string
+          tenant_id: string
         }
         Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
           description?: string | null
           id: string
+          modified_at?: string | null
+          modified_by?: string | null
           name: string
+          status?: string
+          tenant_id?: string
         }
         Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
           description?: string | null
           id?: string
+          modified_at?: string | null
+          modified_by?: string | null
           name?: string
+          status?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -818,6 +842,7 @@ export type Database = {
           skill_description: string | null
           skill_name: string
           status: string
+          tags: string[]
           tenant_id: string
           updated_at: string
         }
@@ -833,6 +858,7 @@ export type Database = {
           skill_description?: string | null
           skill_name: string
           status?: string
+          tags?: string[]
           tenant_id: string
           updated_at?: string
         }
@@ -848,6 +874,7 @@ export type Database = {
           skill_description?: string | null
           skill_name?: string
           status?: string
+          tags?: string[]
           tenant_id?: string
           updated_at?: string
         }
