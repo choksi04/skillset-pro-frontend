@@ -21,7 +21,7 @@ const skillSchema = z.object({
   skill_category: z.string().min(1, 'Category is required'),
 });
 
-const SUGGESTED_TAGS = ['frontend', 'backend', 'common', 'architecture', 'pmo', 'devops', 'testing', 'leadership'];
+// Derive tag suggestions from existing skills in the database instead of hardcoding
 
 interface SkillFormDialogProps {
   open: boolean;
