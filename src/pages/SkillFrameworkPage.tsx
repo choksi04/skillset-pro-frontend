@@ -278,16 +278,24 @@ export default function SkillFrameworkPage() {
             {categories.map((cat) => {
               const count = skills.filter((s) => s.skill_category === cat.name).length;
               return (
-                <button
+                <div
                   key={cat.id}
-                  onClick={() => handleEditCat(cat)}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  className={`group relative rounded-lg border px-3 py-2 text-left transition-colors ${
                     cat.status === 'disabled' ? 'opacity-50 border-border' : 'border-border hover:border-primary/30'
                   }`}
                 >
-                  <p className="text-sm font-medium text-foreground">{cat.name}</p>
-                  <p className="text-xs text-muted-foreground">{count} skill{count !== 1 ? 's' : ''} · {cat.status}</p>
-                </button>
+                  <button onClick={() => handleEditCat(cat)} className="text-left">
+                    <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                    <p className="text-xs text-muted-foreground">{count} skill{count !== 1 ? 's' : ''} · {cat.status}</p>
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget({ type: 'category', id: cat.id, name: cat.name })}
+                    className="absolute top-1.5 right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                    title="Delete category"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               );
             })}
           </div>
