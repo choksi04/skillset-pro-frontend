@@ -149,56 +149,144 @@ export default function QuestionBankPage() {
                 key={q.id}
                 className={`rounded-xl border bg-card overflow-hidden transition-colors ${q.status === 'disabled' ? 'opacity-60 border-border' : 'border-border'}`}
               >
-                {/* Header */}
-                <button
-                  className="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-                  onClick={() => setExpandedId(isExpanded ? null : q.id)}
-                >
-                  <span className="text-lg mt-0.5">{typeIcons[q.question_type]}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground line-clamp-2">{q.question_text}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <Badge variant="secondary" className="text-xs font-normal">{skill?.skill_name ?? 'Unknown'}</Badge>
-                      <Badge variant="outline" className="text-xs font-normal">{competencyLabels[q.competency_level]}</Badge>
-                      <Badge variant="outline" className="text-xs font-normal">{questionTypeLabels[q.question_type]}</Badge>
-                      <Badge className={`text-xs border ${statusStyles[q.status]}`}>{q.status}</Badge>
-                      {q.ai_generated && (
-                        <Badge variant="outline" className="text-xs font-normal gap-1 border-primary/30 text-primary">
-                          <Sparkles size={10} /> AI
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </button>
+              {(() => {
+                const { display, parsed } = parseQuestionText(q.question_text, q.question_type);
+                return (
+                  <>
+                    {/* Header */}
+                    <button
+                      className="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+                      onClick={() => setExpandedId(isExpanded ? null : q.id)}
+                    >
+                      <span className="text-lg mt-0.5">{typeIcons[q.question_type]}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground line-clamp-2">{display}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <Badge variant="secondary" className="text-xs font-normal">{skill?.skill_name ?? 'Unknown'}</Badge>
+                          <Badge variant="outline" className="text-xs font-normal">{competencyLabels[q.competency_level]}</Badge>
+                          <Badge variant="outline" className="text-xs font-normal">{questionTypeLabels[q.question_type]}</Badge>
+                          <Badge className={`text-xs border ${statusStyles[q.status]}`}>{q.status}</Badge>
+                          {q.ai_generated && (
+                            <Badge variant="outline" className="text-xs font-normal gap-1 border-primary/30 text-primary">
+                              <Sparkles size={10} /> AI
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
 
-                {/* Expanded content */}
-                {isExpanded && (
-                  <div className="border-t border-border px-4 py-4 space-y-3 bg-muted/10">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Full Question</h4>
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{q.question_text}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{q.evaluation_guidelines}</p>
-                    </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditQuestion(q); setFormOpen(true); }}>
-                          <Pencil size={12} /> Edit
-                        </Button>
-                        {q.status === 'draft' && (
-                          <Button size="sm" variant="outline" className="gap-1 text-success hover:text-success" onClick={() => publishQuestion(q.id)}>
-                            <CheckCircle size={12} /> Publish
-                          </Button>
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div className="border-t border-border px-4 py-4 space-y-3 bg-muted/10">
+                        {/* Scenario: plain text */}
+                        {q.question_type === 'scenario' && (
+                          <>
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Full Question</h4>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{display}</p>
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{q.evaluation_guidelines}</p>
+                            </div>
+                          </>
                         )}
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => toggleQuestionStatus(q.id)}>
-                          {q.status === 'disabled' ? <><ToggleLeft size={12} /> Enable</> : <><ToggleRight size={12} /> Disable</>}
-                        </Button>
+
+                        {/* MCQ: show question + options with correct highlighted */}
+                        {q.question_type === 'mcq' && parsed && (
+                          <>
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
+                              <p className="text-sm text-foreground">{parsed.questionText || display}</p>
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Options</h4>
+                              <div className="space-y-1.5">
+                                {(parsed.options || []).map((opt: string, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                                      idx === parsed.correctIndex
+                                        ? 'border-success/40 bg-success/5 text-foreground'
+                                        : 'border-border text-foreground'
+                                    }`}
+                                  >
+                                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                                      idx === parsed.correctIndex ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {String.fromCharCode(65 + idx)}
+                                    </span>
+                                    <span>{opt}</span>
+                                    {idx === parsed.correctIndex && (
+                                      <CheckSquare size={14} className="ml-auto text-success shrink-0" />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* MCQ fallback when not parsed */}
+                        {q.question_type === 'mcq' && !parsed && (
+                          <div>
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{q.question_text}</p>
+                          </div>
+                        )}
+
+                        {/* Coding: problem + examples */}
+                        {q.question_type === 'coding' && parsed && (
+                          <>
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Problem Statement</h4>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{parsed.problemStatement}</p>
+                            </div>
+                            {parsed.exampleInput && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Input</h4>
+                                  <pre className="text-xs text-foreground bg-muted rounded-lg p-2 font-mono whitespace-pre-wrap">{parsed.exampleInput}</pre>
+                                </div>
+                                {parsed.exampleOutput && (
+                                  <div>
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Output</h4>
+                                    <pre className="text-xs text-foreground bg-muted rounded-lg p-2 font-mono whitespace-pre-wrap">{parsed.exampleOutput}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Coding fallback */}
+                        {q.question_type === 'coding' && !parsed && (
+                          <div>
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Problem</h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{q.question_text}</p>
+                          </div>
+                        )}
+
+                        {isAdmin && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditQuestion(q); setFormOpen(true); }}>
+                              <Pencil size={12} /> Edit
+                            </Button>
+                            {q.status === 'draft' && (
+                              <Button size="sm" variant="outline" className="gap-1 text-success hover:text-success" onClick={() => publishQuestion(q.id)}>
+                                <CheckCircle size={12} /> Publish
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => toggleQuestionStatus(q.id)}>
+                              {q.status === 'disabled' ? <><ToggleLeft size={12} /> Enable</> : <><ToggleRight size={12} /> Disable</>}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
+                  </>
+                );
+              })()}
               </div>
             );
           })
