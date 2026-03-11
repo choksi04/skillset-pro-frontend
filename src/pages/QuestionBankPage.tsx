@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle, Sparkles } from 'lucide-react';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle, Sparkles, CheckSquare, Code } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   published: 'bg-success/15 text-success border-success/20',
@@ -22,6 +22,20 @@ const typeIcons: Record<string, string> = {
   coding: '💻',
   mcq: '📝',
 };
+
+// Parse structured question_text (MCQ or Coding stored as JSON)
+function parseQuestionText(text: string, type: string): { display: string; parsed: any | null } {
+  try {
+    const parsed = JSON.parse(text);
+    if (type === 'mcq' && parsed?.questionText) {
+      return { display: parsed.questionText, parsed };
+    }
+    if (type === 'coding' && parsed?.problemStatement) {
+      return { display: parsed.problemStatement, parsed };
+    }
+  } catch { /* not JSON, plain text */ }
+  return { display: text, parsed: null };
+}
 
 export default function QuestionBankPage() {
   const { questions, toggleQuestionStatus, publishQuestion, fetchQuestions } = useQuestionStore();
