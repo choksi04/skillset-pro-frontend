@@ -58,7 +58,8 @@ export default function QuestionBankPage() {
 
   const filtered = useMemo(() => {
     return questions.filter((q) => {
-      const matchesSearch = q.question_text.toLowerCase().includes(search.toLowerCase());
+      const { display } = parseQuestionText(q.question_text, q.question_type);
+      const matchesSearch = display.toLowerCase().includes(search.toLowerCase());
       const matchesSkill = skillFilter === 'all' || q.skill_id === skillFilter;
       const matchesLevel = levelFilter === 'all' || q.competency_level === levelFilter;
       const matchesType = typeFilter === 'all' || q.question_type === typeFilter;
