@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
