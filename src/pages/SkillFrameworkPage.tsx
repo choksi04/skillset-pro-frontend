@@ -246,6 +246,10 @@ export default function SkillFrameworkPage() {
                                     {skill.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
                                     {skill.status === 'active' ? 'Disable' : 'Enable'}
                                   </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDeleteTarget({ type: 'skill', id: skill.id, name: skill.skill_name })} className="text-destructive focus:text-destructive">
+                                    <Trash2 size={14} className="mr-2" /> Delete
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
