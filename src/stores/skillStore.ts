@@ -34,6 +34,8 @@ interface SkillStore {
   addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateSkill: (id: string, updates: Partial<Skill>) => Promise<void>;
   toggleSkillStatus: (id: string) => Promise<void>;
+  deleteSkill: (id: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
 export const useSkillStore = create<SkillStore>((set, get) => ({
@@ -138,5 +140,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     if (!skill) return;
     const newStatus = skill.status === 'active' ? 'disabled' : 'active';
     await get().updateSkill(id, { status: newStatus });
+  },
+
+  deleteSkill: async (id) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('skills').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    if (error) { console.error('Failed to delete skill:', error); return; }
+    set((state) => ({ skills: state.skills.filter((s) => s.id !== id) }));
+  },
+
+  deleteCategory: async (id) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('skill_categories').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    if (error) { console.error('Failed to delete category:', error); return; }
+    set((state) => ({ categories: state.categories.filter((c) => c.id !== id) }));
   },
 }));

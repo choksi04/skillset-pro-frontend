@@ -16,12 +16,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, toggleSkillStatus, fetchSkills } = useSkillStore();
+  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
@@ -71,10 +76,30 @@ export default function SkillFrameworkPage() {
     categories: categories.length,
   }), [skills, categories]);
 
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'skill' | 'category'; id: string; name: string } | null>(null);
+
   const handleEditSkill = (skill: Skill) => { setEditingSkill(skill); setSkillDialogOpen(true); };
   const handleCreateSkill = () => { setEditingSkill(null); setSkillDialogOpen(true); };
   const handleEditCat = (cat: SkillCategory) => { setEditingCat(cat); setCatDialogOpen(true); };
   const handleCreateCat = () => { setEditingCat(null); setCatDialogOpen(true); };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'skill') {
+      await deleteSkill(deleteTarget.id);
+      toast.success(`Skill "${deleteTarget.name}" deleted`);
+    } else {
+      const skillsInCat = skills.filter((s) => s.skill_category === deleteTarget.name);
+      if (skillsInCat.length > 0) {
+        toast.error(`Cannot delete category with ${skillsInCat.length} skill(s). Remove or reassign them first.`);
+        setDeleteTarget(null);
+        return;
+      }
+      await deleteCategory(deleteTarget.id);
+      toast.success(`Category "${deleteTarget.name}" deleted`);
+    }
+    setDeleteTarget(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -221,6 +246,10 @@ export default function SkillFrameworkPage() {
                                     {skill.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
                                     {skill.status === 'active' ? 'Disable' : 'Enable'}
                                   </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDeleteTarget({ type: 'skill', id: skill.id, name: skill.skill_name })} className="text-destructive focus:text-destructive">
+                                    <Trash2 size={14} className="mr-2" /> Delete
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -249,16 +278,24 @@ export default function SkillFrameworkPage() {
             {categories.map((cat) => {
               const count = skills.filter((s) => s.skill_category === cat.name).length;
               return (
-                <button
+                <div
                   key={cat.id}
-                  onClick={() => handleEditCat(cat)}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  className={`group relative rounded-lg border px-3 py-2 text-left transition-colors ${
                     cat.status === 'disabled' ? 'opacity-50 border-border' : 'border-border hover:border-primary/30'
                   }`}
                 >
-                  <p className="text-sm font-medium text-foreground">{cat.name}</p>
-                  <p className="text-xs text-muted-foreground">{count} skill{count !== 1 ? 's' : ''} · {cat.status}</p>
-                </button>
+                  <button onClick={() => handleEditCat(cat)} className="text-left">
+                    <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                    <p className="text-xs text-muted-foreground">{count} skill{count !== 1 ? 's' : ''} · {cat.status}</p>
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget({ type: 'category', id: cat.id, name: cat.name })}
+                    className="absolute top-1.5 right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                    title="Delete category"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -267,6 +304,23 @@ export default function SkillFrameworkPage() {
 
       <SkillFormDialog open={skillDialogOpen} onOpenChange={setSkillDialogOpen} editSkill={editingSkill} />
       <CategoryFormDialog open={catDialogOpen} onOpenChange={setCatDialogOpen} editCategory={editingCat} />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.type === 'category' ? 'Category' : 'Skill'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>? This action can be undone by an administrator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
