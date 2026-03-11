@@ -16,12 +16,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, toggleSkillStatus, fetchSkills } = useSkillStore();
+  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
   useEffect(() => { fetchSkills(); }, [fetchSkills]);

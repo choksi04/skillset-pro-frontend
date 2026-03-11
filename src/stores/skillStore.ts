@@ -141,4 +141,18 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     const newStatus = skill.status === 'active' ? 'disabled' : 'active';
     await get().updateSkill(id, { status: newStatus });
   },
+
+  deleteSkill: async (id) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('skills').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    if (error) { console.error('Failed to delete skill:', error); return; }
+    set((state) => ({ skills: state.skills.filter((s) => s.id !== id) }));
+  },
+
+  deleteCategory: async (id) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('skill_categories').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    if (error) { console.error('Failed to delete category:', error); return; }
+    set((state) => ({ categories: state.categories.filter((c) => c.id !== id) }));
+  },
 }));
