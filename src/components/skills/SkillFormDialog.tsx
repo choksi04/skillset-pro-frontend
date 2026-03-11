@@ -30,9 +30,16 @@ interface SkillFormDialogProps {
 }
 
 export default function SkillFormDialog({ open, onOpenChange, editSkill }: SkillFormDialogProps) {
-  const { categories, addSkill, updateSkill } = useSkillStore();
+  const { categories, skills, addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
   const activeCategories = categories.filter((c) => c.status === 'active');
+
+  // Derive suggested tags from all existing skills in the database
+  const existingTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    skills.forEach((s) => (s.tags || []).forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [skills]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
