@@ -34,6 +34,8 @@ interface SkillStore {
   addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateSkill: (id: string, updates: Partial<Skill>) => Promise<void>;
   toggleSkillStatus: (id: string) => Promise<void>;
+  deleteSkill: (id: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
 export const useSkillStore = create<SkillStore>((set, get) => ({
