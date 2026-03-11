@@ -32,23 +32,146 @@ const platformOverview: GuideStep[] = [
 ];
 
 const adminGuide: GuideStep[] = [
-  { title: 'Skill Framework', description: 'Skills are reusable building blocks representing capabilities like React, System Design, or Communication.', icon: <Brain size={16} />, steps: ['Navigate to Skill Framework from the sidebar.', 'Click "Add Skill" to create a new skill with name, description, and category.', 'Skills are organized by categories (Technology, Core Engineering, Architecture, PMO, Soft Skills).', 'Toggle skill status between active and disabled as needed.'] },
-  { title: 'Domain Management', description: 'Domains represent functional areas such as Frontend Engineering or Product Management.', icon: <Network size={16} />, steps: ['Navigate to Domains from the sidebar.', 'Click "Add Domain" to create a new functional domain.', 'Go to Domain-Skill Mapping to link skills to domains.', 'Each skill can belong to multiple domains — skills are reusable.'] },
-  { title: 'Question Bank', description: 'Questions are linked to skills and competency levels. They form the basis of assessments.', icon: <HelpCircle size={16} />, steps: ['Navigate to Question Bank from the sidebar.', 'Create questions manually with skill, competency level, type, and evaluation guidelines.', 'Use AI Generation to auto-generate questions for any skill and level.', 'Publish questions to make them available for assessments.'] },
-  { title: 'Assessment Cycles', description: 'Assessments are auto-generated when employees submit their skill registry.', icon: <ClipboardCheck size={16} />, steps: ['Assessments appear automatically once an employee submits their Skill Registry.', 'View all assessments, their status, and assigned questions in Assessment Management.', 'Track completion rates and pending reviews from the HR Dashboard.'] },
-  { title: 'HR Dashboard & Reports', description: 'View organization-wide analytics, validated skill data, and assessment pipeline tracking.', icon: <BarChart3 size={16} />, steps: ['Navigate to HR Dashboard (requires HR or Admin role).', 'View the Skill Registry tab for all validated skill entries.', 'Check the Distribution tab for skill level charts by domain and skill.', 'Monitor Assessment Tracking for pipeline status.', 'Export registry data as CSV for external reporting.'] },
+  {
+    title: 'Skill Framework & Categories',
+    description: 'Skills are reusable building blocks organized into categories with tags for easy filtering.',
+    icon: <Brain size={16} />,
+    steps: [
+      'Navigate to Skill Framework from the sidebar.',
+      'Create categories first using "Manage Categories" — categories group related skills (e.g. Programming Languages, Frameworks).',
+      'Click "Add Skill" to create a new skill with category, name, description, and tags (e.g. frontend, backend, common).',
+      'Skills are displayed grouped by category in collapsible accordion sections.',
+      'Filter skills by category, tag, or status using the toolbar dropdowns.',
+      'Toggle skill status, edit, or soft-delete skills from the action menu.',
+      'Delete a category only after removing or reassigning all its skills.',
+    ],
+  },
+  {
+    title: 'Domain Management',
+    description: 'Domains represent functional areas such as Frontend Engineering or Product Management.',
+    icon: <Network size={16} />,
+    steps: [
+      'Navigate to Domains from the sidebar.',
+      'Click "Add Domain" to create a new functional domain.',
+      'Go to Domain-Skill Mapping to link skills to domains.',
+      'Each skill can belong to multiple domains — skills are reusable.',
+    ],
+  },
+  {
+    title: 'Question Bank',
+    description: 'Questions are linked to skills and competency levels. The form adapts based on question type.',
+    icon: <HelpCircle size={16} />,
+    steps: [
+      'Navigate to Question Bank from the sidebar.',
+      'Click "Add Question" and select a question type: Scenario, Coding, or MCQ.',
+      'For Scenario: provide question text and evaluation guidelines.',
+      'For MCQ: provide question text, 4 options, and select the correct answer via radio button.',
+      'For Coding: provide a problem statement and optional example input/output.',
+      'The form dynamically shows/hides fields based on the selected question type.',
+      'Use AI Generation to auto-generate questions for any skill and level.',
+      'Publish questions to make them available for assessments.',
+    ],
+  },
+  {
+    title: 'Assessment Cycles',
+    description: 'Assessments are auto-generated when employees submit their skill registry.',
+    icon: <ClipboardCheck size={16} />,
+    steps: [
+      'Assessments appear automatically once an employee submits their Skill Registry.',
+      'The system selects published questions matching the employee\'s submitted skills.',
+      'View all assessments, their status, and assigned questions in Assessment Management.',
+      'Track completion rates and pending reviews from the HR Dashboard.',
+    ],
+  },
+  {
+    title: 'HR Dashboard & Reports',
+    description: 'View organization-wide analytics, validated skill data, and assessment pipeline tracking.',
+    icon: <BarChart3 size={16} />,
+    steps: [
+      'Navigate to HR Dashboard (requires HR or Admin role).',
+      'View the Skill Registry tab for all validated skill entries.',
+      'Check the Distribution tab for skill level charts by domain and skill.',
+      'Monitor Assessment Tracking for pipeline status.',
+      'Export registry data as CSV for external reporting.',
+    ],
+  },
 ];
 
 const managerGuide: GuideStep[] = [
-  { title: 'Review Assessments', description: 'After employees complete assessments and AI evaluation runs, reviews appear in your Manager Reviews dashboard.', icon: <CheckCircle size={16} />, steps: ['Navigate to Reviews from the sidebar (requires Manager or Domain Lead role).', 'Pending reviews show employee name, domain, skill count, and AI score.', 'Expand a review to see the skill comparison table.'] },
-  { title: 'Compare Ratings', description: 'Each skill shows the employee self-rating alongside the AI-calculated assessment level.', icon: <BarChart3 size={16} />, steps: ['Review the Self Rating column (what the employee claimed).', 'Compare with the AI Assessment column (score and calculated level).', 'View detailed AI feedback by clicking "View AI Feedback Details".'] },
-  { title: 'Take Action', description: 'For each skill, approve the AI rating, adjust it, or request reassessment.', icon: <Shield size={16} />, steps: ['Click "Approve" to accept the AI-calculated level as-is.', 'Click "Adjust" to set a different level based on your knowledge.', 'Click "Reassess" to flag a skill for re-evaluation.', 'Add per-skill comments for context.', 'Click "Finalize Review" to generate official registry entries.'] },
+  {
+    title: 'Review Assessments',
+    description: 'After employees complete assessments and AI evaluation runs, reviews appear in your Manager Reviews dashboard.',
+    icon: <CheckCircle size={16} />,
+    steps: [
+      'Navigate to Reviews from the sidebar (requires Manager or Domain Lead role).',
+      'Pending reviews show employee name, domain, skill count, AI score, and submission timestamp.',
+      'Expand a review to see the skill comparison table.',
+    ],
+  },
+  {
+    title: 'Compare Ratings',
+    description: 'Each skill shows the employee self-rating alongside the AI-calculated assessment level.',
+    icon: <BarChart3 size={16} />,
+    steps: [
+      'Review the Self Rating column (what the employee claimed).',
+      'Compare with the AI Assessment column (score and calculated level).',
+      'View detailed AI feedback by clicking "View AI Feedback Details".',
+    ],
+  },
+  {
+    title: 'Take Action',
+    description: 'For each skill, approve the AI rating, adjust it, or request reassessment.',
+    icon: <Shield size={16} />,
+    steps: [
+      'Click "Approve" to accept the AI-calculated level as-is.',
+      'Click "Adjust" to set a different level based on your knowledge.',
+      'Click "Reassess" to flag a skill for re-evaluation.',
+      'Add per-skill comments for context.',
+      'Click "Finalize Review" to generate official registry entries.',
+    ],
+  },
 ];
 
 const employeeGuide: GuideStep[] = [
-  { title: 'Submit Skill Registry', description: 'Start the validation process by rating your proficiency in skills assigned to your domain.', icon: <BarChart3 size={16} />, steps: ['Navigate to Skill Registry from the sidebar.', "You'll see skills mapped to your assigned domain.", 'Rate each skill on a 1-5 scale (Basic Awareness to Expert).', 'Save as draft or submit when ready — submitted ratings trigger assessment generation.'] },
-  { title: 'Take Assessments', description: 'Complete your generated assessments to validate your self-assessed skills.', icon: <ClipboardCheck size={16} />, steps: ['Navigate to Take Assessment from the sidebar.', 'Click "Start Assessment" on any pending assessment.', 'Answer all questions within the time limit.', 'Use the question navigator to jump between questions.', 'Submit when done — AI evaluation runs automatically.'] },
-  { title: 'View Feedback', description: 'After submission, review your AI-generated feedback and scores.', icon: <Sparkles size={16} />, steps: ['Click "View Results" on a completed assessment.', 'See your overall AI score and per-skill breakdown.', 'Expand individual questions to see dimension-level feedback.', 'Your validated skill levels will appear after manager review.'] },
+  {
+    title: 'Submit Skill Registry',
+    description: 'Rate your proficiency in skills grouped by category with progress tracking per section.',
+    icon: <BarChart3 size={16} />,
+    steps: [
+      'Navigate to Skill Registry from the sidebar.',
+      'You\'ll see skills grouped by category in collapsible sections (e.g. Frontend Skills, Backend Skills).',
+      'Each category header shows a progress bar (e.g. "3/5 rated") so you can track completion.',
+      'Use the search bar at the top to filter skills by name or tag.',
+      'Hover over the info icon next to a skill name to see its description.',
+      'Rate each skill on a 1-5 scale (Basic Awareness to Expert).',
+      'Save as draft to continue later — your ratings are preserved.',
+      'Submit when all skills are rated — this locks your ratings and triggers assessment generation.',
+    ],
+  },
+  {
+    title: 'Take Assessments',
+    description: 'Complete your generated assessments to validate your self-assessed skills.',
+    icon: <ClipboardCheck size={16} />,
+    steps: [
+      'Navigate to Take Assessment from the sidebar.',
+      'Click "Start Assessment" on any pending assessment.',
+      'Answer all questions within the time limit.',
+      'Question types include Scenario (free-text), MCQ (select one), and Coding (write code).',
+      'Use the question navigator to jump between questions.',
+      'Submit when done — AI evaluation runs automatically.',
+    ],
+  },
+  {
+    title: 'View Feedback',
+    description: 'After submission, review your AI-generated feedback and scores.',
+    icon: <Sparkles size={16} />,
+    steps: [
+      'Click "View Results" on a completed assessment.',
+      'See your overall AI score and per-skill breakdown.',
+      'Expand individual questions to see dimension-level feedback.',
+      'Your validated skill levels will appear after manager review.',
+    ],
+  },
 ];
 
 function GuideSectionCard({ step, defaultOpen = false }: { step: GuideStep; defaultOpen?: boolean }) {
