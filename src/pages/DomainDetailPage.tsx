@@ -3,35 +3,64 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import DomainFormDialog from '@/components/domains/DomainFormDialog';
 import DomainSkillManager from '@/components/domains/DomainSkillManager';
 import {
-  ArrowLeft, Pencil, Users, UserCircle, Calendar, Clock, FolderOpen, Settings2,
+  ArrowLeft, Pencil, Users, UserCircle, Calendar, Clock, FolderOpen, Settings2, Crown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+
+interface DomainUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  status: string;
+}
 
 export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { domains, mappings, fetchDomains } = useDomainStore();
-  const { skills, categories, fetchSkills, loading, initialized } = useSkillStore();
-  const { user, currentRole } = useAuth();
+  const { domains, mappings, fetchDomains, updateDomain } = useDomainStore();
+  const { skills, fetchSkills, initialized } = useSkillStore();
+  const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin';
 
   const [editOpen, setEditOpen] = useState(false);
   const [manageSkillsOpen, setManageSkillsOpen] = useState(false);
+  const [domainUsers, setDomainUsers] = useState<DomainUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
+  // Fetch users assigned to this domain
+  useEffect(() => {
+    if (!id) return;
+    const fetchDomainUsers = async () => {
+      setUsersLoading(true);
+      const { data } = await supabase
+        .from('users')
+        .select('id, full_name, email, role, status')
+        .eq('domain_id', id)
+        .is('deleted_on', null)
+        .order('full_name');
+      setDomainUsers((data as unknown as DomainUser[]) || []);
+      setUsersLoading(false);
+    };
+    fetchDomainUsers();
+  }, [id]);
+
   const domain = domains.find((d) => d.id === id);
   const currentMappings = useMemo(() => mappings.filter((m) => m.domain_id === id), [mappings, id]);
-  const mappedSkillIds = useMemo(() => new Set(currentMappings.map((m) => m.skill_id)), [currentMappings]);
 
-  // Group mapped skills by category
   const mappedByCategory = useMemo(() => {
     const map = new Map<string, typeof skills>();
     currentMappings.forEach((m) => {
@@ -44,6 +73,25 @@ export default function DomainDetailPage() {
     });
     return map;
   }, [currentMappings, skills]);
+
+  const domainLead = useMemo(() => {
+    if (!domain?.domain_lead_id) return null;
+    return domainUsers.find((u) => u.id === domain.domain_lead_id) || null;
+  }, [domain?.domain_lead_id, domainUsers]);
+
+  // Eligible leads: managers or admins assigned to this domain
+  const eligibleLeads = useMemo(
+    () => domainUsers.filter((u) => (u.role === 'manager' || u.role === 'admin') && u.status === 'active'),
+    [domainUsers]
+  );
+
+  const handleSetLead = async (userId: string) => {
+    const leadId = userId === 'none' ? null : userId;
+    await updateDomain(id!, { domain_lead_id: leadId } as any);
+    toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
+  };
+
+  const activeEmployees = domainUsers.filter((u) => u.status === 'active');
 
   // Not found
   if (!domain && initialized) {
@@ -81,7 +129,6 @@ export default function DomainDetailPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Back */}
       <Button variant="ghost" size="sm" onClick={() => navigate('/domains')} className="gap-1.5 -ml-2">
         <ArrowLeft size={14} /> Back to Domains
       </Button>
@@ -118,10 +165,42 @@ export default function DomainDetailPage() {
         {/* Domain Lead */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2 mb-3">
-            <UserCircle size={16} className="text-primary" />
+            <Crown size={16} className="text-primary" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Domain Lead</h3>
           </div>
-          <p className="text-sm text-muted-foreground italic">No domain lead assigned</p>
+          {domainLead ? (
+            <div>
+              <p className="text-sm font-medium text-card-foreground">{domainLead.full_name}</p>
+              <p className="text-xs text-muted-foreground">{domainLead.email}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">No lead assigned</p>
+          )}
+          {isAdmin && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <Select
+                value={domain.domain_lead_id ?? 'none'}
+                onValueChange={handleSetLead}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Assign lead…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No lead</SelectItem>
+                  {eligibleLeads.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.full_name} ({u.role})
+                    </SelectItem>
+                  ))}
+                  {eligibleLeads.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      No managers assigned to this domain yet.
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Employees */}
@@ -130,7 +209,9 @@ export default function DomainDetailPage() {
             <Users size={16} className="text-primary" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employees</h3>
           </div>
-          <p className="text-2xl font-bold text-card-foreground">0</p>
+          <p className="text-2xl font-bold text-card-foreground">
+            {usersLoading ? '—' : activeEmployees.length}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">assigned to this domain</p>
         </div>
 
@@ -142,6 +223,62 @@ export default function DomainDetailPage() {
           </div>
           <p className="text-2xl font-bold text-card-foreground">{currentMappings.length}</p>
           <p className="text-xs text-muted-foreground mt-0.5">across {mappedByCategory.size} {mappedByCategory.size === 1 ? 'category' : 'categories'}</p>
+        </div>
+      </div>
+
+      {/* ─── People Section ─── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="p-5 pb-0">
+          <h2 className="text-base font-semibold text-card-foreground">People</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Users assigned to this domain</p>
+        </div>
+        <div className="p-5">
+          {usersLoading ? (
+            <Skeleton className="h-20 w-full rounded-lg" />
+          ) : domainUsers.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              <UserCircle size={32} className="mx-auto mb-3 text-muted-foreground/40" />
+              <p>No users assigned to this domain yet.</p>
+              {isAdmin && <p className="mt-1">Assign users from the User Management page.</p>}
+            </div>
+          ) : (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/40">
+                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Email</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[100px]">Role</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[80px]">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {domainUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          {u.id === domain.domain_lead_id && <Crown size={12} className="text-primary" />}
+                          {u.full_name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">{u.email}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="outline" className="text-[10px] capitalize">{u.role}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${u.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}
+                        >
+                          {u.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -158,13 +295,12 @@ export default function DomainDetailPage() {
             </Button>
           )}
         </div>
-
         <div className="p-5">
           {currentMappings.length === 0 ? (
             <div className="text-center py-10 text-sm text-muted-foreground">
               <FolderOpen size={32} className="mx-auto mb-3 text-muted-foreground/40" />
               <p>No skills mapped yet.</p>
-              {isAdmin && <p className="mt-1">Click "Manage Skills" to start mapping skills to this domain.</p>}
+              {isAdmin && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
             </div>
           ) : (
             <div className="space-y-5">
@@ -190,10 +326,7 @@ export default function DomainDetailPage() {
                             <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{skill.skill_name}</td>
                             <td className="px-4 py-2.5 text-muted-foreground text-xs line-clamp-1" title={skill.skill_description}>{skill.skill_description || '—'}</td>
                             <td className="px-4 py-2.5">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] ${skill.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}
-                              >
+                              <Badge variant="outline" className={`text-[10px] ${skill.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}>
                                 {skill.status}
                               </Badge>
                             </td>
@@ -243,12 +376,8 @@ export default function DomainDetailPage() {
 
       {/* Dialogs */}
       <DomainFormDialog open={editOpen} onOpenChange={setEditOpen} editDomain={domain} />
-
       {manageSkillsOpen && id && (
-        <DomainSkillManager
-          domainId={id}
-          onClose={() => setManageSkillsOpen(false)}
-        />
+        <DomainSkillManager domainId={id} onClose={() => setManageSkillsOpen(false)} />
       )}
     </div>
   );
