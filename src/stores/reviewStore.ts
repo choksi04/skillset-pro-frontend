@@ -35,7 +35,7 @@ export interface ManagerReview {
 export interface Notification {
   id: string;
   tenant_id: string;
-  target_role: 'manager' | 'hr' | 'employee';
+  target_role: 'manager' | 'admin' | 'employee';
   target_user_id?: string;
   message: string;
   type: 'assessment_completed' | 'review_completed' | 'reassessment_requested';
