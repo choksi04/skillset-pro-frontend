@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSkillStore, Skill, SkillCategory } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 import SkillFormDialog from '@/components/skills/SkillFormDialog';
 import CategoryFormDialog from '@/components/skills/CategoryFormDialog';
 import { Button } from '@/components/ui/button';
@@ -22,14 +23,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2, ChevronsDownUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills } = useSkillStore();
+  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills, loading, initialized } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
+
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -165,104 +168,134 @@ export default function SkillFrameworkPage() {
       </div>
 
       {/* Grouped accordion table */}
-      {filtered.length === 0 ? (
+      {loading && !initialized ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="space-y-2">
+                {[1, 2].map((j) => (
+                  <div key={j} className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
           No skills found matching your filters.
         </div>
       ) : (
-        <Accordion type="multiple" defaultValue={Array.from(grouped.keys())} className="space-y-3">
-          {Array.from(grouped.entries()).map(([catName, catSkills]) => {
-            const catObj = categories.find((c) => c.name === catName);
-            return (
-              <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
-                <AccordionTrigger className="px-5 py-3 hover:no-underline">
-                  <div className="flex items-center gap-3 text-left">
-                    <FolderOpen size={16} className="text-primary shrink-0" />
-                    <div>
-                      <span className="font-semibold text-card-foreground">{catName}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">({catSkills.length} skill{catSkills.length !== 1 ? 's' : ''})</span>
+        <>
+          {openAccordions.length > 0 && (
+            <div className="flex justify-end">
+              <Button size="sm" variant="ghost" onClick={() => setOpenAccordions([])} className="gap-1.5 text-xs text-muted-foreground">
+                <ChevronsDownUp size={14} /> Collapse All
+              </Button>
+            </div>
+          )}
+          <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions} className="space-y-3">
+            {Array.from(grouped.entries()).map(([catName, catSkills]) => {
+              const catObj = categories.find((c) => c.name === catName);
+              return (
+                <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <AccordionTrigger className="px-5 py-3 hover:no-underline">
+                    <div className="flex items-center gap-3 text-left">
+                      <FolderOpen size={16} className="text-primary shrink-0" />
+                      <div>
+                        <span className="font-semibold text-card-foreground">{catName}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">({catSkills.length} skill{catSkills.length !== 1 ? 's' : ''})</span>
+                      </div>
+                      {isAdmin && catObj && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEditCat(catObj); }}
+                          className="ml-2 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          title="Edit category"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
                     </div>
-                    {isAdmin && catObj && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEditCat(catObj); }}
-                        className="ml-2 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                        title="Edit category"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-0 pb-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">Skill & Description</TableHead>
-                        <TableHead className="w-[200px]">Tags</TableHead>
-                        <TableHead className="w-[100px]">Status</TableHead>
-                        {isAdmin && <TableHead className="w-[80px] text-right">Actions</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {catSkills.map((skill) => (
-                        <TableRow key={skill.id} className={skill.status === 'disabled' ? 'opacity-60' : ''}>
-                          <TableCell>
-                            <p className="font-medium text-foreground">{skill.skill_name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{skill.skill_description}</p>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {(skill.tags || []).map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-[11px] font-normal">
-                                  <Tag size={10} className="mr-1" />{tag}
-                                </Badge>
-                              ))}
-                              {(!skill.tags || skill.tags.length === 0) && (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={skill.status === 'active' ? 'default' : 'outline'}
-                              className={`text-xs ${skill.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
-                            >
-                              {skill.status}
-                            </Badge>
-                          </TableCell>
-                          {isAdmin && (
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                                    <MoreHorizontal size={14} />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEditSkill(skill)}>
-                                    <Pencil size={14} className="mr-2" /> Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => toggleSkillStatus(skill.id)}>
-                                    {skill.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
-                                    {skill.status === 'active' ? 'Disable' : 'Enable'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => setDeleteTarget({ type: 'skill', id: skill.id, name: skill.skill_name })} className="text-destructive focus:text-destructive">
-                                    <Trash2 size={14} className="mr-2" /> Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          )}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-0 pb-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[200px]">Skill & Description</TableHead>
+                          <TableHead className="w-[200px]">Tags</TableHead>
+                          <TableHead className="w-[100px]">Status</TableHead>
+                          {isAdmin && <TableHead className="w-[80px] text-right">Actions</TableHead>}
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                      </TableHeader>
+                      <TableBody>
+                        {catSkills.map((skill) => (
+                          <TableRow key={skill.id} className={skill.status === 'disabled' ? 'opacity-60' : ''}>
+                            <TableCell>
+                              <p className="font-medium text-foreground">{skill.skill_name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{skill.skill_description}</p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {(skill.tags || []).map((tag) => (
+                                  <Badge key={tag} variant="outline" className="text-[11px] font-normal">
+                                    <Tag size={10} className="mr-1" />{tag}
+                                  </Badge>
+                                ))}
+                                {(!skill.tags || skill.tags.length === 0) && (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={skill.status === 'active' ? 'default' : 'outline'}
+                                className={`text-xs ${skill.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
+                              >
+                                {skill.status}
+                              </Badge>
+                            </TableCell>
+                            {isAdmin && (
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                                      <MoreHorizontal size={14} />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditSkill(skill)}>
+                                      <Pencil size={14} className="mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => toggleSkillStatus(skill.id)}>
+                                      {skill.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
+                                      {skill.status === 'active' ? 'Disable' : 'Enable'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setDeleteTarget({ type: 'skill', id: skill.id, name: skill.skill_name })} className="text-destructive focus:text-destructive">
+                                      <Trash2 size={14} className="mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </>
       )}
 
       {/* Category management overview */}
