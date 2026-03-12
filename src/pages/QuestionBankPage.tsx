@@ -288,6 +288,9 @@ export default function QuestionBankPage() {
                             <Button size="sm" variant="outline" className="gap-1" onClick={() => toggleQuestionStatus(q.id)}>
                               {q.status === 'disabled' ? <><ToggleLeft size={12} /> Enable</> : <><ToggleRight size={12} /> Disable</>}
                             </Button>
+                            <Button size="sm" variant="outline" className="gap-1 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(q)}>
+                              <Trash2 size={12} /> Delete
+                            </Button>
                           </div>
                         )}
                       </div>
