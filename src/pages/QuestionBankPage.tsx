@@ -43,7 +43,7 @@ function parseQuestionText(text: string, type: string): { display: string; parse
 }
 
 export default function QuestionBankPage() {
-  const { questions, toggleQuestionStatus, publishQuestion, fetchQuestions } = useQuestionStore();
+  const { questions, toggleQuestionStatus, publishQuestion, deleteQuestion, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
