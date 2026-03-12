@@ -29,6 +29,8 @@ interface QuestionStore {
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
   toggleQuestionStatus: (id: string) => Promise<void>;
   publishQuestion: (id: string) => Promise<void>;
+  deleteQuestion: (id: string) => Promise<{ success: boolean; error?: string }>;
+  checkQuestionUsage: (id: string) => Promise<boolean>;
 }
 
 export const useQuestionStore = create<QuestionStore>((set, get) => ({
