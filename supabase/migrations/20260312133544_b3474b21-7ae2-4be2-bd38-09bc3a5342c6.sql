@@ -1,0 +1,1 @@
+ALTER TABLE public.domains ADD COLUMN domain_lead_id text DEFAULT NULL;

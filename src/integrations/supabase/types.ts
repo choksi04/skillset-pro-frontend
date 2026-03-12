@@ -382,6 +382,7 @@ export type Database = {
           deleted_by: string | null
           deleted_on: string | null
           description: string | null
+          domain_lead_id: string | null
           id: string
           modified_at: string | null
           modified_by: string | null
@@ -396,6 +397,7 @@ export type Database = {
           deleted_by?: string | null
           deleted_on?: string | null
           description?: string | null
+          domain_lead_id?: string | null
           id: string
           modified_at?: string | null
           modified_by?: string | null
@@ -410,6 +412,7 @@ export type Database = {
           deleted_by?: string | null
           deleted_on?: string | null
           description?: string | null
+          domain_lead_id?: string | null
           id?: string
           modified_at?: string | null
           modified_by?: string | null
