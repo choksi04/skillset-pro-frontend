@@ -9,7 +9,12 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle, Sparkles, CheckSquare, Code } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle, Sparkles, CheckSquare, Code, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const statusStyles: Record<string, string> = {
   published: 'bg-success/15 text-success border-success/20',
@@ -38,7 +43,7 @@ function parseQuestionText(text: string, type: string): { display: string; parse
 }
 
 export default function QuestionBankPage() {
-  const { questions, toggleQuestionStatus, publishQuestion, fetchQuestions } = useQuestionStore();
+  const { questions, toggleQuestionStatus, publishQuestion, deleteQuestion, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
@@ -52,6 +57,8 @@ export default function QuestionBankPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
@@ -281,6 +288,9 @@ export default function QuestionBankPage() {
                             <Button size="sm" variant="outline" className="gap-1" onClick={() => toggleQuestionStatus(q.id)}>
                               {q.status === 'disabled' ? <><ToggleLeft size={12} /> Enable</> : <><ToggleRight size={12} /> Disable</>}
                             </Button>
+                            <Button size="sm" variant="outline" className="gap-1 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(q)}>
+                              <Trash2 size={12} /> Delete
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -295,6 +305,40 @@ export default function QuestionBankPage() {
       </div>
 
       <QuestionFormDialog open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Question</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this question. Only unused questions (not linked to any assessment) can be deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!deleteTarget) return;
+                setDeleteLoading(true);
+                const result = await deleteQuestion(deleteTarget.id);
+                setDeleteLoading(false);
+                if (result.success) {
+                  toast.success('Question deleted successfully.');
+                  setDeleteTarget(null);
+                  if (expandedId === deleteTarget.id) setExpandedId(null);
+                } else {
+                  toast.error(result.error || 'Failed to delete question.');
+                }
+              }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
