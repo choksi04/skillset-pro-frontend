@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) { setError('Please enter your email.'); return; }
+    if (!email.trim()) {setError('Please enter your email.');return;}
     setError('');
     setLoading(true);
     const result = await login(email);
@@ -48,16 +48,16 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               autoFocus
               autoComplete="email"
-              className="h-10"
-            />
+              className="h-10" />
+            
           </div>
 
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error &&
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               <AlertCircle size={14} className="shrink-0" />
               {error}
             </div>
-          )}
+          }
 
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             <LogIn size={16} />
@@ -73,12 +73,12 @@ export default function LoginPage() {
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Demo accounts:</p>
           <div className="space-y-1 text-xs text-muted-foreground">
-            <p><span className="font-medium text-foreground">Admin:</span> sarah@acmecorp.com</p>
-            <p><span className="font-medium text-foreground">Manager:</span> james@acmecorp.com</p>
+            <p><span className="font-medium text-foreground">Admin:</span>Admin: jagdish@1rivet.com</p>
+            <p><span className="font-medium text-foreground">Manager:</span>Manager: ashish@1rivet.com, purvesh@1rivet.com, gaurav@1rivet.com</p>
             <p><span className="font-medium text-foreground">Employee:</span> priya@acmecorp.com</p>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
