@@ -57,6 +57,8 @@ export default function QuestionBankPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
