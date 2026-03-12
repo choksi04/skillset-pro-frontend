@@ -9,6 +9,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
 import DomainsPage from "@/pages/DomainsPage";
+import DomainDetailPage from "@/pages/DomainDetailPage";
 import DomainSkillMappingPage from "@/pages/DomainSkillMappingPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
 import AIGenerationPage from "@/pages/AIGenerationPage";
