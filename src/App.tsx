@@ -9,6 +9,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
 import DomainsPage from "@/pages/DomainsPage";
+import DomainDetailPage from "@/pages/DomainDetailPage";
 import DomainSkillMappingPage from "@/pages/DomainSkillMappingPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
 import AIGenerationPage from "@/pages/AIGenerationPage";
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/organization" element={<OrganizationPage />} />
               <Route path="/skills" element={<SkillFrameworkPage />} />
               <Route path="/domains" element={<DomainsPage />} />
+              <Route path="/domains/:id" element={<DomainDetailPage />} />
               <Route path="/domain-skills" element={<DomainSkillMappingPage />} />
               <Route path="/questions" element={<QuestionBankPage />} />
               <Route path="/ai-generate" element={<AIGenerationPage />} />
