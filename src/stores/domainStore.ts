@@ -7,6 +7,7 @@ export interface Domain {
   name: string;
   description: string;
   status: 'active' | 'disabled';
+  domain_lead_id: string | null;
   created_at: string;
   updated_at: string;
 }
