@@ -27,10 +27,12 @@ import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, 
 import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills } = useSkillStore();
+  const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills, loading, initialized } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin' || currentRole === 'hr';
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
+
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
