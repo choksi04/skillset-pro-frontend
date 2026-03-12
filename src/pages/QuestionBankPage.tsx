@@ -305,6 +305,40 @@ export default function QuestionBankPage() {
       </div>
 
       <QuestionFormDialog open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Question</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this question. Only unused questions (not linked to any assessment) can be deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!deleteTarget) return;
+                setDeleteLoading(true);
+                const result = await deleteQuestion(deleteTarget.id);
+                setDeleteLoading(false);
+                if (result.success) {
+                  toast.success('Question deleted successfully.');
+                  setDeleteTarget(null);
+                  if (expandedId === deleteTarget.id) setExpandedId(null);
+                } else {
+                  toast.error(result.error || 'Failed to delete question.');
+                }
+              }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
