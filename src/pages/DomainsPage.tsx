@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network, FolderOpen } from 'lucide-react';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network } from 'lucide-react';
 
 export default function DomainsPage() {
   const navigate = useNavigate();
@@ -30,17 +30,7 @@ export default function DomainsPage() {
       d.description.toLowerCase().includes(search.toLowerCase())
     ), [domains, search]);
 
-  const getSkillsByCategory = (domainId: string) => {
-    const ids = mappings.filter((m) => m.domain_id === domainId).map((m) => m.skill_id);
-    const mapped = skills.filter((s) => ids.includes(s.id));
-    const grouped = new Map<string, string[]>();
-    mapped.forEach((s) => {
-      const cat = s.skill_category || 'Uncategorized';
-      if (!grouped.has(cat)) grouped.set(cat, []);
-      grouped.get(cat)!.push(s.skill_name);
-    });
-    return grouped;
-  };
+  const getSkillCount = (domainId: string) => mappings.filter((m) => m.domain_id === domainId).length;
 
   return (
     <div className="space-y-6">
@@ -77,9 +67,8 @@ export default function DomainsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Domain</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="w-[300px]">Mapped Skills</TableHead>
+              <TableHead>Domain</TableHead>
+              <TableHead className="w-[120px] text-center">Mapped Skills</TableHead>
               <TableHead className="w-[90px]">Status</TableHead>
               {isAdmin && <TableHead className="w-[100px] text-right">Actions</TableHead>}
             </TableRow>
@@ -87,45 +76,27 @@ export default function DomainsPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 5 : 4} className="text-center text-sm text-muted-foreground py-10">
+                <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-sm text-muted-foreground py-10">
                   No domains found.
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((domain) => {
-                const skillsByCategory = getSkillsByCategory(domain.id);
-                const totalSkills = mappings.filter((m) => m.domain_id === domain.id).length;
+                const skillCount = getSkillCount(domain.id);
                 return (
                   <TableRow
                     key={domain.id}
                     className={`cursor-pointer ${domain.status === 'disabled' ? 'opacity-60' : ''}`}
                     onClick={() => navigate(`/domains/${domain.id}`)}
                   >
-                    <TableCell className="font-medium text-foreground">{domain.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{domain.description}</TableCell>
                     <TableCell>
-                      {totalSkills === 0 ? (
-                        <span className="text-xs text-muted-foreground italic">None</span>
-                      ) : (
-                        <div className="space-y-1">
-                          {Array.from(skillsByCategory.entries()).slice(0, 3).map(([cat, skillNames]) => (
-                            <div key={cat} className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                                <FolderOpen size={10} className="text-primary" />{cat}:
-                              </span>
-                              {skillNames.slice(0, 2).map((name) => (
-                                <Badge key={name} variant="secondary" className="text-[11px] font-normal">{name}</Badge>
-                              ))}
-                              {skillNames.length > 2 && (
-                                <Badge variant="outline" className="text-[11px]">+{skillNames.length - 2}</Badge>
-                              )}
-                            </div>
-                          ))}
-                          {skillsByCategory.size > 3 && (
-                            <span className="text-[10px] text-muted-foreground">+{skillsByCategory.size - 3} more categories</span>
-                          )}
-                        </div>
-                      )}
+                      <p className="font-medium text-foreground">{domain.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2" title={domain.description}>
+                        {domain.description}
+                      </p>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-sm font-medium text-card-foreground">{skillCount}</span>
                     </TableCell>
                     <TableCell>
                       <Badge
