@@ -46,7 +46,7 @@ export default function DomainFormDialog({ open, onOpenChange, editDomain }: Dom
     if (editDomain) {
       updateDomain(editDomain.id, { name: result.data.name, description: result.data.description });
     } else {
-      addDomain({ tenant_id: user?.tenant_id ?? 'tenant-001', name: result.data.name, description: result.data.description, status: 'active' });
+      addDomain({ tenant_id: user?.tenant_id ?? 'tenant-001', name: result.data.name, description: result.data.description, status: 'active', domain_lead_id: null });
     }
     onOpenChange(false);
     resetForm();

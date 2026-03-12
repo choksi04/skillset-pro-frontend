@@ -7,6 +7,7 @@ export interface Domain {
   name: string;
   description: string;
   status: 'active' | 'disabled';
+  domain_lead_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,7 +54,8 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
 
       const domains: Domain[] = (domainsRes.data || []).map((d: any) => ({
         id: d.id, tenant_id: d.tenant_id, name: d.name, description: d.description || '',
-        status: d.status as 'active' | 'disabled', created_at: d.created_at, updated_at: d.updated_at,
+        status: d.status as 'active' | 'disabled', domain_lead_id: d.domain_lead_id || null,
+        created_at: d.created_at, updated_at: d.updated_at,
       }));
       const mappings: DomainSkillMap[] = (mappingsRes.data || []).map((m: any) => ({
         id: m.id, domain_id: m.domain_id, skill_id: m.skill_id, tenant_id: m.tenant_id,
