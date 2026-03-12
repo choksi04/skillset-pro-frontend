@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSkillStore, Skill, SkillCategory } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 import SkillFormDialog from '@/components/skills/SkillFormDialog';
 import CategoryFormDialog from '@/components/skills/CategoryFormDialog';
 import { Button } from '@/components/ui/button';
