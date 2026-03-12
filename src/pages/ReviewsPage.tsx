@@ -512,7 +512,7 @@ export default function ReviewsPage() {
     fetchAssessments(); fetchAttempts(); fetchReviews(); fetchSkills(); fetchDomains(); fetchRegistry();
   }, [fetchAssessments, fetchAttempts, fetchReviews, fetchSkills, fetchDomains, fetchRegistry]);
 
-  const isManager = currentRole === 'manager' || currentRole === 'admin' || currentRole === 'domain_lead';
+  const isManager = currentRole === 'manager' || currentRole === 'admin';
 
   const pendingReviews = reviews.filter((r) => r.status !== 'completed');
   const completedReviews = reviews.filter((r) => r.status === 'completed');

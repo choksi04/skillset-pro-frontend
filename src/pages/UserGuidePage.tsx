@@ -234,7 +234,7 @@ export default function UserGuidePage() {
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
       </div>
 
-      <Tabs defaultValue={currentRole === 'admin' || currentRole === 'hr' ? 'admin' : currentRole === 'manager' || currentRole === 'domain_lead' ? 'manager' : 'employee'}>
+      <Tabs defaultValue={currentRole === 'admin' ? 'admin' : currentRole === 'manager' ? 'manager' : 'employee'}>
         <TabsList className="bg-muted/50">
           <TabsTrigger value="admin" className="gap-1.5 text-xs"><Shield size={12} /> Admin / HR Guide</TabsTrigger>
           <TabsTrigger value="manager" className="gap-1.5 text-xs"><Users size={12} /> Manager Guide</TabsTrigger>
