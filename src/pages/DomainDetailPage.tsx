@@ -20,7 +20,7 @@ export default function DomainDetailPage() {
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, categories, fetchSkills, loading, initialized } = useSkillStore();
   const { user, currentRole } = useAuth();
-  const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  const isAdmin = currentRole === 'admin';
 
   const [editOpen, setEditOpen] = useState(false);
   const [manageSkillsOpen, setManageSkillsOpen] = useState(false);

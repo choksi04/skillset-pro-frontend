@@ -880,6 +880,66 @@ export type Database = {
         }
         Relationships: []
       }
+      users: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
+          department: string | null
+          designation: string | null
+          domain_id: string | null
+          email: string
+          full_name: string
+          id: string
+          modified_at: string | null
+          modified_by: string | null
+          role: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          department?: string | null
+          designation?: string | null
+          domain_id?: string | null
+          email: string
+          full_name: string
+          id: string
+          modified_at?: string | null
+          modified_by?: string | null
+          role?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          department?: string | null
+          designation?: string | null
+          domain_id?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          role?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

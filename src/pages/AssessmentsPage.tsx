@@ -25,7 +25,7 @@ export default function AssessmentsPage() {
     fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains();
   }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains]);
 
-  const isAdmin = currentRole === 'admin' || currentRole === 'hr' || currentRole === 'manager' || currentRole === 'domain_lead';
+  const isAdmin = currentRole === 'admin' || currentRole === 'manager';
 
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);

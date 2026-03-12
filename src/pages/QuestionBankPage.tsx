@@ -46,7 +46,7 @@ export default function QuestionBankPage() {
   const { questions, toggleQuestionStatus, publishQuestion, deleteQuestion, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
-  const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  const isAdmin = currentRole === 'admin';
   useEffect(() => { fetchQuestions(); fetchSkills(); }, [fetchQuestions, fetchSkills]);
 
   const [search, setSearch] = useState('');

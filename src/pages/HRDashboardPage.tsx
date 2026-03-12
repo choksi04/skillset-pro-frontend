@@ -508,7 +508,7 @@ export default function HRDashboardPage() {
   }, [fetchAssessments, fetchAttempts, fetchReviews, fetchSkills, fetchDomains]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const isHROrAdmin = currentRole === 'hr' || currentRole === 'admin';
+  const isHROrAdmin = currentRole === 'admin';
 
   // Stats
   const uniqueEmployees = new Set(officialEntries.map((e) => e.employee_id)).size;

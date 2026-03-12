@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 export default function SkillFrameworkPage() {
   const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills, loading, initialized } = useSkillStore();
   const { currentRole } = useAuth();
-  const isAdmin = currentRole === 'admin' || currentRole === 'hr';
+  const isAdmin = currentRole === 'admin';
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
 
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);

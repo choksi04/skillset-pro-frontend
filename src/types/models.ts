@@ -3,7 +3,7 @@
 // All models include tenant_id for multi-tenant isolation
 // ============================================
 
-export type UserRole = 'admin' | 'hr' | 'manager' | 'domain_lead' | 'employee';
+export type UserRole = 'admin' | 'manager' | 'employee';
 
 export type AssessmentStatus = 'draft' | 'published' | 'in_progress' | 'completed' | 'reviewed';
 
