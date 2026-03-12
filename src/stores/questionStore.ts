@@ -112,6 +112,35 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   publishQuestion: async (id) => {
     await get().updateQuestion(id, { status: 'published' });
   },
+
+  checkQuestionUsage: async (id) => {
+    const { data } = await supabase
+      .from('assessment_questions')
+      .select('id')
+      .eq('question_id', id)
+      .is('deleted_on', null)
+      .limit(1);
+    return (data && data.length > 0) || false;
+  },
+
+  deleteQuestion: async (id) => {
+    const isUsed = await get().checkQuestionUsage(id);
+    if (isUsed) {
+      return { success: false, error: 'This question is used in one or more assessments and cannot be deleted.' };
+    }
+    const { error } = await supabase.from('questions').update({
+      deleted_on: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) {
+      console.error('Failed to delete question:', error);
+      return { success: false, error: 'Failed to delete question.' };
+    }
+    set((state) => ({
+      questions: state.questions.filter((q) => q.id !== id),
+    }));
+    return { success: true };
+  },
 }));
 
 export const competencyLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
