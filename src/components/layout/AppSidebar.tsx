@@ -2,20 +2,9 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/models';
 import {
-  Building2,
-  LayoutDashboard,
-  Brain,
-  Network,
-  Link2,
-  HelpCircle,
-  FileText,
-  Play,
-  CheckCircle,
-  ClipboardCheck,
-  BarChart3,
-  BookOpen,
-  ChevronDown,
-  Shield,
+  Building2, LayoutDashboard, Brain, Network, Link2, HelpCircle,
+  FileText, Play, CheckCircle, ClipboardCheck, BarChart3, BookOpen,
+  Shield, Users, LogOut,
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -27,36 +16,33 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'dashboard' },
-  { title: 'Organization', href: '/organization', icon: <Building2 size={18} />, roles: ['admin', 'hr'], tourId: 'organization' },
-  { title: 'Skill Framework', href: '/skills', icon: <Brain size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'skills' },
-  { title: 'Domains', href: '/domains', icon: <Network size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'domains' },
-  { title: 'Domain-Skill Map', href: '/domain-skills', icon: <Link2 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'domain-skills' },
-  { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'questions' },
-  { title: 'AI Generation', href: '/ai-generate', icon: <FileText size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead'], tourId: 'ai-generate' },
-  { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'assessments' },
+  { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'manager', 'employee'], tourId: 'dashboard' },
+  { title: 'Organization', href: '/organization', icon: <Building2 size={18} />, roles: ['admin'], tourId: 'organization' },
+  { title: 'User Management', href: '/users', icon: <Users size={18} />, roles: ['admin'], tourId: 'users' },
+  { title: 'Skill Framework', href: '/skills', icon: <Brain size={18} />, roles: ['admin', 'manager'], tourId: 'skills' },
+  { title: 'Domains', href: '/domains', icon: <Network size={18} />, roles: ['admin', 'manager'], tourId: 'domains' },
+  { title: 'Domain-Skill Map', href: '/domain-skills', icon: <Link2 size={18} />, roles: ['admin', 'manager'], tourId: 'domain-skills' },
+  { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'manager'], tourId: 'questions' },
+  { title: 'AI Generation', href: '/ai-generate', icon: <FileText size={18} />, roles: ['admin', 'manager'], tourId: 'ai-generate' },
+  { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'manager', 'employee'], tourId: 'assessments' },
   { title: 'Take Assessment', href: '/assessment-exec', icon: <Play size={18} />, roles: ['employee'], tourId: 'assessment-exec' },
-  { title: 'Reviews', href: '/reviews', icon: <CheckCircle size={18} />, roles: ['manager', 'domain_lead'], tourId: 'reviews' },
-  { title: 'Skill Registry', href: '/registry', icon: <BarChart3 size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'registry' },
-  { title: 'HR Dashboard', href: '/hr-dashboard', icon: <Shield size={18} />, roles: ['admin', 'hr'], tourId: 'hr-dashboard' },
-  { title: 'User Guide', href: '/guide', icon: <BookOpen size={18} />, roles: ['admin', 'hr', 'manager', 'domain_lead', 'employee'], tourId: 'guide' },
+  { title: 'Reviews', href: '/reviews', icon: <CheckCircle size={18} />, roles: ['manager'], tourId: 'reviews' },
+  { title: 'Skill Registry', href: '/registry', icon: <BarChart3 size={18} />, roles: ['admin', 'manager', 'employee'], tourId: 'registry' },
+  { title: 'HR Dashboard', href: '/hr-dashboard', icon: <Shield size={18} />, roles: ['admin'], tourId: 'hr-dashboard' },
+  { title: 'User Guide', href: '/guide', icon: <BookOpen size={18} />, roles: ['admin', 'manager', 'employee'], tourId: 'guide' },
 ];
 
 const roleLabels: Record<UserRole, string> = {
   admin: 'Administrator',
-  hr: 'HR Manager',
   manager: 'Manager',
-  domain_lead: 'Domain Lead',
   employee: 'Employee',
 };
 
 export default function AppSidebar() {
-  const { user, currentRole, setCurrentRole } = useAuth();
+  const { user, currentRole, logout } = useAuth();
   const location = useLocation();
 
   const filteredItems = sidebarItems.filter((item) => item.roles.includes(currentRole));
-
-  const allRoles: UserRole[] = ['admin', 'hr', 'manager', 'domain_lead', 'employee'];
 
   return (
     <aside className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -71,22 +57,10 @@ export default function AppSidebar() {
         </div>
       </div>
 
-      {/* Role Switcher */}
-      <div className="px-3 py-3 border-b border-sidebar-border">
-        <label className="text-[10px] uppercase tracking-wider text-sidebar-muted px-2 mb-1 block">
-          Viewing as
-        </label>
-        <select
-          value={currentRole}
-          onChange={(e) => setCurrentRole(e.target.value as UserRole)}
-          className="w-full rounded-md bg-sidebar-accent text-sidebar-accent-foreground text-xs px-2 py-1.5 border border-sidebar-border focus:outline-none focus:ring-1 focus:ring-sidebar-ring"
-        >
-          {allRoles.map((role) => (
-            <option key={role} value={role}>
-              {roleLabels[role]}
-            </option>
-          ))}
-        </select>
+      {/* Role display */}
+      <div className="px-4 py-3 border-b border-sidebar-border">
+        <p className="text-[10px] uppercase tracking-wider text-sidebar-muted">Role</p>
+        <p className="text-xs font-medium text-sidebar-accent-foreground mt-0.5">{roleLabels[currentRole]}</p>
       </div>
 
       {/* Navigation */}
@@ -118,8 +92,15 @@ export default function AppSidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-sidebar-accent-foreground">{user?.full_name}</p>
-            <p className="truncate text-[10px] text-sidebar-muted">{user?.organization_name}</p>
+            <p className="truncate text-[10px] text-sidebar-muted">{user?.email}</p>
           </div>
+          <button
+            onClick={logout}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            title="Sign out"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
       </div>
     </aside>

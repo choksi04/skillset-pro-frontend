@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
+import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
@@ -19,9 +20,17 @@ import ReviewsPage from "@/pages/ReviewsPage";
 import SkillRegistryPage from "@/pages/SkillRegistryPage";
 import HRDashboardPage from "@/pages/HRDashboardPage";
 import UserGuidePage from "@/pages/UserGuidePage";
+import UsersPage from "@/pages/UsersPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground text-sm">Loading…</div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -31,7 +40,8 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route element={<AppLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/organization" element={<OrganizationPage />} />
               <Route path="/skills" element={<SkillFrameworkPage />} />
@@ -46,6 +56,7 @@ const App = () => (
               <Route path="/registry" element={<SkillRegistryPage />} />
               <Route path="/hr-dashboard" element={<HRDashboardPage />} />
               <Route path="/guide" element={<UserGuidePage />} />
+              <Route path="/users" element={<UsersPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
