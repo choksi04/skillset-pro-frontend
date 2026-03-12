@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2, ChevronsDownUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
