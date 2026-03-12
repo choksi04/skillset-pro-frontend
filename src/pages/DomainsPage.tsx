@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network, FolderOpen } from 'lucide-react';
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network } from 'lucide-react';
 
 export default function DomainsPage() {
   const navigate = useNavigate();
@@ -30,17 +30,7 @@ export default function DomainsPage() {
       d.description.toLowerCase().includes(search.toLowerCase())
     ), [domains, search]);
 
-  const getSkillsByCategory = (domainId: string) => {
-    const ids = mappings.filter((m) => m.domain_id === domainId).map((m) => m.skill_id);
-    const mapped = skills.filter((s) => ids.includes(s.id));
-    const grouped = new Map<string, string[]>();
-    mapped.forEach((s) => {
-      const cat = s.skill_category || 'Uncategorized';
-      if (!grouped.has(cat)) grouped.set(cat, []);
-      grouped.get(cat)!.push(s.skill_name);
-    });
-    return grouped;
-  };
+  const getSkillCount = (domainId: string) => mappings.filter((m) => m.domain_id === domainId).length;
 
   return (
     <div className="space-y-6">
@@ -78,8 +68,36 @@ export default function DomainsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Domain</TableHead>
-              <TableHead className="w-[120px]">Mapped Skills</TableHead>
-
+              <TableHead className="w-[120px] text-center">Mapped Skills</TableHead>
+              <TableHead className="w-[90px]">Status</TableHead>
+              {isAdmin && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-sm text-muted-foreground py-10">
+                  No domains found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((domain) => {
+                const skillCount = getSkillCount(domain.id);
+                return (
+                  <TableRow
+                    key={domain.id}
+                    className={`cursor-pointer ${domain.status === 'disabled' ? 'opacity-60' : ''}`}
+                    onClick={() => navigate(`/domains/${domain.id}`)}
+                  >
+                    <TableCell>
+                      <p className="font-medium text-foreground">{domain.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2" title={domain.description}>
+                        {domain.description}
+                      </p>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-sm font-medium text-card-foreground">{skillCount}</span>
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={domain.status === 'active' ? 'default' : 'outline'}
