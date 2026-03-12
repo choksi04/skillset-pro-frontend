@@ -77,56 +77,9 @@ export default function DomainsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Domain</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="w-[300px]">Mapped Skills</TableHead>
-              <TableHead className="w-[90px]">Status</TableHead>
-              {isAdmin && <TableHead className="w-[100px] text-right">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={isAdmin ? 5 : 4} className="text-center text-sm text-muted-foreground py-10">
-                  No domains found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((domain) => {
-                const skillsByCategory = getSkillsByCategory(domain.id);
-                const totalSkills = mappings.filter((m) => m.domain_id === domain.id).length;
-                return (
-                  <TableRow
-                    key={domain.id}
-                    className={`cursor-pointer ${domain.status === 'disabled' ? 'opacity-60' : ''}`}
-                    onClick={() => navigate(`/domains/${domain.id}`)}
-                  >
-                    <TableCell className="font-medium text-foreground">{domain.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{domain.description}</TableCell>
-                    <TableCell>
-                      {totalSkills === 0 ? (
-                        <span className="text-xs text-muted-foreground italic">None</span>
-                      ) : (
-                        <div className="space-y-1">
-                          {Array.from(skillsByCategory.entries()).slice(0, 3).map(([cat, skillNames]) => (
-                            <div key={cat} className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                                <FolderOpen size={10} className="text-primary" />{cat}:
-                              </span>
-                              {skillNames.slice(0, 2).map((name) => (
-                                <Badge key={name} variant="secondary" className="text-[11px] font-normal">{name}</Badge>
-                              ))}
-                              {skillNames.length > 2 && (
-                                <Badge variant="outline" className="text-[11px]">+{skillNames.length - 2}</Badge>
-                              )}
-                            </div>
-                          ))}
-                          {skillsByCategory.size > 3 && (
-                            <span className="text-[10px] text-muted-foreground">+{skillsByCategory.size - 3} more categories</span>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
+              <TableHead>Domain</TableHead>
+              <TableHead className="w-[120px]">Mapped Skills</TableHead>
+
                     <TableCell>
                       <Badge
                         variant={domain.status === 'active' ? 'default' : 'outline'}
