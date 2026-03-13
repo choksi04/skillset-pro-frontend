@@ -53,24 +53,24 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               autoFocus
               autoComplete="email"
-              className="h-10"
-            />
+              className="h-10" />
+            
           </div>
 
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error &&
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               <AlertCircle size={14} className="shrink-0" />
               {error}
             </div>
-          )}
+          }
 
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             <LogIn size={16} />
             {loading ? "Signing in…" : "Sign In"}
           </Button>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Demo mode — no password required. Use a registered email.
+          <p className="text-muted-foreground text-center text-base">USE DEMO ACCOUNTS MENTIONED BELOW 👇👇
+
           </p>
         </form>
 
@@ -91,6 +91,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
