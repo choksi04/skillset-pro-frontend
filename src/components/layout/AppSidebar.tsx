@@ -49,7 +49,6 @@ const sidebarItems: SidebarItem[] = [
     roles: ["admin"],
     tourId: "organization",
   },
-  { title: "User Management", href: "/users", icon: <Users size={18} />, roles: ["admin"], tourId: "users" },
   {
     title: "Skill Framework",
     href: "/skills",
@@ -95,7 +94,7 @@ const sidebarItems: SidebarItem[] = [
     tourId: "assessment-exec",
   },
   // { title: 'Reviews', href: '/reviews', icon: <CheckCircle size={18} />, roles: ['manager'], tourId: 'reviews' },
-
+  { title: "User Management", href: "/users", icon: <Users size={18} />, roles: ["admin"], tourId: "users" },
   {
     title: "User Guide",
     href: "/guide",
