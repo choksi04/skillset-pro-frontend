@@ -78,15 +78,12 @@ export default function LoginPage() {
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
           <p className="font-medium text-muted-foreground text-xl font-mono">Demo accounts:</p>
           <div className="space-y-1 text-xs text-muted-foreground">
-            <p>Admin:
-jagdish@1rivet.com<span className="font-medium text-foreground">Admin:</span>jagdish@1rivet.com
+            <p><span className="font-medium text-foreground">Admin:</span>jagdish@1rivet.com
             </p>
-            <p className="mx-0 my-[16px]">Manager:
-ashish@1rivet.com, purvesh@1rivet.com, gaurav@1rivet.com<span className="font-medium text-foreground">Manager:</span>ashish@1rivet.com, purvesh@1rivet.com,
+            <p className="mx-0 my-[16px]"<span className="font-medium text-foreground">Manager:</span>ashish@1rivet.com, purvesh@1rivet.com,
               gaurav@1rivet.com
             </p>
-            <p>Employee: 
-mitul@1rivet.com, akash@1rivet.com<span className="font-medium text-foreground">Employee:</span> mitul@1rivet.com, akash@1rivet.com
+            <p><span className="font-medium text-foreground">Employee:</span> mitul@1rivet.com, akash@1rivet.com
             </p>
           </div>
         </div>
