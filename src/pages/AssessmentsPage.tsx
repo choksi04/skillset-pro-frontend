@@ -19,7 +19,9 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function AssessmentsPage() {
+  const navigate = useNavigate();
   const { assessments, fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
