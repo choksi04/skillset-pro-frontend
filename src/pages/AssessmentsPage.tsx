@@ -1,12 +1,15 @@
 import { useMemo, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAssessmentStore } from '@/stores/assessmentStore';
+import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCheck, Brain, Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ClipboardCheck, Brain, Target, Play, CheckCircle, BarChart3 } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   pending: 'bg-warning/15 text-warning border-warning/20',
