@@ -28,7 +28,13 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  // { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'manager', 'employee'], tourId: 'dashboard' },
+  {
+    title: "Dashboard",
+    href: "/",
+    icon: <LayoutDashboard size={18} />,
+    roles: ["admin", "manager", "employee"],
+    tourId: "dashboard",
+  },
   {
     title: "HR Dashboard",
     href: "/hr-dashboard",
