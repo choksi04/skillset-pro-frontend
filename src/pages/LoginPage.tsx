@@ -80,7 +80,7 @@ export default function LoginPage() {
           <div className="space-y-1 text-xs text-muted-foreground">
             <p><span className="font-medium text-foreground">Admin:</span>jagdish@1rivet.com
             </p>
-            <p className="mx-0 my-[16px]"<span className="font-medium text-foreground">Manager:</span>ashish@1rivet.com, purvesh@1rivet.com,
+            <p className="mx-0 my-[16px]"><span className="font-medium text-foreground">Manager:</span> ashish@1rivet.com, purvesh@1rivet.com,
               gaurav@1rivet.com
             </p>
             <p><span className="font-medium text-foreground">Employee:</span> mitul@1rivet.com, akash@1rivet.com
