@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { useQuestionStore, competencyLevels, questionTypes, competencyLabels, questionTypeLabels, CompetencyLevel, QuestionType, Question } from '@/stores/questionStore';
+import { useQuestionStore, competencyLevels, questionTypes, competencyLabels, questionTypeLabels, CompetencyLevel, QuestionType } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Sparkles, CheckCircle, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Sparkles, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 const genSchema = z.object({
   skill_id: z.string().min(1, 'Skill is required'),
@@ -20,62 +22,66 @@ const genSchema = z.object({
   count: z.number().min(1).max(10),
 });
 
-// Template-based mock generator (no AI API needed)
-function generateMockQuestions(
-  skillName: string,
-  level: CompetencyLevel,
-  type: QuestionType,
-  context: string,
-  count: number,
-): { question_text: string; evaluation_guidelines: string }[] {
-  const contextHint = context.length > 50 ? context.slice(0, 50) + '...' : context;
-
-  const scenarioTemplates = [
-    `Your team is building an internal portal. A junior developer has implemented a ${skillName} solution that works but has significant performance issues affecting the back-office dashboard. As a ${level}-level practitioner, describe how you would identify the bottlenecks, propose improvements, and ensure the solution scales for the organization's needs. Context: ${contextHint}`,
-    `During a sprint review, a stakeholder reports that a critical ${skillName} feature in the internal dashboard is producing incorrect results intermittently. Walk through your systematic approach to diagnosing, reproducing, and resolving this issue at a ${level} level. Context: ${contextHint}`,
-    `You're tasked with migrating a legacy internal tool to use modern ${skillName} patterns. The tool is used daily by 200+ back-office staff. Describe your migration strategy, risk mitigation approach, and how you'd ensure zero downtime. Context: ${contextHint}`,
-    `A new compliance requirement demands that all ${skillName} implementations in your internal portals must meet specific security and audit standards. How would you assess the current state, plan the remediation, and implement the changes? Context: ${contextHint}`,
-    `Your organization needs to integrate ${skillName} with three existing internal systems that have different data formats and APIs. Design an integration strategy that maintains data consistency and handles failures gracefully. Context: ${contextHint}`,
-    `A team member proposes replacing the current ${skillName} approach with an alternative technology. Evaluate the trade-offs, create a decision framework, and make a recommendation with justification. Context: ${contextHint}`,
-    `The ${skillName} component of your internal dashboard needs to handle a 10x increase in data volume. Describe your approach to scaling the solution while maintaining response times under 2 seconds. Context: ${contextHint}`,
-    `During a code review, you find that a ${skillName} implementation follows anti-patterns that could cause issues at scale. How would you address this diplomatically and ensure knowledge sharing across the team? Context: ${contextHint}`,
-    `Your team is adopting ${skillName} for a new internal tool. Create an onboarding plan that helps team members of varying experience levels get productive quickly. Context: ${contextHint}`,
-    `A production incident was traced to a ${skillName} configuration issue in the back-office system. Describe your incident response, root cause analysis, and preventive measures. Context: ${contextHint}`,
-  ];
-
-  const codingTemplates = [
-    `Write a ${level}-level ${skillName} implementation that processes and validates form submissions from an internal portal. Include error handling, input sanitization, and proper type definitions. Context: ${contextHint}`,
-    `Implement a reusable ${skillName} utility module for an internal dashboard that handles data transformation, caching, and error recovery. Write production-ready code with appropriate tests. Context: ${contextHint}`,
-    `Create a ${skillName} solution that implements a search and filter system for an internal records management application. The solution should handle pagination, sorting, and compound filters. Context: ${contextHint}`,
-    `Write a ${skillName} component/module that implements role-based access control for an internal admin panel. Include proper authorization checks and audit logging. Context: ${contextHint}`,
-    `Implement a ${skillName} solution for batch processing and exporting data from an internal reporting system. Handle large datasets efficiently with progress tracking. Context: ${contextHint}`,
-  ];
-
-  const mcqTemplates = [
-    `Which of the following best describes the ${level}-level approach to ${skillName} error handling in internal applications?\n\nA) Catch all errors silently to prevent user-facing issues\nB) Implement structured error boundaries with logging, user feedback, and recovery strategies\nC) Let errors propagate to the global handler\nD) Display technical error messages to end users`,
-    `When implementing ${skillName} in a back-office portal, which pattern is most appropriate for managing complex state at the ${level} level?\n\nA) Store everything in global state regardless of scope\nB) Use component-local state only\nC) Apply appropriate state management patterns based on data scope, update frequency, and sharing requirements\nD) Avoid state management entirely by reloading data on each interaction`,
-    `What is the primary consideration when optimizing ${skillName} performance in an internal dashboard used by 500+ concurrent users?\n\nA) Minimizing code file sizes\nB) Identifying and optimizing critical rendering and data-fetching paths based on usage patterns\nC) Using the latest framework version\nD) Adding more server resources`,
-    `In a ${level}-level ${skillName} code review, which issue would you prioritize fixing first?\n\nA) Inconsistent variable naming\nB) Missing input validation on user-facing forms handling sensitive data\nC) Using an older API syntax that still works\nD) Comments that could be more descriptive`,
-    `Which testing strategy is most effective for ${skillName} at the ${level} level in internal applications?\n\nA) Only unit tests with 100% coverage\nB) A balanced testing pyramid with unit, integration, and critical path E2E tests\nC) Manual testing before each release\nD) Only E2E tests for user flows`,
-  ];
-
-  const templates = type === 'scenario' ? scenarioTemplates : type === 'coding' ? codingTemplates : mcqTemplates;
-
-  const guidelines = type === 'mcq'
-    ? 'Correct answer: C (for most MCQs). Evaluate understanding of the concept, not just memorization.'
-    : `Evaluate the response at the ${level} level. Look for: depth of analysis, practical applicability to internal/back-office contexts, consideration of trade-offs, and actionable recommendations. ${type === 'coding' ? 'Code should be production-quality with proper error handling and types.' : ''}`;
-
-  const shuffled = [...templates].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count).map((q) => ({
-    question_text: q,
-    evaluation_guidelines: guidelines,
-  }));
-}
-
 interface GeneratedPreview {
   question_text: string;
   evaluation_guidelines: string;
   accepted: boolean;
+}
+
+function McqPreview({ questionText }: { questionText: string }) {
+  try {
+    const parsed = JSON.parse(questionText);
+    const options: string[] = parsed.options || [];
+    const correctIndex: number | null = parsed.correctIndex ?? null;
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-foreground">{parsed.questionText || ''}</p>
+        <div className="grid gap-1.5 pl-1">
+          {options.map((opt: string, i: number) => (
+            <div
+              key={i}
+              className={`text-xs px-3 py-1.5 rounded-md border ${
+                i === correctIndex
+                  ? 'border-success/40 bg-success/10 text-success font-medium'
+                  : 'border-border text-muted-foreground'
+              }`}
+            >
+              <span className="font-semibold mr-1.5">{String.fromCharCode(65 + i)}.</span>
+              {opt}
+              {i === correctIndex && <Badge variant="outline" className="ml-2 text-[10px] border-success/40 text-success">Correct</Badge>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  } catch {
+    return <p className="text-sm text-foreground whitespace-pre-wrap">{questionText}</p>;
+  }
+}
+
+function CodingPreview({ questionText }: { questionText: string }) {
+  try {
+    const parsed = JSON.parse(questionText);
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-foreground">{parsed.problemStatement || ''}</p>
+        {parsed.exampleInput && (
+          <div className="text-xs">
+            <span className="font-semibold text-muted-foreground">Input: </span>
+            <code className="bg-muted px-1.5 py-0.5 rounded">{parsed.exampleInput}</code>
+          </div>
+        )}
+        {parsed.exampleOutput && (
+          <div className="text-xs">
+            <span className="font-semibold text-muted-foreground">Output: </span>
+            <code className="bg-muted px-1.5 py-0.5 rounded">{parsed.exampleOutput}</code>
+          </div>
+        )}
+      </div>
+    );
+  } catch {
+    return <p className="text-sm text-foreground whitespace-pre-wrap">{questionText}</p>;
+  }
 }
 
 export default function AIGenerationPage() {
@@ -114,19 +120,39 @@ export default function AIGenerationPage() {
 
     const skill = skills.find((s) => s.id === skillId);
 
-    // Simulate AI generation delay
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-questions', {
+        body: {
+          skillName: skill?.skill_name ?? 'Unknown',
+          competencyLevel: level,
+          questionType: qType,
+          organizationContext: context,
+          count,
+        },
+      });
 
-    const generated = generateMockQuestions(
-      skill?.skill_name ?? 'Unknown',
-      level as CompetencyLevel,
-      qType as QuestionType,
-      context,
-      count,
-    );
+      if (error) throw error;
 
-    setPreviews(generated.map((g) => ({ ...g, accepted: true })));
-    setGenerating(false);
+      if (data?.error) {
+        toast.error(data.error);
+        setGenerating(false);
+        return;
+      }
+
+      const questions: { question_text: string; evaluation_guidelines: string }[] = data?.questions ?? [];
+      if (questions.length === 0) {
+        toast.warning('No questions were generated. Please try again.');
+        setGenerating(false);
+        return;
+      }
+
+      setPreviews(questions.map((g) => ({ ...g, accepted: true })));
+    } catch (err: any) {
+      console.error('AI generation failed:', err);
+      toast.error(err?.message || 'Failed to generate questions. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const togglePreview = (index: number) => {
@@ -148,6 +174,7 @@ export default function AIGenerationPage() {
       ai_generated: true,
     })));
 
+    toast.success(`${accepted.length} question(s) saved as draft.`);
     setPreviews([]);
   };
 
@@ -157,11 +184,11 @@ export default function AIGenerationPage() {
     <div className="space-y-6 max-w-4xl">
       {/* Info banner */}
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
-        <AlertTriangle size={18} className="text-primary mt-0.5 shrink-0" />
+        <Sparkles size={18} className="text-primary mt-0.5 shrink-0" />
         <div>
-          <p className="text-sm font-medium text-foreground">AI Question Generation</p>
+          <p className="text-sm font-medium text-foreground">AI-Powered Question Generation</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Currently using template-based generation. Connect an AI provider (OpenAI, Gemini, etc.) via Lovable Cloud for true AI-powered generation. All generated questions are saved as "Draft" and require admin review before publishing.
+            Uses AI to generate high-quality assessment questions tailored to your skill, level, and organizational context. All generated questions are saved as "Draft" and require admin review before publishing.
           </p>
         </div>
       </div>
@@ -232,7 +259,7 @@ export default function AIGenerationPage() {
           </div>
           <Button onClick={handleGenerate} disabled={generating} className="gap-1.5">
             {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {generating ? 'Generating...' : 'Generate Questions'}
+            {generating ? 'Generating with AI...' : 'Generate Questions'}
           </Button>
         </div>
       </div>
@@ -268,7 +295,13 @@ export default function AIGenerationPage() {
                   {p.accepted && <CheckCircle size={12} />}
                 </button>
                 <div className="flex-1 min-w-0 space-y-2">
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{p.question_text}</p>
+                  {qType === 'mcq' ? (
+                    <McqPreview questionText={p.question_text} />
+                  ) : qType === 'coding' ? (
+                    <CodingPreview questionText={p.question_text} />
+                  ) : (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{p.question_text}</p>
+                  )}
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Evaluation Guidelines</p>
                     <p className="text-xs text-muted-foreground">{p.evaluation_guidelines}</p>
