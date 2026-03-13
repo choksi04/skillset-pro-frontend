@@ -1,12 +1,15 @@
 import { useMemo, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAssessmentStore } from '@/stores/assessmentStore';
+import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCheck, Brain, Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ClipboardCheck, Brain, Target, Play, CheckCircle, BarChart3 } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   pending: 'bg-warning/15 text-warning border-warning/20',
@@ -16,7 +19,9 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function AssessmentsPage() {
+  const navigate = useNavigate();
   const { assessments, fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
@@ -24,8 +29,8 @@ export default function AssessmentsPage() {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains();
-  }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains]);
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts();
+  }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains, fetchAttempts]);
 
   // Filter by domain for managers
   const filteredAssessments = useMemo(() => {
@@ -91,7 +96,38 @@ export default function AssessmentsPage() {
                     Employee: {userNames[assessment.employee_id] || assessment.employee_id} · {assessment.assessment_questions.length} questions · {assessment.duration_minutes} min
                   </p>
                 </div>
-                <Badge className={`text-xs border ${statusStyles[assessment.status]}`}>{assessment.status}</Badge>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const attempt = getAttemptForAssessment(assessment.id);
+                    const isOwner = assessment.employee_id === user?.id;
+                    const isInProgress = assessment.status === 'in_progress' || (attempt && attempt.status === 'in_progress');
+                    const isCompleted = attempt?.status === 'evaluated' || attempt?.status === 'reviewed' || assessment.status === 'completed';
+
+                    if (isOwner && isInProgress && !isCompleted) {
+                      return (
+                        <Button size="sm" onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+                          <Play size={14} /> Resume
+                        </Button>
+                      );
+                    }
+                    if (isOwner && assessment.status === 'pending') {
+                      return (
+                        <Button size="sm" variant="outline" onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+                          <Play size={14} /> Start
+                        </Button>
+                      );
+                    }
+                    if (isCompleted) {
+                      return (
+                        <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs">
+                          <CheckCircle size={12} /> Completed
+                        </Badge>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <Badge className={`text-xs border ${statusStyles[assessment.status]}`}>{assessment.status}</Badge>
+                </div>
               </div>
 
               <div className="px-5 py-4 space-y-4">

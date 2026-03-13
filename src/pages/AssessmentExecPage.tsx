@@ -109,10 +109,22 @@ function MyAssessmentsView() {
     }
     await startAttempt(assessment.id, tenantId, employeeId);
     await updateAssessmentStatus(assessment.id, 'in_progress');
+    
+    // Restore previously saved answers if resuming
+    const existingAttempt = getAttemptForAssessment(assessment.id);
+    const restoredAnswers: Record<string, string> = {};
+    const restoredTime: Record<string, number> = {};
+    if (existingAttempt?.answers?.length) {
+      for (const ans of existingAttempt.answers) {
+        restoredAnswers[ans.question_id] = ans.answer_text;
+        restoredTime[ans.question_id] = ans.time_spent_seconds;
+      }
+    }
+    
     setActiveAssessment(assessment);
     setCurrentIdx(0);
-    setAnswers({});
-    setTimeSpent({});
+    setAnswers(restoredAnswers);
+    setTimeSpent(restoredTime);
     setQuestionStartTime(Date.now());
   };
 
