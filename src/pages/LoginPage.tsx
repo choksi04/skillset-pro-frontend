@@ -76,7 +76,7 @@ export default function LoginPage() {
 
         {/* Demo accounts hint */}
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Demo accounts:</p>
+          <p className="font-medium text-muted-foreground text-xl font-mono">Demo accounts:</p>
           <div className="space-y-1 text-xs text-muted-foreground">
             <p>Admin:
 jagdish@1rivet.com<span className="font-medium text-foreground">Admin:</span>jagdish@1rivet.com
