@@ -299,7 +299,7 @@ function MyRegistryView() {
                                     {skill.skill_description}{" "}
                                   </p>
                                 </div>
-
+                                /*{" "}
                                 {skill.skill_description && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -309,7 +309,8 @@ function MyRegistryView() {
                                       {skill.skill_description}
                                     </TooltipContent>
                                   </Tooltip>
-                                )}
+                                )}{" "}
+                                */
                               </div>
                               {(skill.tags || []).length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
