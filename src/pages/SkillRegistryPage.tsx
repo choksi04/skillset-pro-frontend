@@ -20,8 +20,12 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CheckCircle, Lock, AlertTriangle, Send, Search, Info, FolderOpen, Tag, Users, User } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+} from '@/components/ui/alert-dialog';
+import { CheckCircle, Lock, AlertTriangle, Send, Search, Info, FolderOpen, Tag, Users, User, ClipboardCheck, Clock, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 // Employee self-rating view (used for both employee role and manager's "My Registry" tab)
 function MyRegistryView() {
