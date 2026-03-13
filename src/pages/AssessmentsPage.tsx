@@ -96,7 +96,38 @@ export default function AssessmentsPage() {
                     Employee: {userNames[assessment.employee_id] || assessment.employee_id} · {assessment.assessment_questions.length} questions · {assessment.duration_minutes} min
                   </p>
                 </div>
-                <Badge className={`text-xs border ${statusStyles[assessment.status]}`}>{assessment.status}</Badge>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const attempt = getAttemptForAssessment(assessment.id);
+                    const isOwner = assessment.employee_id === user?.id;
+                    const isInProgress = assessment.status === 'in_progress' || (attempt && attempt.status === 'in_progress');
+                    const isCompleted = attempt?.status === 'evaluated' || attempt?.status === 'reviewed' || assessment.status === 'completed';
+
+                    if (isOwner && isInProgress && !isCompleted) {
+                      return (
+                        <Button size="sm" onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+                          <Play size={14} /> Resume
+                        </Button>
+                      );
+                    }
+                    if (isOwner && assessment.status === 'pending') {
+                      return (
+                        <Button size="sm" variant="outline" onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+                          <Play size={14} /> Start
+                        </Button>
+                      );
+                    }
+                    if (isCompleted) {
+                      return (
+                        <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs">
+                          <CheckCircle size={12} /> Completed
+                        </Badge>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <Badge className={`text-xs border ${statusStyles[assessment.status]}`}>{assessment.status}</Badge>
+                </div>
               </div>
 
               <div className="px-5 py-4 space-y-4">
