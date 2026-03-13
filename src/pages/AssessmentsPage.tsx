@@ -29,8 +29,8 @@ export default function AssessmentsPage() {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains();
-  }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains]);
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts();
+  }, [fetchAssessments, fetchQuestions, fetchSkills, fetchDomains, fetchAttempts]);
 
   // Filter by domain for managers
   const filteredAssessments = useMemo(() => {
