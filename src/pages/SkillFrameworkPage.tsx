@@ -8,21 +8,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from
+'@/components/ui/select';
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-} from '@/components/ui/accordion';
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger } from
+'@/components/ui/accordion';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from
+'@/components/ui/table';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from
+'@/components/ui/dropdown-menu';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from
+'@/components/ui/alert-dialog';
 import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Brain, FolderOpen, Tag, MoreHorizontal, Settings, Trash2, ChevronsDownUp } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,7 +30,7 @@ export default function SkillFrameworkPage() {
   const { skills, categories, toggleSkillStatus, deleteSkill, deleteCategory, fetchSkills, loading, initialized } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin';
-  useEffect(() => { fetchSkills(); }, [fetchSkills]);
+  useEffect(() => {fetchSkills();}, [fetchSkills]);
 
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
@@ -76,15 +76,15 @@ export default function SkillFrameworkPage() {
     total: skills.length,
     active: skills.filter((s) => s.status === 'active').length,
     disabled: skills.filter((s) => s.status === 'disabled').length,
-    categories: categories.length,
+    categories: categories.length
   }), [skills, categories]);
 
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'skill' | 'category'; id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{type: 'skill' | 'category';id: string;name: string;} | null>(null);
 
-  const handleEditSkill = (skill: Skill) => { setEditingSkill(skill); setSkillDialogOpen(true); };
-  const handleCreateSkill = () => { setEditingSkill(null); setSkillDialogOpen(true); };
-  const handleEditCat = (cat: SkillCategory) => { setEditingCat(cat); setCatDialogOpen(true); };
-  const handleCreateCat = () => { setEditingCat(null); setCatDialogOpen(true); };
+  const handleEditSkill = (skill: Skill) => {setEditingSkill(skill);setSkillDialogOpen(true);};
+  const handleCreateSkill = () => {setEditingSkill(null);setSkillDialogOpen(true);};
+  const handleEditCat = (cat: SkillCategory) => {setEditingCat(cat);setCatDialogOpen(true);};
+  const handleCreateCat = () => {setEditingCat(null);setCatDialogOpen(true);};
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -109,16 +109,16 @@ export default function SkillFrameworkPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Total Skills', value: stats.total, icon: <Brain size={18} /> },
-          { label: 'Active', value: stats.active, color: 'text-success' },
-          { label: 'Disabled', value: stats.disabled, color: 'text-muted-foreground' },
-          { label: 'Categories', value: stats.categories, icon: <FolderOpen size={18} /> },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+        { label: 'Total Skills', value: stats.total, icon: <Brain size={18} /> },
+        { label: 'Active', value: stats.active, color: 'text-success' },
+        { label: 'Disabled', value: stats.disabled, color: 'text-muted-foreground' },
+        { label: 'Categories', value: stats.categories, icon: <FolderOpen size={18} /> }].
+        map((s) =>
+        <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
             <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? 'text-card-foreground'}`}>{s.value}</p>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Toolbar */}
@@ -132,18 +132,18 @@ export default function SkillFrameworkPage() {
             <SelectTrigger className="w-[160px] h-9 text-sm"><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.filter((c) => c.status === 'active').map((cat) => (
-                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-              ))}
+              {categories.filter((c) => c.status === 'active').map((cat) =>
+              <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+              )}
             </SelectContent>
           </Select>
           <Select value={tagFilter} onValueChange={setTagFilter}>
             <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Tag" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tags</SelectItem>
-              {allTags.map((tag) => (
-                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-              ))}
+              {allTags.map((tag) =>
+              <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+              )}
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -155,8 +155,8 @@ export default function SkillFrameworkPage() {
             </SelectContent>
           </Select>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
+        {isAdmin &&
+        <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={handleCreateCat} className="gap-1.5">
               <Settings size={14} /> Manage Categories
             </Button>
@@ -164,49 +164,49 @@ export default function SkillFrameworkPage() {
               <Plus size={14} /> Add Skill
             </Button>
           </div>
-        )}
+        }
       </div>
 
       {/* Grouped accordion table */}
-      {loading && !initialized ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+      {loading && !initialized ?
+      <div className="space-y-3">
+          {[1, 2, 3].map((i) =>
+        <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-4 w-4 rounded" />
                 <Skeleton className="h-5 w-40" />
                 <Skeleton className="h-4 w-16" />
               </div>
               <div className="space-y-2">
-                {[1, 2].map((j) => (
-                  <div key={j} className="flex items-center gap-4">
+                {[1, 2].map((j) =>
+            <div key={j} className="flex items-center gap-4">
                     <Skeleton className="h-4 w-48" />
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-5 w-16 rounded-full" />
                   </div>
-                ))}
+            )}
               </div>
             </div>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+        )}
+        </div> :
+      filtered.length === 0 ?
+      <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
           No skills found matching your filters.
-        </div>
-      ) : (
-        <>
-          {openAccordions.length > 0 && (
-            <div className="flex justify-end">
+        </div> :
+
+      <>
+          {openAccordions.length > 0 &&
+        <div className="flex justify-end">
               <Button size="sm" variant="ghost" onClick={() => setOpenAccordions([])} className="gap-1.5 text-xs text-muted-foreground">
                 <ChevronsDownUp size={14} /> Collapse All
               </Button>
             </div>
-          )}
+        }
           <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions} className="space-y-3">
             {Array.from(grouped.entries()).map(([catName, catSkills]) => {
-              const catObj = categories.find((c) => c.name === catName);
-              return (
-                <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
+            const catObj = categories.find((c) => c.name === catName);
+            return (
+              <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
                   <AccordionTrigger className="px-5 py-3 hover:no-underline">
                     <div className="flex items-center gap-3 text-left">
                       <FolderOpen size={16} className="text-primary shrink-0" />
@@ -214,15 +214,15 @@ export default function SkillFrameworkPage() {
                         <span className="font-semibold text-card-foreground">{catName}</span>
                         <span className="ml-2 text-xs text-muted-foreground">({catSkills.length} skill{catSkills.length !== 1 ? 's' : ''})</span>
                       </div>
-                      {isAdmin && catObj && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleEditCat(catObj); }}
-                          className="ml-2 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                          title="Edit category"
-                        >
+                      {isAdmin && catObj &&
+                    <button
+                      onClick={(e) => {e.stopPropagation();handleEditCat(catObj);}}
+                      className="ml-2 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      title="Edit category">
+                      
                           <Pencil size={12} />
                         </button>
-                      )}
+                    }
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-0 pb-0">
@@ -236,34 +236,34 @@ export default function SkillFrameworkPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {catSkills.map((skill) => (
-                          <TableRow key={skill.id} className={skill.status === 'disabled' ? 'opacity-60' : ''}>
+                        {catSkills.map((skill) =>
+                      <TableRow key={skill.id} className={skill.status === 'disabled' ? 'opacity-60' : ''}>
                             <TableCell>
                               <p className="font-medium text-foreground">{skill.skill_name}</p>
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{skill.skill_description}</p>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
-                                {(skill.tags || []).map((tag) => (
-                                  <Badge key={tag} variant="outline" className="text-[11px] font-normal">
+                                {(skill.tags || []).map((tag) =>
+                            <Badge key={tag} variant="outline" className="text-[11px] font-normal">
                                     <Tag size={10} className="mr-1" />{tag}
                                   </Badge>
-                                ))}
-                                {(!skill.tags || skill.tags.length === 0) && (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
+                            )}
+                                {(!skill.tags || skill.tags.length === 0) &&
+                            <span className="text-xs text-muted-foreground">—</span>
+                            }
                               </div>
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={skill.status === 'active' ? 'default' : 'outline'}
-                                className={`text-xs ${skill.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
-                              >
+                            variant={skill.status === 'active' ? 'default' : 'outline'}
+                            className={`text-xs ${skill.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}>
+                            
                                 {skill.status}
                               </Badge>
                             </TableCell>
-                            {isAdmin && (
-                              <TableCell className="text-right">
+                            {isAdmin &&
+                        <TableCell className="text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
@@ -285,60 +285,60 @@ export default function SkillFrameworkPage() {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </TableCell>
-                            )}
+                        }
                           </TableRow>
-                        ))}
+                      )}
                       </TableBody>
                     </Table>
                   </AccordionContent>
-                </AccordionItem>
-              );
-            })}
+                </AccordionItem>);
+
+          })}
           </Accordion>
         </>
-      )}
+      }
 
       {/* Category management overview */}
-      {isAdmin && (
-        <div className="rounded-xl border border-border bg-card p-5">
+      {isAdmin &&
+      <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-card-foreground">Categories</h3>
             <Button size="sm" variant="ghost" onClick={handleCreateCat} className="gap-1 h-7 text-xs">
               <Plus size={12} /> New
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex-wrap gap-2 flex flex-col">
             {categories.map((cat) => {
-              const count = skills.filter((s) => s.skill_category === cat.name).length;
-              return (
-                <div
-                  key={cat.id}
-                  className={`group relative rounded-lg border px-3 py-2 text-left transition-colors ${
-                    cat.status === 'disabled' ? 'opacity-50 border-border' : 'border-border hover:border-primary/30'
-                  }`}
-                >
+            const count = skills.filter((s) => s.skill_category === cat.name).length;
+            return (
+              <div
+                key={cat.id}
+                className={`group relative rounded-lg border px-3 py-2 text-left transition-colors ${
+                cat.status === 'disabled' ? 'opacity-50 border-border' : 'border-border hover:border-primary/30'}`
+                }>
+                
                   <button onClick={() => handleEditCat(cat)} className="text-left">
                     <p className="text-sm font-medium text-foreground">{cat.name}</p>
                     <p className="text-xs text-muted-foreground">{count} skill{count !== 1 ? 's' : ''} · {cat.status}</p>
                   </button>
                   <button
-                    onClick={() => setDeleteTarget({ type: 'category', id: cat.id, name: cat.name })}
-                    className="absolute top-1.5 right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
-                    title="Delete category"
-                  >
+                  onClick={() => setDeleteTarget({ type: 'category', id: cat.id, name: cat.name })}
+                  className="absolute top-1.5 right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                  title="Delete category">
+                  
                     <Trash2 size={12} />
                   </button>
-                </div>
-              );
-            })}
+                </div>);
+
+          })}
           </div>
         </div>
-      )}
+      }
 
       <SkillFormDialog open={skillDialogOpen} onOpenChange={setSkillDialogOpen} editSkill={editingSkill} />
       <CategoryFormDialog open={catDialogOpen} onOpenChange={setCatDialogOpen} editCategory={editingCat} />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => {if (!open) setDeleteTarget(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteTarget?.type === 'category' ? 'Category' : 'Skill'}</AlertDialogTitle>
@@ -354,6 +354,6 @@ export default function SkillFrameworkPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
+    </div>);
+
 }
