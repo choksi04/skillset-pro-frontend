@@ -36,11 +36,11 @@ const sidebarItems: SidebarItem[] = [
     tourId: "dashboard",
   },
   {
-    title: "HR Dashboard",
-    href: "/hr-dashboard",
+    title: "Skill Analytics",
+    href: "/skill-analytics",
     icon: <Shield size={18} />,
     roles: ["admin"],
-    tourId: "hr-dashboard",
+    tourId: "skill-analytic",
   },
   {
     title: "Organization",
