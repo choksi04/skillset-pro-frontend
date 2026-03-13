@@ -1,26 +1,26 @@
-import { useLocation } from 'react-router-dom';
-import { Bell, Search } from 'lucide-react';
-import HelpButton from '@/components/onboarding/HelpButton';
+import { useLocation } from "react-router-dom";
+import { Bell, Search } from "lucide-react";
+import HelpButton from "@/components/onboarding/HelpButton";
 
 const pageTitles: Record<string, string> = {
-  '/': 'Dashboard',
-  '/organization': 'Organization Setup',
-  '/skills': 'Skill Framework',
-  '/domains': 'Domain Management',
-  '/domain-skills': 'Domain-Skill Mapping',
-  '/questions': 'Question Bank',
-  '/ai-generate': 'AI Question Generation',
-  '/assessments': 'Assessment Management',
-  '/assessment-exec': 'Take Assessment',
-  '/reviews': 'Manager Reviews',
-  '/registry': 'Skill Registry',
-  '/hr-dashboard': 'HR Dashboard',
-  '/guide': 'User Guide',
+  "/": "Dashboard",
+  "/organization": "Organization Setup",
+  "/skills": "Skill Framework",
+  "/domains": "Domain Management",
+  "/domain-skills": "Domain-Skill Mapping",
+  "/questions": "Question Bank",
+  "/ai-generate": "AI Question Generation",
+  "/assessments": "Assessment Management",
+  "/assessment-exec": "Take Assessment",
+  "/reviews": "Manager Reviews",
+  "/registry": "Skill Registry",
+  "/skill-analytics": "Skill Analytics",
+  "/guide": "User Guide",
 };
 
 export default function PageHeader() {
   const location = useLocation();
-  const title = pageTitles[location.pathname] || 'Page';
+  const title = pageTitles[location.pathname] || "Page";
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
