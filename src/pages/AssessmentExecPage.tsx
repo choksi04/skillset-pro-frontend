@@ -226,6 +226,8 @@ function MyAssessmentsView() {
                           </Button>
                           <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs"><CheckCircle size={12} /> Completed</Badge>
                         </>
+                      ) : assessment.status === 'in_progress' || attempt?.status === 'in_progress' ? (
+                        <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5" variant="outline"><Play size={14} /> Continue Assessment</Button>
                       ) : (
                         <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5"><Play size={14} /> Start Assessment</Button>
                       )}
