@@ -49,8 +49,7 @@ const App = () => (
                 </AuthGuard>
               }
             >
-              <Route path="/" element={<HRDashboardPage />} />
-              {/* <Route path="/" element={<DashboardPage />} /> */}
+              <Route path="/" element={<DashboardPage />} />
               <Route path="/organization" element={<OrganizationPage />} />
               <Route path="/skills" element={<SkillFrameworkPage />} />
               <Route path="/domains" element={<DomainsPage />} />
