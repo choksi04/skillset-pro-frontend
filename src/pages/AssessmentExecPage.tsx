@@ -109,22 +109,10 @@ function MyAssessmentsView() {
     }
     await startAttempt(assessment.id, tenantId, employeeId);
     await updateAssessmentStatus(assessment.id, 'in_progress');
-
-    // Restore existing answers if resuming an in-progress attempt
-    const currentAttempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
-    const restoredAnswers: Record<string, string> = {};
-    const restoredTime: Record<string, number> = {};
-    if (currentAttempt?.answers?.length) {
-      for (const a of currentAttempt.answers) {
-        restoredAnswers[a.question_id] = a.answer_text;
-        restoredTime[a.question_id] = a.time_spent_seconds;
-      }
-    }
-
     setActiveAssessment(assessment);
     setCurrentIdx(0);
-    setAnswers(restoredAnswers);
-    setTimeSpent(restoredTime);
+    setAnswers({});
+    setTimeSpent({});
     setQuestionStartTime(Date.now());
   };
 
@@ -226,8 +214,6 @@ function MyAssessmentsView() {
                           </Button>
                           <Badge className="bg-success/15 text-success border-success/20 gap-1 text-xs"><CheckCircle size={12} /> Completed</Badge>
                         </>
-                      ) : assessment.status === 'in_progress' || attempt?.status === 'in_progress' ? (
-                        <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5" variant="outline"><Play size={14} /> Continue Assessment</Button>
                       ) : (
                         <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5"><Play size={14} /> Start Assessment</Button>
                       )}
