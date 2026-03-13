@@ -294,7 +294,10 @@ function MyRegistryView() {
                             <div className="flex-1">
                               <div className="flex items-center gap-1.5">
                                 <p className="text-sm font-medium text-card-foreground">{skill.skill_name}</p>
-                                <p className="text-xs font-regular text-card-foreground"> {skill.skill_description} </p>
+                                <p className="d-block text-xs font-regular text-card-foreground">
+                                  {" "}
+                                  {skill.skill_description}{" "}
+                                </p>
                                 {skill.skill_description && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
