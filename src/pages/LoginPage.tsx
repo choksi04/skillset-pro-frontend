@@ -81,7 +81,7 @@ export default function LoginPage() {
             <p>Admin:
 jagdish@1rivet.com<span className="font-medium text-foreground">Admin:</span>jagdish@1rivet.com
             </p>
-            <p className="mx-0 my-[16px]">Manager: 
+            <p className="mx-0 my-[16px]">Manager:
 ashish@1rivet.com, purvesh@1rivet.com, gaurav@1rivet.com<span className="font-medium text-foreground">Manager:</span>ashish@1rivet.com, purvesh@1rivet.com,
               gaurav@1rivet.com
             </p>
