@@ -77,7 +77,9 @@ function MyRegistryView() {
   }, [submission?.id]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   const allRated = domainSkills.length > 0 && domainSkills.every((s) => ratings[s.id] != null);
 
