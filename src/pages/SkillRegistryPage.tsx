@@ -20,8 +20,12 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CheckCircle, Lock, AlertTriangle, Send, Search, Info, FolderOpen, Tag, Users, User } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
+} from '@/components/ui/alert-dialog';
+import { CheckCircle, Lock, AlertTriangle, Send, Search, Info, FolderOpen, Tag, Users, User, ClipboardCheck, Clock, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 // Employee self-rating view (used for both employee role and manager's "My Registry" tab)
 function MyRegistryView() {
@@ -73,7 +77,9 @@ function MyRegistryView() {
   }, [submission?.id]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   const allRated = domainSkills.length > 0 && domainSkills.every((s) => ratings[s.id] != null);
 
@@ -135,7 +141,7 @@ function MyRegistryView() {
       await markAssessmentGenerated(sub.id);
     }
     setConfirmOpen(false);
-    toast.success('Skill registry submitted! Assessment has been generated.');
+    setSuccessOpen(true);
   };
 
   if (!assignedDomain) {
@@ -306,6 +312,33 @@ function MyRegistryView() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
+          <AlertDialogContent className="sm:max-w-md">
+            <AlertDialogHeader>
+              <div className="flex justify-center mb-3">
+                <div className="rounded-full bg-success/10 p-3">
+                  <ClipboardCheck size={28} className="text-success" />
+                </div>
+              </div>
+              <AlertDialogTitle className="text-center">Assessment Ready!</AlertDialogTitle>
+              <AlertDialogDescription className="text-center">
+                Your skill registry has been submitted successfully and an assessment has been generated based on your self-ratings. You can attempt it now or come back later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+              <Button onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+                <ClipboardCheck size={14} /> Attempt Now
+              </Button>
+              <Button variant="outline" onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+                <Eye size={14} /> View Assessment
+              </Button>
+              <Button variant="ghost" onClick={() => setSuccessOpen(false)} className="w-full gap-1.5">
+                <Clock size={14} /> Later
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
