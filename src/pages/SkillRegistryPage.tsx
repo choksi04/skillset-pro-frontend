@@ -141,7 +141,7 @@ function MyRegistryView() {
       await markAssessmentGenerated(sub.id);
     }
     setConfirmOpen(false);
-    toast.success('Skill registry submitted! Assessment has been generated.');
+    setSuccessOpen(true);
   };
 
   if (!assignedDomain) {
