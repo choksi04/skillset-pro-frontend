@@ -27,7 +27,8 @@ const queryClient = new QueryClient();
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground text-sm">Loading…</div>;
+  if (loading)
+    return <div className="flex h-screen items-center justify-center text-muted-foreground text-sm">Loading…</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -41,8 +42,15 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
-              <Route path="/" element={<DashboardPage />} />
+            <Route
+              element={
+                <AuthGuard>
+                  <AppLayout />
+                </AuthGuard>
+              }
+            >
+              <Route path="/" element={<HRDashboardPage />} />
+              {/* <Route path="/" element={<DashboardPage />} /> */}
               <Route path="/organization" element={<OrganizationPage />} />
               <Route path="/skills" element={<SkillFrameworkPage />} />
               <Route path="/domains" element={<DomainsPage />} />
