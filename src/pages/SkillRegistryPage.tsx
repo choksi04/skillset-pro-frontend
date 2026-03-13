@@ -312,6 +312,33 @@ function MyRegistryView() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
+          <AlertDialogContent className="sm:max-w-md">
+            <AlertDialogHeader>
+              <div className="flex justify-center mb-3">
+                <div className="rounded-full bg-success/10 p-3">
+                  <ClipboardCheck size={28} className="text-success" />
+                </div>
+              </div>
+              <AlertDialogTitle className="text-center">Assessment Ready!</AlertDialogTitle>
+              <AlertDialogDescription className="text-center">
+                Your skill registry has been submitted successfully and an assessment has been generated based on your self-ratings. You can attempt it now or come back later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+              <Button onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+                <ClipboardCheck size={14} /> Attempt Now
+              </Button>
+              <Button variant="outline" onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+                <Eye size={14} /> View Assessment
+              </Button>
+              <Button variant="ghost" onClick={() => setSuccessOpen(false)} className="w-full gap-1.5">
+                <Clock size={14} /> Later
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
