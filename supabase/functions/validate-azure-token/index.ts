@@ -117,14 +117,14 @@ serve(async (req) => {
       finalUser = created;
     }
 
-    if (user.status !== "active") {
+    if (finalUser.status !== "active") {
       return new Response(
         JSON.stringify({ error: "Your account is disabled. Contact your admin." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(JSON.stringify({ user }), {
+    return new Response(JSON.stringify({ user: finalUser }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
