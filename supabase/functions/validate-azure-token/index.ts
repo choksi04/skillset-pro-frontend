@@ -82,13 +82,39 @@ serve(async (req) => {
       .eq("email", email)
       .single();
 
-    if (dbError || !user) {
+    if (dbError && dbError.code !== "PGRST116") {
       return new Response(
-        JSON.stringify({
-          error: "No account found. Your admin must add you to the platform first.",
-        }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Database error. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    let finalUser = user;
+
+    // Auto-register new Azure AD users as employees
+    if (!user) {
+      const newId = crypto.randomUUID();
+      const { data: created, error: insertErr } = await supabaseAdmin
+        .from("users")
+        .insert({
+          id: newId,
+          email,
+          full_name: fullName,
+          role: "employee",
+          status: "active",
+          tenant_id: "tenant-001",
+        })
+        .select("*")
+        .single();
+
+      if (insertErr || !created) {
+        console.error("Auto-register error:", insertErr);
+        return new Response(
+          JSON.stringify({ error: "Failed to create your account. Contact your admin." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      finalUser = created;
     }
 
     if (user.status !== "active") {
