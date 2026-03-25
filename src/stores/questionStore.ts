@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentUserId } from '@/lib/audit';
 
 export type CompetencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 export type QuestionType = 'scenario' | 'coding' | 'mcq';
@@ -66,7 +67,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
 
   addQuestion: async (q) => {
     const id = `q-${Date.now()}`;
-    const { data, error } = await supabase.from('questions').insert({ id, ...q }).select().single();
+    const userId = getCurrentUserId();
+    const { data, error } = await supabase.from('questions').insert({ id, ...q, created_by: userId }).select().single();
     if (error) { console.error('Failed to add question:', error); return; }
     set((state) => ({
       questions: [...state.questions, {
@@ -76,7 +78,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 
   addQuestions: async (qs) => {
-    const rows = qs.map((q, i) => ({ ...q, id: `q-${Date.now()}-${i}` }));
+    const userId = getCurrentUserId();
+    const rows = qs.map((q, i) => ({ ...q, id: `q-${Date.now()}-${i}`, created_by: userId }));
     const { data, error } = await supabase.from('questions').insert(rows).select();
     if (error) { console.error('Failed to add questions:', error); return; }
     const newQuestions: Question[] = (data || []).map((d: any) => ({
@@ -91,8 +94,9 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 
   updateQuestion: async (id, updates) => {
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('questions').update({
-      ...updates, updated_at: new Date().toISOString(),
+      ...updates, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) { console.error('Failed to update question:', error); return; }
     set((state) => ({
@@ -128,8 +132,10 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
     if (isUsed) {
       return { success: false, error: 'This question is used in one or more assessments and cannot be deleted.' };
     }
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('questions').update({
       deleted_on: new Date().toISOString(),
+      deleted_by: userId,
       updated_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) {

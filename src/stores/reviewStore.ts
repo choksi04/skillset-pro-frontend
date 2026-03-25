@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { RatingLevel } from './registryStore';
 import { SkillScore } from './attemptStore';
+import { getCurrentUserId } from '@/lib/audit';
 
 export type ReviewAction = 'approve' | 'adjust' | 'reassess';
 
@@ -152,11 +153,11 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   },
 
   createReview: async (params) => {
-    // Check if review already exists for this assessment (prevent duplicates)
     const existing = get().reviews.find((r) => r.assessment_id === params.assessment_id);
     if (existing) return existing.id;
 
     const id = `review-${Date.now()}`;
+    const userId = getCurrentUserId();
     const skillReviews: SkillReviewEntry[] = params.skill_scores.map((ss) => {
       const selfRating = params.self_ratings.find((r) => r.skill_id === ss.skill_id);
       return {
@@ -170,15 +171,13 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       };
     });
 
-    // Insert review
     const { error: reviewError } = await supabase.from('manager_reviews').insert({
       id, tenant_id: params.tenant_id, assessment_id: params.assessment_id,
       attempt_id: params.attempt_id, employee_id: params.employee_id,
       employee_name: params.employee_name, domain_id: params.domain_id,
-      reviewer_id: params.reviewer_id, status: 'pending',
+      reviewer_id: params.reviewer_id, status: 'pending', created_by: userId,
     });
     if (reviewError) {
-      // If unique constraint violation, find existing
       if (reviewError.code === '23505') {
         const existing = get().reviews.find((r) => r.assessment_id === params.assessment_id);
         return existing?.id ?? '';
@@ -187,7 +186,6 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       return '';
     }
 
-    // Insert skill entries
     if (skillReviews.length > 0) {
       await supabase.from('review_skill_entries').insert(
         skillReviews.map((sr) => ({
@@ -208,7 +206,6 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
 
     set((state) => ({ reviews: [...state.reviews, review] }));
 
-    // Create notification
     await get().addNotification({
       tenant_id: params.tenant_id, target_role: 'manager', target_user_id: params.reviewer_id,
       message: `Assessment completed for ${params.employee_name}. Ready for review.`,
@@ -219,13 +216,14 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   },
 
   setSkillAction: async (reviewId, skillId, action, adjustedLevel) => {
+    const userId = getCurrentUserId();
     await supabase.from('review_skill_entries').update({
       manager_action: action,
       manager_adjusted_level: action === 'adjust' ? (adjustedLevel ?? null) : null,
     }).eq('review_id', reviewId).eq('skill_id', skillId);
 
     await supabase.from('manager_reviews').update({
-      status: 'in_progress', updated_at: new Date().toISOString(),
+      status: 'in_progress', updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', reviewId);
 
     set((state) => ({
@@ -259,8 +257,9 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   },
 
   setOverallComment: async (reviewId, comment) => {
+    const userId = getCurrentUserId();
     await supabase.from('manager_reviews').update({
-      overall_comment: comment, updated_at: new Date().toISOString(),
+      overall_comment: comment, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', reviewId);
 
     set((state) => ({
@@ -275,8 +274,8 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
     if (!review) return;
 
     const now = new Date().toISOString();
+    const userId = getCurrentUserId();
 
-    // Generate official entries
     const newEntries: OfficialSkillEntry[] = review.skill_reviews
       .filter((sr) => sr.manager_action === 'approve' || sr.manager_action === 'adjust')
       .map((sr) => ({
@@ -288,9 +287,8 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         timestamp: now, cycle, self_rating: sr.self_rating, ai_level: sr.ai_calculated_level, review_id: reviewId,
       }));
 
-    // Persist
     await supabase.from('manager_reviews').update({
-      status: 'completed', completed_at: now, updated_at: now,
+      status: 'completed', completed_at: now, updated_at: now, modified_by: userId, modified_at: now,
     }).eq('id', reviewId);
 
     if (newEntries.length > 0) {
@@ -299,12 +297,11 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
           id: e.id, employee_id: e.employee_id, tenant_id: e.tenant_id, skill_id: e.skill_id,
           final_level: e.final_level, assessment_reference: e.assessment_reference,
           manager_comments: e.manager_comments, cycle: e.cycle, self_rating: e.self_rating,
-          ai_level: e.ai_level, review_id: e.review_id,
+          ai_level: e.ai_level, review_id: e.review_id, created_by: userId,
         }))
       );
     }
 
-    // Notification for employee
     await get().addNotification({
       tenant_id: review.tenant_id, target_role: 'employee', target_user_id: review.employee_id,
       message: 'Your skill assessment has been reviewed and approved.',

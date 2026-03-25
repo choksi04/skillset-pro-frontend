@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question, CompetencyLevel } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
+import { getCurrentUserId } from '@/lib/audit';
 
 export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
 
@@ -109,7 +110,6 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
       if (error) throw error;
 
-      // Fetch all assessment questions
       const assessmentIds = (assessmentRows || []).map((a: any) => a.id);
       let questionRows: any[] = [];
       if (assessmentIds.length > 0) {
@@ -121,7 +121,6 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         questionRows = data || [];
       }
 
-      // Build assessment objects
       const assessments: Assessment[] = (assessmentRows || []).map((a: any) => {
         const aqs = questionRows
           .filter((q: any) => q.assessment_id === a.id)
@@ -158,8 +157,8 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill);
     const skillIds = [...new Set(ratings.map((r) => r.skill_id))];
     const durationMinutes = Math.max(30, assessmentQuestions.length * 10);
+    const userId = getCurrentUserId();
 
-    // Insert assessment
     const { data: row, error } = await supabase
       .from('assessments')
       .insert({
@@ -169,6 +168,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         domain_id,
         status: 'pending',
         duration_minutes: durationMinutes,
+        created_by: userId,
       })
       .select()
       .single();
@@ -180,7 +180,6 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
     const assessmentId = (row as any).id;
 
-    // Insert assessment questions
     if (assessmentQuestions.length > 0) {
       const { error: qError } = await supabase
         .from('assessment_questions')
@@ -190,12 +189,12 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
             question_id: aq.question_id,
             skill_id: aq.skill_id,
             target_level: aq.target_level,
+            created_by: userId,
           }))
         );
       if (qError) console.error('Failed to insert assessment questions:', qError);
     }
 
-    // Update local state
     const newAssessment: Assessment = {
       id: assessmentId,
       tenant_id,
@@ -218,9 +217,10 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     get().assessments.filter((a) => a.employee_id === employeeId),
 
   updateAssessmentStatus: async (id, status) => {
+    const userId = getCurrentUserId();
     const { error } = await supabase
       .from('assessments')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ status, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {

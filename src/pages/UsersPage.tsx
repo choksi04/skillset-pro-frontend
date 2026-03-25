@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, Search, Pencil, Shield, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { getCurrentUserId } from '@/lib/audit';
 
 interface UserRow {
   id: string;
@@ -88,6 +89,7 @@ export default function UsersPage() {
       return;
     }
 
+    const userId = getCurrentUserId();
     if (editing) {
       const { error } = await supabase.from('users').update({
         full_name: form.full_name.trim(),
@@ -98,6 +100,8 @@ export default function UsersPage() {
         designation: form.designation.trim(),
         status: form.status,
         updated_at: new Date().toISOString(),
+        modified_by: userId,
+        modified_at: new Date().toISOString(),
       }).eq('id', editing.id);
       if (error) { toast.error('Failed to update user.'); return; }
       toast.success('User updated.');
@@ -113,6 +117,7 @@ export default function UsersPage() {
         department: form.department.trim(),
         designation: form.designation.trim(),
         status: form.status,
+        created_by: userId,
       });
       if (error) {
         if (error.code === '23505') toast.error('Email already exists.');

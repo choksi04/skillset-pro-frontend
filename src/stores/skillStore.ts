@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentUserId } from '@/lib/audit';
 
 export interface SkillCategory {
   id: string;
@@ -83,16 +84,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   addCategory: async (cat) => {
     const id = `cat-${Date.now()}`;
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('skill_categories').insert({
       id, name: cat.name, description: cat.description || '', tenant_id: cat.tenant_id, status: cat.status || 'active',
+      created_by: userId,
     });
     if (error) { console.error('Failed to add category:', error); return; }
     set((state) => ({ categories: [...state.categories, { ...cat, id, created_at: new Date().toISOString() }] }));
   },
 
   updateCategory: async (id, updates) => {
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('skill_categories').update({
-      ...updates, modified_at: new Date().toISOString(),
+      ...updates, modified_at: new Date().toISOString(), modified_by: userId,
     }).eq('id', id);
     if (error) { console.error('Failed to update category:', error); return; }
     set((state) => ({
@@ -109,10 +113,11 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   addSkill: async (skill) => {
     const id = `skill-${Date.now()}`;
+    const userId = getCurrentUserId();
     const { data, error } = await supabase.from('skills').insert({
       id, skill_name: skill.skill_name, skill_description: skill.skill_description,
       skill_category: skill.skill_category, tags: skill.tags || [], status: skill.status,
-      tenant_id: skill.tenant_id,
+      tenant_id: skill.tenant_id, created_by: userId,
     }).select().single();
     if (error) { console.error('Failed to add skill:', error); return; }
     set((state) => ({
@@ -124,8 +129,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   },
 
   updateSkill: async (id, updates) => {
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('skills').update({
-      ...updates, updated_at: new Date().toISOString(),
+      ...updates, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) { console.error('Failed to update skill:', error); return; }
     set((state) => ({
@@ -144,14 +150,16 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   deleteSkill: async (id) => {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('skills').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skills').update({ deleted_on: now, deleted_by: userId }).eq('id', id);
     if (error) { console.error('Failed to delete skill:', error); return; }
     set((state) => ({ skills: state.skills.filter((s) => s.id !== id) }));
   },
 
   deleteCategory: async (id) => {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('skill_categories').update({ deleted_on: now, deleted_by: 'current-user' }).eq('id', id);
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_categories').update({ deleted_on: now, deleted_by: userId }).eq('id', id);
     if (error) { console.error('Failed to delete category:', error); return; }
     set((state) => ({ categories: state.categories.filter((c) => c.id !== id) }));
   },

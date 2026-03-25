@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentUserId } from '@/lib/audit';
 
 export interface Domain {
   id: string;
@@ -70,8 +71,9 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
 
   addDomain: async (domain) => {
     const id = `dom-${Date.now()}`;
+    const userId = getCurrentUserId();
     const { data, error } = await supabase.from('domains').insert({
-      id, ...domain,
+      id, ...domain, created_by: userId,
     }).select().single();
     if (error) { console.error('Failed to add domain:', error); return; }
     set((state) => ({
@@ -82,8 +84,9 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
   },
 
   updateDomain: async (id, updates) => {
+    const userId = getCurrentUserId();
     const { error } = await supabase.from('domains').update({
-      ...updates, updated_at: new Date().toISOString(),
+      ...updates, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) { console.error('Failed to update domain:', error); return; }
     set((state) => ({
@@ -102,8 +105,9 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
 
   addMapping: async (mapping) => {
     const id = `dsm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const userId = getCurrentUserId();
     const { data, error } = await supabase.from('domain_skill_mappings').insert({
-      id, ...mapping,
+      id, ...mapping, created_by: userId,
     }).select().single();
     if (error) { console.error('Failed to add mapping:', error); return; }
     set((state) => ({
@@ -112,7 +116,11 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
   },
 
   removeMapping: async (id) => {
-    const { error } = await supabase.from('domain_skill_mappings').delete().eq('id', id);
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('domain_skill_mappings').update({
+      deleted_on: now, deleted_by: userId,
+    }).eq('id', id);
     if (error) { console.error('Failed to remove mapping:', error); return; }
     set((state) => ({ mappings: state.mappings.filter((m) => m.id !== id) }));
   },
