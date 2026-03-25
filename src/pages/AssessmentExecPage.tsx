@@ -44,6 +44,23 @@ function Timer({ totalSeconds, onTimeUp }: { totalSeconds: number; onTimeUp: () 
 }
 
 function parseMCQOptions(text: string) {
+  // Try JSON format first (AI-generated MCQs)
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.questionText && Array.isArray(parsed.options)) {
+      return {
+        prefix: '',
+        body: parsed.questionText,
+        optionLines: parsed.options.map((opt: string, i: number) => ({
+          key: String.fromCharCode(65 + i), // A, B, C, D
+          text: opt,
+        })),
+        correctIndex: typeof parsed.correctIndex === 'number' ? parsed.correctIndex : null,
+      };
+    }
+  } catch { /* not JSON, fall through */ }
+
+  // Legacy plain-text format
   const lines = text.split('\n');
   const optionPattern = /^([A-D])\)\s*(.+)/;
   const optionLines: { key: string; text: string }[] = [];
@@ -53,7 +70,26 @@ function parseMCQOptions(text: string) {
     if (match) optionLines.push({ key: match[1], text: match[2] });
     else bodyLines.push(line);
   }
-  return { prefix: '', body: bodyLines.join('\n').trim(), optionLines };
+  return { prefix: '', body: bodyLines.join('\n').trim(), optionLines, correctIndex: null };
+}
+
+function parseCodingQuestion(text: string) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.problemStatement) {
+      return { problemStatement: parsed.problemStatement, exampleInput: parsed.exampleInput || '', exampleOutput: parsed.exampleOutput || '' };
+    }
+  } catch { /* not JSON */ }
+  return null;
+}
+
+function parseScenarioQuestion(text: string) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.question_text) return parsed.question_text;
+    if (parsed.questionText) return parsed.questionText;
+  } catch { /* not JSON */ }
+  return text;
 }
 
 // My Assessments (take assessment view)
@@ -267,13 +303,13 @@ function MyAssessmentsView() {
       </div>
 
       <div className="flex flex-1 gap-4 min-h-0">
-        <div className="w-16 shrink-0 rounded-xl border border-border bg-card p-2 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-1">
+        <div className="w-14 shrink-0 rounded-xl border border-border bg-card p-2 overflow-y-auto">
+          <div className="flex flex-col gap-1.5">
             {currentQuestions.map((aq, i) => {
               const hasAnswer = !!answers[aq.question_id]?.trim();
               const isCurrent = i === currentIdx;
               return (
-                <button key={aq.question_id} onClick={() => goTo(i)} className={`flex h-7 w-7 items-center justify-center rounded-md text-xs font-medium transition-all ${isCurrent ? 'bg-primary text-primary-foreground' : hasAnswer ? 'bg-success/15 text-success border border-success/20' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                <button key={aq.question_id} onClick={() => goTo(i)} className={`flex h-8 w-full items-center justify-center rounded-lg text-xs font-semibold transition-all ${isCurrent ? 'bg-primary text-primary-foreground shadow-sm' : hasAnswer ? 'bg-success/15 text-success border border-success/20' : 'bg-muted text-muted-foreground hover:bg-accent/10'}`}>
                   {i + 1}
                 </button>
               );
@@ -303,12 +339,34 @@ function MyAssessmentsView() {
                     ))}
                   </RadioGroup>
                 </div>
-              ) : (
+              ) : currentQuestion.question_type === 'coding' ? (() => {
+                const codingData = parseCodingQuestion(currentQuestion.question_text);
+                return (
+                  <div className="space-y-4">
+                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{codingData ? codingData.problemStatement : currentQuestion.question_text}</p>
+                    {codingData?.exampleInput && (
+                      <div className="rounded-lg bg-muted p-3 space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground">Example Input</p>
+                        <pre className="text-xs font-mono text-foreground">{codingData.exampleInput}</pre>
+                        {codingData.exampleOutput && <>
+                          <p className="text-xs font-semibold text-muted-foreground mt-2">Expected Output</p>
+                          <pre className="text-xs font-mono text-foreground">{codingData.exampleOutput}</pre>
+                        </>}
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">Your Code</Label>
+                      <Textarea value={answers[currentAQ.question_id] ?? ''} onChange={(e) => setAnswers((prev) => ({ ...prev, [currentAQ.question_id]: e.target.value }))} placeholder="Write your code here..." rows={12} maxLength={5000} className="font-mono text-sm" />
+                      <p className="text-xs text-muted-foreground mt-1 text-right">{(answers[currentAQ.question_id] ?? '').length}/5000</p>
+                    </div>
+                  </div>
+                );
+              })() : (
                 <div className="space-y-4">
-                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{currentQuestion.question_text}</p>
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{parseScenarioQuestion(currentQuestion.question_text)}</p>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1.5 block">{currentQuestion.question_type === 'coding' ? 'Your Code' : 'Your Answer'}</Label>
-                    <Textarea value={answers[currentAQ.question_id] ?? ''} onChange={(e) => setAnswers((prev) => ({ ...prev, [currentAQ.question_id]: e.target.value }))} placeholder={currentQuestion.question_type === 'coding' ? 'Write your code here...' : 'Write your answer here...'} rows={currentQuestion.question_type === 'coding' ? 12 : 8} maxLength={5000} className={currentQuestion.question_type === 'coding' ? 'font-mono text-sm' : 'text-sm'} />
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">Your Answer</Label>
+                    <Textarea value={answers[currentAQ.question_id] ?? ''} onChange={(e) => setAnswers((prev) => ({ ...prev, [currentAQ.question_id]: e.target.value }))} placeholder="Write your answer here..." rows={8} maxLength={5000} className="text-sm" />
                     <p className="text-xs text-muted-foreground mt-1 text-right">{(answers[currentAQ.question_id] ?? '').length}/5000</p>
                   </div>
                 </div>
