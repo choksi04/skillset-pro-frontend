@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -53,13 +53,15 @@ serve(async (req) => {
       );
     }
 
-    // Extract email
+    // Extract email and name
     const email = (
       payload.preferred_username ||
       payload.email ||
       payload.upn ||
       ""
     ).toLowerCase().trim();
+
+    const fullName = payload.name || payload.given_name || email.split("@")[0] || "New User";
 
     if (!email) {
       return new Response(
@@ -80,23 +82,49 @@ serve(async (req) => {
       .eq("email", email)
       .single();
 
-    if (dbError || !user) {
+    if (dbError && dbError.code !== "PGRST116") {
       return new Response(
-        JSON.stringify({
-          error: "No account found. Your admin must add you to the platform first.",
-        }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Database error. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (user.status !== "active") {
+    let finalUser = user;
+
+    // Auto-register new Azure AD users as employees
+    if (!user) {
+      const newId = crypto.randomUUID();
+      const { data: created, error: insertErr } = await supabaseAdmin
+        .from("users")
+        .insert({
+          id: newId,
+          email,
+          full_name: fullName,
+          role: "employee",
+          status: "active",
+          tenant_id: "tenant-001",
+        })
+        .select("*")
+        .single();
+
+      if (insertErr || !created) {
+        console.error("Auto-register error:", insertErr);
+        return new Response(
+          JSON.stringify({ error: "Failed to create your account. Contact your admin." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      finalUser = created;
+    }
+
+    if (finalUser.status !== "active") {
       return new Response(
         JSON.stringify({ error: "Your account is disabled. Contact your admin." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(JSON.stringify({ user }), {
+    return new Response(JSON.stringify({ user: finalUser }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
