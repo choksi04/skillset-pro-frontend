@@ -53,13 +53,15 @@ serve(async (req) => {
       );
     }
 
-    // Extract email
+    // Extract email and name
     const email = (
       payload.preferred_username ||
       payload.email ||
       payload.upn ||
       ""
     ).toLowerCase().trim();
+
+    const fullName = payload.name || payload.given_name || email.split("@")[0] || "New User";
 
     if (!email) {
       return new Response(
