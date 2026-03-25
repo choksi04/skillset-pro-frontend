@@ -91,6 +91,21 @@ serve(async (req) => {
 
     let finalUser = user;
 
+    // Sync to auth.users so user appears in Cloud Users section
+    try {
+      const { data: authLookup } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+      const existingAuthUser = authLookup?.users?.find((u: any) => u.email === email);
+      if (!existingAuthUser) {
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: { full_name: fullName },
+        });
+      }
+    } catch (syncErr) {
+      console.warn("Auth sync (non-blocking):", syncErr);
+    }
+
     // Auto-register new Azure AD users as employees
     if (!user) {
       const newId = crypto.randomUUID();
