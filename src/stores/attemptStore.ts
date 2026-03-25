@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from './questionStore';
+import { getCurrentUserId } from '@/lib/audit';
 
 export interface AnswerEntry {
   question_id: string;
@@ -229,9 +230,10 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     const existing = get().attempts.find((a) => a.assessment_id === assessmentId);
     if (existing) return existing.id;
 
+    const userId = getCurrentUserId();
     const { data: row, error } = await supabase
       .from('assessment_attempts')
-      .insert({ assessment_id: assessmentId, tenant_id: tenantId, employee_id: employeeId, status: 'in_progress' })
+      .insert({ assessment_id: assessmentId, tenant_id: tenantId, employee_id: employeeId, status: 'in_progress', created_by: userId })
       .select()
       .single();
 
@@ -251,12 +253,14 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   },
 
   saveAnswer: async (attemptId, answer) => {
+    const userId = getCurrentUserId();
     await supabase.from('attempt_answers').delete()
       .eq('attempt_id', attemptId).eq('question_id', answer.question_id);
 
     await supabase.from('attempt_answers').insert({
       attempt_id: attemptId, question_id: answer.question_id,
       answer_text: answer.answer_text, time_spent_seconds: answer.time_spent_seconds,
+      created_by: userId,
     });
 
     set((state) => ({
@@ -272,15 +276,14 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     const attempt = get().attempts.find((a) => a.id === attemptId);
     if (!attempt) return;
 
-    // Check if already evaluated (prevent duplicate submissions)
     if (attempt.status === 'evaluated' || attempt.status === 'submitted') return;
 
+    const userId = getCurrentUserId();
     const evaluations = generateStructuredEvaluation(attempt.answers, questionMap);
     const totalScore = evaluations.length > 0
       ? Math.round(evaluations.reduce((sum, e) => sum + e.score, 0) / evaluations.length)
       : 0;
 
-    // Calculate per-skill scores
     const skillScoreMap: Record<string, { total: number; count: number }> = {};
     for (const ev of evaluations) {
       const aq = assessmentQuestions.find((q) => q.question_id === ev.question_id);
@@ -296,16 +299,15 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
 
     const now = new Date().toISOString();
 
-    // Delete existing evals/scores first (idempotent)
     await Promise.all([
       supabase.from('ai_evaluations').delete().eq('attempt_id', attemptId),
       supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId),
     ]);
 
-    // Persist to DB
     await Promise.all([
       supabase.from('assessment_attempts').update({
         status: 'evaluated', total_ai_score: totalScore, submitted_at: now, evaluated_at: now,
+        modified_by: userId, modified_at: now,
       }).eq('id', attemptId),
 
       evaluations.length > 0
@@ -313,6 +315,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
             evaluations.map((ev) => ({
               attempt_id: attemptId, question_id: ev.question_id, score: ev.score,
               feedback: ev.feedback, dimensions: ev.dimensions as any, confidence: ev.confidence,
+              created_by: userId,
             }))
           )
         : Promise.resolve(),
@@ -322,6 +325,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
             skillScores.map((ss) => ({
               attempt_id: attemptId, skill_id: ss.skill_id, avg_score: ss.avg_score,
               calculated_level: ss.calculated_level, question_count: ss.question_count,
+              created_by: userId,
             }))
           )
         : Promise.resolve(),
