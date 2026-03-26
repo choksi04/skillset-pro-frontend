@@ -1,71 +1,81 @@
 
 
-## Plan: Notify All Roles on Cycle Activation + Manager/Admin Self-Review with External Reviewer Assignment
+## Plan: Split Skill Registry into Two Separate Pages
 
-### Part 1: Notify All Users on Cycle Activation
-
-**File: `src/stores/cycleStore.ts`**
-
-Change the `activateCycle` method to query ALL active users in the tenant (not just `role = 'employee'`) and send role-appropriate notifications:
-- Employees: "Submit your skill ratings by {date}" with link to `/skill-registry`
-- Managers: "A new review cycle has started. Monitor your team's progress." with link to `/review-cycles`
-- Admins: "Review cycle '{name}' is now active." with link to `/review-cycles`
-
-Also update `sendReminder` to similarly notify managers about pending reviews in their domain.
+Split the current `SkillRegistryPage.tsx` (which uses tabs for My/Team) into two dedicated pages with separate routes and sidebar entries, matching the pattern used by Assessments and Manager Reviews.
 
 ---
 
-### Part 2: Manager/Admin Skill Registry Participation
+### Architecture
 
-**Current behavior**: Managers and Admins already have a "My Registry" tab in SkillRegistryPage. The `MyRegistryView` component works for any role — it checks `user.domain_id` to find the assigned domain. If a manager/admin is assigned to a domain, they can already submit self-ratings.
+```text
+/skill-registry        → My Skill Registry (employee's own view)
+/team-registry          → Team's Registry (manager/admin supervisory view)
+```
 
-**Current reviewer assignment problem**: When assessment is submitted (`AssessmentExecPage.tsx` line 197-205), the reviewer is always the domain lead. If the submitter IS the domain lead, they become their own reviewer — which is the "self-approve" default behavior you described.
-
-**Changes needed**:
-
-1. **`src/pages/AssessmentExecPage.tsx`** — Update reviewer assignment logic during `doSubmit`:
-   - If the employee IS the domain lead (self-review case): assign themselves as reviewer (default self-approve)
-   - Otherwise: assign domain lead as before
-
-2. **New: Admin "Assign External Reviewer" feature on `ReviewsPage.tsx`**:
-   - Add a button on each review card (visible to admins only): "Assign Reviewer"
-   - Opens a dialog that lists all active users in the same tenant (excluding the employee being reviewed)
-   - Admin selects a user → updates `manager_reviews.reviewer_id` in DB
-   - Sends notification to the new reviewer: "You have been assigned to review {employee_name}'s assessment."
-   - The new reviewer then sees this review on their Reviews page
-
-3. **`src/stores/reviewStore.ts`** — Add new action:
-   - `reassignReviewer(reviewId: string, newReviewerId: string, reviewerName: string): Promise<void>` — updates DB, sends notification, updates local state
-
-4. **`src/pages/ReviewsPage.tsx`** — UI changes:
-   - Show current reviewer name on each review card
-   - Admin-only "Change Reviewer" button that opens a user picker dialog
-   - Fetch tenant users for the picker (filter out the employee under review)
-   - After reassignment, show toast confirmation
+Both pages are standalone — no tabs. The sidebar shows both links (role-filtered).
 
 ---
 
-### Database Changes
+### File Changes
 
-**None required.** The `manager_reviews.reviewer_id` field already exists and can be updated. The `notifications` table already supports all needed fields.
+#### 1. `src/pages/SkillRegistryPage.tsx` — Rewrite as "My Skill Registry"
+
+Remove `TeamRegistryView`, `TeamMemberDetail`, and the `Tabs` wrapper. This page becomes the employee-focused page with:
+
+- **Section 1: Current Active Cycle Card** — highlighted card with cycle name, dates, status badge, days remaining. Derives employee status (Not Started / In Progress / Self Review Submitted / Assessment Pending / Assessment Completed / Manager Review Pending / Approved) by cross-referencing submissions, assessments, attempts, and reviews. Shows dynamic CTA button based on status.
+- **Section 2: Self Review Form** — skills grouped by category with accordion, `RatingSlider` per skill, previous cycle rating shown inline ("Last cycle: L3"), optional collapsible comment textarea per skill, progress bar ("8 of 12 skills rated"), category-level progress, search, auto-save (2s debounce with "Saving..."/"Saved" indicator), validation before submit.
+- **Section 3: Past Registries Table** — past submissions for this employee, showing Cycle Name, Date, Avg Score, Status, with expandable detail (Skill / Self Score / Assessment Score / Final Score / Gap).
+- Edge cases: no active cycle, no domain, no skills, cycle closed.
+
+All roles can access this page (everyone has their own registry).
+
+#### 2. `src/pages/TeamRegistryPage.tsx` — New Page
+
+Extract `TeamRegistryView` and `TeamMemberDetail` into this new page. Admin + Manager only. Shows team submissions list with drill-down into member detail. Same logic as current `TeamRegistryView`.
+
+#### 3. `src/components/layout/AppSidebar.tsx`
+
+Replace the single "Skill Registry" entry with two entries:
+- `{ title: 'My Registry', href: '/skill-registry', roles: ['admin', 'manager', 'employee'] }`
+- `{ title: 'Team Registry', href: '/team-registry', roles: ['admin', 'manager'] }`
+
+#### 4. `src/App.tsx` — Routing
+
+- Add route: `/team-registry` → `<RoleGuard allowed={["admin", "manager"]}><TeamRegistryPage /></RoleGuard>`
+- Keep `/skill-registry` → `<SkillRegistryPage />` (all roles)
+
+#### 5. `src/components/layout/PageHeader.tsx`
+
+Add breadcrumb entries:
+- `/skill-registry` → `{ group: 'Operations', title: 'My Registry' }`
+- `/team-registry` → `{ group: 'Operations', title: 'Team Registry' }`
+
+#### 6. `src/stores/registryStore.ts`
+
+- Add `comment?: string` to `SkillSelfRating` interface
+- Update `createOrUpdateDraft` to persist comments in `skill_self_ratings.comment`
+
+#### 7. `src/components/registry/RatingSlider.tsx`
+
+- Add optional `previousRating?: RatingLevel` prop
+- Display "Last cycle: L{n}" label when provided
+
+#### 8. Database Migration
+
+- Add `comment text` nullable column to `skill_self_ratings` table
+
+#### 9. `src/pages/UserGuidePage.tsx`
+
+- Update Employee Guide with Skill Registry instructions (self review, scores, post-submission, auto-save)
 
 ---
 
-### Summary of File Changes
+### Key Technical Details
 
-| File | Change |
-|------|--------|
-| `src/stores/cycleStore.ts` | Notify all roles on activation (employees, managers, admins) |
-| `src/stores/reviewStore.ts` | Add `reassignReviewer` action |
-| `src/pages/ReviewsPage.tsx` | Show reviewer name, add admin "Change Reviewer" dialog |
-| `src/pages/AssessmentExecPage.tsx` | Handle self-review case for domain leads |
-
----
-
-### Edge Cases
-
-- **Manager self-approves**: Allowed by default. Their review appears in their own Reviews page since `reviewer_id === user.id`.
-- **Admin reassigns reviewer mid-review**: If review is `in_progress`, the new reviewer picks up where the previous left off (skill actions already saved).
-- **External reviewer has no domain**: Works fine — the review card shows all data regardless of reviewer's domain. The reviewer just needs to be an active user in the tenant.
-- **Multiple reassignments**: Each reassignment overwrites the previous reviewer and notifies the new one.
+- **Auto-save**: `useEffect` with 2s debounce on `ratings` state. Calls `createOrUpdateDraft`. Shows "Saving..." / "All changes saved" indicator. No manual Save Draft button.
+- **Status derivation**: Cross-reference `registryStore.submissions`, `assessmentStore.assessments`, `attemptStore.attempts`, `reviewStore.reviews` for the current cycle to compute status. No new DB columns.
+- **Previous cycle scores**: Query past submissions for same employee, build `Record<string, RatingLevel>` map, pass as `previousRating` to each `RatingSlider`.
+- **Past registries**: Filter submissions by employee_id excluding active cycle. Lazy-load assessment/final scores on expand by querying `attempt_skill_scores` and `official_skill_entries`.
+- **Comments**: Collapsible textarea per skill, only in draft mode. Stored in new `skill_self_ratings.comment` column.
 
