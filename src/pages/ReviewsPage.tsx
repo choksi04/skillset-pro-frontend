@@ -350,9 +350,8 @@ export default function ReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <p className="text-sm text-muted-foreground">Review AI-evaluated assessment results, adjust skill levels, and generate official registry entries.</p>
-        <NotificationPanel />
       </div>
 
       {!isManager && (

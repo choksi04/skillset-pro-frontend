@@ -1,6 +1,7 @@
 import { useLocation, Link } from 'react-router-dom';
-import { Bell, Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight } from 'lucide-react';
 import HelpButton from '@/components/onboarding/HelpButton';
+import NotificationDropdown from '@/components/layout/NotificationDropdown';
 import { useSkillStore } from '@/stores/skillStore';
 
 interface BreadcrumbEntry {
@@ -78,10 +79,7 @@ export default function PageHeader() {
           <Search size={16} />
         </button>
         <HelpButton />
-        <button className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors relative">
-          <Bell size={16} />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
-        </button>
+        <NotificationDropdown />
       </div>
     </header>
   );
