@@ -35,6 +35,7 @@ interface DomainStore {
   removeMapping: (id: string) => Promise<void>;
   getMappingsForDomain: (domainId: string) => DomainSkillMap[];
   checkDomainDeletable: (id: string) => Promise<{ deletable: boolean; reason?: string }>;
+  deleteDomain: (id: string) => Promise<boolean>;
 }
 
 export const useDomainStore = create<DomainStore>((set, get) => ({
@@ -143,5 +144,18 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
       return { deletable: false, reason: `Domain has ${count} assigned user(s). Remove them first.` };
     }
     return { deletable: true };
+  },
+
+  deleteDomain: async (id) => {
+    const check = await get().checkDomainDeletable(id);
+    if (!check.deletable) return false;
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('domains').update({
+      deleted_on: now, deleted_by: userId, modified_at: now, modified_by: userId,
+    }).eq('id', id);
+    if (error) { console.error('Failed to delete domain:', error); return false; }
+    set((state) => ({ domains: state.domains.filter((d) => d.id !== id) }));
+    return true;
   },
 }));
