@@ -270,7 +270,7 @@ export default function QuestionBankPage() {
   const [aiErrors, setAiErrors] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
   const [previews, setPreviews] = useState<GeneratedPreview[]>([]);
-  const [expandedPreview, setExpandedPreview] = useState<number | null>(null);
+  const [previewDetailIndex, setPreviewDetailIndex] = useState<number | null>(null);
 
   // Load topics when AI skill changes
   useEffect(() => {
@@ -343,7 +343,7 @@ export default function QuestionBankPage() {
     setAiErrors({});
     setGenerating(true);
     setPreviews([]);
-    setExpandedPreview(null);
+    setPreviewDetailIndex(null);
 
     const skill = skills.find((s) => s.id === aiSkillId);
     const topic = aiTopicId ? topicMap.get(aiTopicId) : undefined;
@@ -528,10 +528,8 @@ export default function QuestionBankPage() {
                     </div>
                     {previews.map((p, i) => {
                       const { display } = parseQuestionText(p.question_text, aiQType);
-                      const isExpanded = expandedPreview === i;
                       return (
                         <div key={i} className={`rounded-lg border bg-card overflow-hidden transition-all ${p.accepted ? 'border-success/30' : 'border-border opacity-50'}`}>
-                          {/* Collapsed row: checkbox + title + expand */}
                           <div className="flex items-center gap-3 p-3">
                             <button
                               onClick={(e) => { e.stopPropagation(); togglePreview(i); }}
@@ -542,24 +540,14 @@ export default function QuestionBankPage() {
                               {p.accepted && <CheckCircle size={12} />}
                             </button>
                             <button
-                              className="flex-1 min-w-0 text-left flex items-center gap-2"
-                              onClick={() => setExpandedPreview(isExpanded ? null : i)}
+                              className="flex-1 min-w-0 text-left flex items-center gap-2 hover:underline"
+                              onClick={() => setPreviewDetailIndex(i)}
                             >
                               <Badge variant="secondary" className="text-[10px] shrink-0">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
                               <span className="text-sm text-foreground truncate">{display}</span>
-                              {isExpanded ? <ChevronDown size={14} className="text-muted-foreground shrink-0 ml-auto" /> : <ChevronRight size={14} className="text-muted-foreground shrink-0 ml-auto" />}
+                              <Eye size={14} className="text-muted-foreground shrink-0 ml-auto" />
                             </button>
                           </div>
-                          {/* Expanded detail */}
-                          {isExpanded && (
-                            <div className="border-t border-border px-4 py-3">
-                              <FormattedQuestionContent
-                                text={p.question_text}
-                                guidelines={p.evaluation_guidelines}
-                                type={aiQType}
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -760,6 +748,32 @@ export default function QuestionBankPage() {
           topicName={detailQuestion.topic_id ? (topicMap.get(detailQuestion.topic_id) || null) : null}
           onClose={() => setDetailQuestion(null)}
         />
+      )}
+
+      {/* AI Preview Detail Sheet */}
+      {previewDetailIndex !== null && previews[previewDetailIndex] && (
+        <Sheet open onOpenChange={(open) => { if (!open) setPreviewDetailIndex(null); }}>
+          <SheetContent className="sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>AI Generated Question</SheetTitle>
+              <SheetDescription>
+                {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {competencyLabels[aiLevel as CompetencyLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 mt-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
+                <Badge variant="secondary" className="text-xs">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
+                <Badge variant="outline" className="text-xs">{competencyLabels[aiLevel as CompetencyLevel] || aiLevel}</Badge>
+              </div>
+              <FormattedQuestionContent
+                text={previews[previewDetailIndex].question_text}
+                guidelines={previews[previewDetailIndex].evaluation_guidelines}
+                type={aiQType}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
 
       {/* Form Sheet */}
