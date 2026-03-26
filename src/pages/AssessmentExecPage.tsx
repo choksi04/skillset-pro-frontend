@@ -248,11 +248,11 @@ export default function AssessmentExecPage() {
       });
     }
 
-    const qMap = new Map(
-      currentQuestions
-        .map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as const)
-        .filter(([, q]) => q != null)
-    );
+    const qMap = new Map<string, any>();
+    for (const aq of currentQuestions) {
+      const q = questionMap.get(aq.question_id);
+      if (q) qMap.set(aq.question_id, q);
+    }
     await submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
     await updateAssessmentStatus(activeAssessment.id, 'completed');
 
