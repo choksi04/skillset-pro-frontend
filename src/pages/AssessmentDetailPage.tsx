@@ -10,13 +10,14 @@ import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import EvalResults from '@/components/assessment/EvalResults';
+import ManagerReviewPanel from '@/components/assessment/ManagerReviewPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Play, BarChart3, ClipboardCheck, Clock,
-  CheckCircle, Loader2, RotateCcw, ArrowRight,
+  CheckCircle, Loader2, RotateCcw,
 } from 'lucide-react';
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
@@ -181,16 +182,16 @@ export default function AssessmentDetailPage() {
             </Button>
           </div>
         )}
-        {!isOwner && (status === 'evaluated' || status === 'review_pending') && (
-          <Button variant="outline" onClick={() => navigate('/manager-reviews')} className="gap-1.5">
-            <ArrowRight size={14} /> Go to Review
-          </Button>
-        )}
       </div>
 
       {/* Evaluation Results */}
       {isEvaluated && attempt && (
         <EvalResults attempt={attempt} assessment={assessment} />
+      )}
+
+      {/* Manager Review Panel (inline for team assessments) */}
+      {!isOwner && review && attempt && (
+        <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
       )}
     </div>
   );
