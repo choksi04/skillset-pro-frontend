@@ -14,7 +14,8 @@ const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
   '/all-registries': { group: 'Insights', title: 'All Registries' },
   '/skill-registry': { group: 'Operations', title: 'My Registry' },
   '/team-registry': { group: 'Operations', title: 'Team Registry' },
-  '/assessments': { group: 'Operations', title: 'Assessments' },
+  '/assessments': { group: 'Operations', title: 'My Assessments' },
+  '/team-assessments': { group: 'Operations', title: 'Team Assessments' },
   '/skill-library': { group: 'Settings', title: 'Skill Library' },
   '/domains': { group: 'Settings', title: 'Domains' },
   '/users': { group: 'Settings', title: 'Users' },
@@ -22,6 +23,7 @@ const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
   '/question-settings': { group: 'Settings', title: 'Question Settings' },
   '/review-cycles': { group: 'Settings', title: 'Review Cycles' },
   '/manager-reviews': { group: 'Operations', title: 'Manager Reviews' },
+  '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
   '/help': { group: 'Support', title: 'Help & Tutorial' },
   '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
 };
