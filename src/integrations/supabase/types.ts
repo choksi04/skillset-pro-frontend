@@ -81,6 +81,8 @@ export type Database = {
           id: string
           modified_at: string | null
           modified_by: string | null
+          paused_at: string | null
+          remaining_seconds: number | null
           started_at: string
           status: string
           submitted_at: string | null
@@ -97,6 +99,8 @@ export type Database = {
           id?: string
           modified_at?: string | null
           modified_by?: string | null
+          paused_at?: string | null
+          remaining_seconds?: number | null
           started_at?: string
           status?: string
           submitted_at?: string | null
@@ -113,6 +117,8 @@ export type Database = {
           id?: string
           modified_at?: string | null
           modified_by?: string | null
+          paused_at?: string | null
+          remaining_seconds?: number | null
           started_at?: string
           status?: string
           submitted_at?: string | null
@@ -183,14 +189,17 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          cycle_id: string | null
           deleted_by: string | null
           deleted_on: string | null
           domain_id: string
           duration_minutes: number
           employee_id: string
           id: string
+          is_reassessment: boolean
           modified_at: string | null
           modified_by: string | null
+          parent_assessment_id: string | null
           status: string
           submission_id: string
           tenant_id: string
@@ -199,14 +208,17 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id: string
           duration_minutes?: number
           employee_id: string
           id?: string
+          is_reassessment?: boolean
           modified_at?: string | null
           modified_by?: string | null
+          parent_assessment_id?: string | null
           status?: string
           submission_id: string
           tenant_id: string
@@ -215,14 +227,17 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id?: string
           duration_minutes?: number
           employee_id?: string
           id?: string
+          is_reassessment?: boolean
           modified_at?: string | null
           modified_by?: string | null
+          parent_assessment_id?: string | null
           status?: string
           submission_id?: string
           tenant_id?: string
@@ -720,6 +735,42 @@ export type Database = {
           tenant_id?: string
           topic_id?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      reassessment_requests: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          review_id: string
+          skill_ids: Json
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          review_id: string
+          skill_ids?: Json
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          review_id?: string
+          skill_ids?: Json
+          status?: string
+          tenant_id?: string
         }
         Relationships: []
       }
