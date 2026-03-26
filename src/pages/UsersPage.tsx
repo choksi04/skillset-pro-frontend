@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Pencil, Shield, Users } from 'lucide-react';
+import { Plus, Search, Pencil, Shield, Users, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getCurrentUserId } from '@/lib/audit';
 
@@ -48,7 +48,6 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
 
-  // Form state
   const [form, setForm] = useState({
     full_name: '', email: '', role: 'employee' as string,
     domain_id: '' as string, department: '', designation: '', status: 'active',
@@ -83,9 +82,16 @@ export default function UsersPage() {
     setDialogOpen(true);
   };
 
+  const isDomainRequired = form.role === 'employee' || form.role === 'manager';
+  const domainMissing = isDomainRequired && !form.domain_id;
+
   const handleSave = async () => {
     if (!form.full_name.trim() || !form.email.trim()) {
       toast.error('Name and email are required.');
+      return;
+    }
+    if (domainMissing) {
+      toast.error('Domain is required for employees and managers.');
       return;
     }
 
@@ -190,6 +196,7 @@ export default function UsersPage() {
             ) : (
               filtered.map((u) => {
                 const domain = domains.find((d) => d.id === u.domain_id);
+                const needsDomain = (u.role === 'employee' || u.role === 'manager') && !u.domain_id;
                 return (
                   <TableRow key={u.id}>
                     <TableCell>
@@ -199,7 +206,17 @@ export default function UsersPage() {
                     <TableCell>
                       <Badge variant="outline" className="text-xs capitalize">{roleLabels[u.role] ?? u.role}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{domain?.name ?? '—'}</TableCell>
+                    <TableCell className="text-sm">
+                      {domain ? (
+                        <span className="text-muted-foreground">{domain.name}</span>
+                      ) : needsDomain ? (
+                        <span className="flex items-center gap-1 text-xs text-destructive">
+                          <AlertTriangle size={12} /> No domain
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={u.status === 'active' ? 'default' : 'outline'}
@@ -264,14 +281,25 @@ export default function UsersPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Domain</Label>
+              <Label className="text-xs">
+                Domain {isDomainRequired && <span className="text-destructive">*</span>}
+              </Label>
               <Select value={form.domain_id || 'none'} onValueChange={(v) => setForm({ ...form, domain_id: v === 'none' ? '' : v })}>
-                <SelectTrigger><SelectValue placeholder="No domain" /></SelectTrigger>
+                <SelectTrigger className={domainMissing ? 'border-destructive' : ''}>
+                  <SelectValue placeholder="No domain" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No domain</SelectItem>
-                  {domains.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  {!isDomainRequired && <SelectItem value="none">No domain</SelectItem>}
+                  {domains.filter((d) => d.status === 'active').map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {domainMissing && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle size={12} /> Domain is required for {form.role}s.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

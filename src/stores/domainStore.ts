@@ -28,12 +28,13 @@ interface DomainStore {
   loading: boolean;
   initialized: boolean;
   fetchDomains: () => Promise<void>;
-  addDomain: (domain: Omit<Domain, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addDomain: (domain: Omit<Domain, 'id' | 'created_at' | 'updated_at'>) => Promise<string | undefined>;
   updateDomain: (id: string, updates: Partial<Domain>) => Promise<void>;
   toggleDomainStatus: (id: string) => Promise<void>;
   addMapping: (mapping: Omit<DomainSkillMap, 'id' | 'created_at'>) => Promise<void>;
   removeMapping: (id: string) => Promise<void>;
   getMappingsForDomain: (domainId: string) => DomainSkillMap[];
+  checkDomainDeletable: (id: string) => Promise<{ deletable: boolean; reason?: string }>;
 }
 
 export const useDomainStore = create<DomainStore>((set, get) => ({
@@ -75,12 +76,13 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
     const { data, error } = await supabase.from('domains').insert({
       id, ...domain, created_by: userId,
     }).select().single();
-    if (error) { console.error('Failed to add domain:', error); return; }
+    if (error) { console.error('Failed to add domain:', error); return undefined; }
     set((state) => ({
       domains: [...state.domains, {
         id, ...domain, created_at: (data as any).created_at, updated_at: (data as any).updated_at,
       }],
     }));
+    return id;
   },
 
   updateDomain: async (id, updates) => {
@@ -126,4 +128,20 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
   },
 
   getMappingsForDomain: (domainId) => get().mappings.filter((m) => m.domain_id === domainId),
+
+  checkDomainDeletable: async (id) => {
+    const mappingCount = get().mappings.filter((m) => m.domain_id === id).length;
+    if (mappingCount > 0) {
+      return { deletable: false, reason: `Domain has ${mappingCount} mapped skill(s). Remove them first.` };
+    }
+    const { count } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('domain_id', id)
+      .is('deleted_on', null);
+    if (count && count > 0) {
+      return { deletable: false, reason: `Domain has ${count} assigned user(s). Remove them first.` };
+    }
+    return { deletable: true };
+  },
 }));
