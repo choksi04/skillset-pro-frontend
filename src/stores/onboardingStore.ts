@@ -71,7 +71,7 @@ const coreTourSteps: TourStep[] = [
 const adminExtraSteps: TourStep[] = [
   { id: 'admin-domains', title: 'Create Domains', description: 'As an admin, you can create and manage functional domains.', targetSelector: '[data-tour="domains"]', roles: ['admin'], position: 'right' },
   { id: 'admin-skills', title: 'Add Skills', description: 'Build your skill library by adding individual skills.', targetSelector: '[data-tour="skills"]', roles: ['admin'], position: 'right' },
-  { id: 'admin-mapping', title: 'Map Skills to Domains', description: 'Link skills to domains to define what capabilities are needed.', targetSelector: '[data-tour="domain-skills"]', roles: ['admin'], position: 'right' },
+  { id: 'admin-mapping', title: 'Map Skills to Domains', description: 'Link skills to domains to define what capabilities are needed.', targetSelector: '[data-tour="domains"]', roles: ['admin'], position: 'right' },
   { id: 'admin-questions', title: 'Manage Questions', description: 'Create assessment questions manually or use AI generation.', targetSelector: '[data-tour="questions"]', roles: ['admin'], position: 'right' },
   { id: 'admin-reports', title: 'View Reports', description: 'Access organization-wide analytics on the HR Dashboard.', targetSelector: '[data-tour="hr-dashboard"]', roles: ['admin'], position: 'right' },
 ];

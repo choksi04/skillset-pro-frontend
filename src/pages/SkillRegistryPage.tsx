@@ -451,10 +451,10 @@ function MyRegistryView() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+            <Button onClick={() => { setSuccessOpen(false); navigate('/assessments'); }} className="w-full gap-1.5">
               <ClipboardCheck size={14} /> Attempt Now
             </Button>
-            <Button variant="outline" onClick={() => { setSuccessOpen(false); navigate('/assessment-exec'); }} className="w-full gap-1.5">
+            <Button variant="outline" onClick={() => { setSuccessOpen(false); navigate('/assessments'); }} className="w-full gap-1.5">
               <Eye size={14} /> View Assessment
             </Button>
             <Button variant="ghost" onClick={() => setSuccessOpen(false)} className="w-full gap-1.5">
