@@ -47,8 +47,8 @@ const sidebarGroups: SidebarGroup[] = [
     items: [
       { title: 'My Registry', href: '/skill-registry', icon: <BarChart3 size={18} />, roles: ['admin', 'manager', 'employee'] },
       { title: 'Team Registry', href: '/team-registry', icon: <Users size={18} />, roles: ['admin', 'manager'] },
-      { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'manager', 'employee'] },
-      { title: 'Manager Reviews', href: '/manager-reviews', icon: <FileText size={18} />, roles: ['admin', 'manager'] },
+      { title: 'My Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'manager', 'employee'] },
+      { title: 'Team Assessments', href: '/team-assessments', icon: <FileText size={18} />, roles: ['admin', 'manager'] },
     ],
   },
   {

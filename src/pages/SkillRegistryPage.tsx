@@ -139,10 +139,10 @@ export default function SkillRegistryPage() {
   const submissionAllowed = isSubmissionAllowed();
   const daysRemaining = getDaysRemaining();
 
-  // CTA handler — navigates to detail page
-  const handleCTA = async () => {
+  // CTA handler — status-dependent navigation
+  const handleCTA = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (employeeStatus === 'not_started') {
-      // Create draft first then navigate
       if (assignedDomain) {
         await createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, []);
         await fetchRegistry();
@@ -156,13 +156,18 @@ export default function SkillRegistryPage() {
       return;
     }
     if (employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') {
+      navigate('/assessments');
+      return;
+    }
+    if (employeeStatus === 'assessment_completed' || employeeStatus === 'approved' || employeeStatus === 'review_pending') {
       if (submission) navigate(`/skill-registry/${submission.id}`);
       return;
     }
-    if (employeeStatus === 'assessment_completed' || employeeStatus === 'approved') {
-      if (submission) navigate(`/skill-registry/${submission.id}`);
-      return;
-    }
+  };
+
+  // Card click — always goes to detail (if submission exists)
+  const handleCardClick = () => {
+    if (submission) navigate(`/skill-registry/${submission.id}`);
   };
 
   const config = employeeStatus ? statusConfig[employeeStatus] : null;
@@ -227,7 +232,7 @@ export default function SkillRegistryPage() {
           {/* Active registry card — same format as past registry cards */}
           <Card
             className="border-primary/20 hover:border-primary/40 transition-colors cursor-pointer"
-            onClick={handleCTA}
+            onClick={handleCardClick}
           >
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -252,13 +257,13 @@ export default function SkillRegistryPage() {
                       <ManagerAvatar reviewer={activeEnriched.reviewer} />
                     </div>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1 text-xs shrink-0"
-                    disabled={config.ctaDisabled}
-                    onClick={(e) => { e.stopPropagation(); handleCTA(); }}
-                  >
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     className="gap-1 text-xs shrink-0"
+                     disabled={config.ctaDisabled}
+                     onClick={(e) => handleCTA(e)}
+                   >
                     {employeeStatus === 'not_started' && <Play size={13} />}
                     {employeeStatus === 'in_progress' && <ArrowRight size={13} />}
                     {(employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') && <ClipboardCheck size={13} />}
