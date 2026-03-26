@@ -90,7 +90,8 @@ export default function TeamRegistryPage() {
         finalAvg = avgRound(officialForCycle.map((oe) => oe.final_level));
       }
 
-      const status = deriveStatus(sub, assessments, attempts, reviews);
+      const subCycleClosed = !activeCycle || sub.cycle !== activeCycle.name;
+      const status = deriveStatus(sub, assessments, attempts, reviews, sub.status === 'draft' ? subCycleClosed : false);
 
       let reviewer: EnrichedSubmission['reviewer'] = null;
       if (assessment) {
