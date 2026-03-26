@@ -9,6 +9,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
+import CategoryDetailPage from "@/pages/CategoryDetailPage";
 import DomainsPage from "@/pages/DomainsPage";
 import DomainDetailPage from "@/pages/DomainDetailPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
