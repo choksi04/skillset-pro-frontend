@@ -12,7 +12,8 @@ interface BreadcrumbEntry {
 const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
   '/': { group: 'Insights', title: 'Dashboard' },
   '/all-registries': { group: 'Insights', title: 'All Registries' },
-  '/skill-registry': { group: 'Operations', title: 'Skill Registry' },
+  '/skill-registry': { group: 'Operations', title: 'My Registry' },
+  '/team-registry': { group: 'Operations', title: 'Team Registry' },
   '/assessments': { group: 'Operations', title: 'Assessments' },
   '/skill-library': { group: 'Settings', title: 'Skill Library' },
   '/domains': { group: 'Settings', title: 'Domains' },

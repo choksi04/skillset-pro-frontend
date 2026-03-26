@@ -45,7 +45,8 @@ const sidebarGroups: SidebarGroup[] = [
   {
     label: 'Operations',
     items: [
-      { title: 'Skill Registry', href: '/skill-registry', icon: <BarChart3 size={18} />, roles: ['admin', 'manager', 'employee'] },
+      { title: 'My Registry', href: '/skill-registry', icon: <BarChart3 size={18} />, roles: ['admin', 'manager', 'employee'] },
+      { title: 'Team Registry', href: '/team-registry', icon: <Users size={18} />, roles: ['admin', 'manager'] },
       { title: 'Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'manager', 'employee'] },
       { title: 'Manager Reviews', href: '/manager-reviews', icon: <FileText size={18} />, roles: ['admin', 'manager'] },
     ],
