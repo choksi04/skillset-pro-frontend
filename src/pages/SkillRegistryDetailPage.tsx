@@ -418,9 +418,24 @@ export default function SkillRegistryDetailPage() {
   }
 
   // ── SUBMITTED / LOCKED / COMPLETED → Read-only detail view ──
+  const showGoToAssessment = ['submitted', 'assessment_pending'].includes(employeeStatus);
+
   return (
     <div className="space-y-6">
       {header}
+
+      {/* Go to Assessment CTA */}
+      {showGoToAssessment && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Assessment Generated</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Your self-assessment has been submitted. Proceed to take your skill assessment.</p>
+          </div>
+          <Button onClick={() => navigate('/assessments')} className="gap-1.5 shrink-0">
+            <ClipboardCheck size={14} /> Go to Assessment
+          </Button>
+        </div>
+      )}
 
       {/* Score tiles with icons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
