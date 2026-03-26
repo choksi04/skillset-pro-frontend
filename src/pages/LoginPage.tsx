@@ -125,10 +125,10 @@ export default function LoginPage() {
               <div className="space-y-1.5 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground text-[11px] uppercase tracking-wider">Demo accounts</p>
                 <p>
-                  <span className="font-medium text-foreground">Admin:</span> temp_admin@1rivet.com
+                  <span className="font-medium text-foreground">Admin:</span> test_admin@1rivet.com
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">Manager:</span> temp_manager@1rivet.com
+                  <span className="font-medium text-foreground">Manager:</span> test_manager@1rivet.com
                 </p>
                 <p>
                   <span className="font-medium text-foreground">Employee:</span> test_emp@1rivet.com
