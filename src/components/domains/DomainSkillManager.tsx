@@ -8,16 +8,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Search, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface DomainSkillManagerProps {
   domainId: string;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export default function DomainSkillManager({ domainId, onClose }: DomainSkillManagerProps) {
+export default function DomainSkillManager({ domainId, open, onOpenChange }: DomainSkillManagerProps) {
   const { mappings, addMapping, removeMapping } = useDomainStore();
   const { skills, categories } = useSkillStore();
   const { user } = useAuth();
@@ -29,7 +30,6 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
   const currentMappings = useMemo(() => mappings.filter((m) => m.domain_id === domainId), [mappings, domainId]);
   const mappedSkillIds = useMemo(() => new Set(currentMappings.map((m) => m.skill_id)), [currentMappings]);
 
-  // Group skills by category
   const grouped = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = q
@@ -90,15 +90,14 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Manage Skills</DialogTitle>
-          <DialogDescription>Select categories to map all skills, or expand to pick individual skills.</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-2xl flex flex-col">
+        <SheetHeader>
+          <SheetTitle>Manage Skills</SheetTitle>
+          <SheetDescription>Select categories to map all skills, or expand to pick individual skills.</SheetDescription>
+        </SheetHeader>
 
-        {/* Search */}
-        <div className="relative">
+        <div className="relative mt-4">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search categories or skills..."
@@ -109,14 +108,12 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
           />
         </div>
 
-        {/* Summary */}
         <div className="flex items-center gap-3 px-1 text-xs text-muted-foreground">
           <span>{currentMappings.length} skill{currentMappings.length !== 1 ? 's' : ''} mapped</span>
           <Separator orientation="vertical" className="h-3" />
           <span>{grouped.size} {grouped.size === 1 ? 'category' : 'categories'} shown</span>
         </div>
 
-        {/* Category list */}
         <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
           {grouped.size === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No skills found.</p>
@@ -128,7 +125,6 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
 
               return (
                 <div key={catName} className="border border-border rounded-lg overflow-hidden">
-                  {/* Category row */}
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
                     <Checkbox
                       checked={catState === 'all'}
@@ -149,7 +145,6 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
                     </Badge>
                   </div>
 
-                  {/* Expanded skills */}
                   {isExpanded && (
                     <div className="border-t border-border">
                       <table className="w-full text-sm">
@@ -180,9 +175,9 @@ export default function DomainSkillManager({ domainId, onClose }: DomainSkillMan
 
         <Separator />
         <div className="flex justify-end">
-          <Button variant="outline" onClick={onClose}>Done</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

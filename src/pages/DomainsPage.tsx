@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDomainStore, Domain } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import DomainFormDialog from '@/components/domains/DomainFormDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,26 @@ export default function DomainsPage() {
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editDomain, setEditDomain] = useState<Domain | null>(null);
+  const [userCounts, setUserCounts] = useState<Record<string, number>>({});
+
+  // Fetch user counts per domain lazily
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('domain_id')
+        .is('deleted_on', null)
+        .not('domain_id', 'is', null);
+      if (data) {
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach((u) => {
+          if (u.domain_id) counts[u.domain_id] = (counts[u.domain_id] || 0) + 1;
+        });
+        setUserCounts(counts);
+      }
+    };
+    fetchCounts();
+  }, []);
 
   const filtered = useMemo(() =>
     domains.filter((d) =>
@@ -31,6 +52,10 @@ export default function DomainsPage() {
     ), [domains, search]);
 
   const getSkillCount = (domainId: string) => mappings.filter((m) => m.domain_id === domainId).length;
+
+  const handleCreated = (newId: string) => {
+    navigate(`/domains/${newId}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -68,6 +93,7 @@ export default function DomainsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Domain</TableHead>
+              <TableHead className="w-[100px] text-center">Users</TableHead>
               <TableHead className="w-[120px] text-center">Mapped Skills</TableHead>
               <TableHead className="w-[90px]">Status</TableHead>
               {isAdmin && <TableHead className="w-[100px] text-right">Actions</TableHead>}
@@ -76,13 +102,14 @@ export default function DomainsPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-sm text-muted-foreground py-10">
+                <TableCell colSpan={isAdmin ? 5 : 4} className="text-center text-sm text-muted-foreground py-10">
                   No domains found.
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((domain) => {
                 const skillCount = getSkillCount(domain.id);
+                const uCount = userCounts[domain.id] || 0;
                 return (
                   <TableRow
                     key={domain.id}
@@ -94,6 +121,9 @@ export default function DomainsPage() {
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2" title={domain.description}>
                         {domain.description}
                       </p>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-sm font-medium text-card-foreground">{uCount}</span>
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="text-sm font-medium text-card-foreground">{skillCount}</span>
@@ -134,7 +164,7 @@ export default function DomainsPage() {
         </Table>
       </div>
 
-      <DomainFormDialog open={formOpen} onOpenChange={setFormOpen} editDomain={editDomain} />
+      <DomainFormDialog open={formOpen} onOpenChange={setFormOpen} editDomain={editDomain} onCreated={handleCreated} />
     </div>
   );
 }
