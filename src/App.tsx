@@ -19,6 +19,8 @@ import ReviewsPage from "@/pages/ReviewsPage";
 import ReviewCyclesPage from "@/pages/ReviewCyclesPage";
 import SkillRegistryPage from "@/pages/SkillRegistryPage";
 import TeamRegistryPage from "@/pages/TeamRegistryPage";
+import SkillRegistryDetailPage from "@/pages/SkillRegistryDetailPage";
+import TeamRegistryDetailPage from "@/pages/TeamRegistryDetailPage";
 import HRDashboardPage from "@/pages/HRDashboardPage";
 import UserGuidePage from "@/pages/UserGuidePage";
 import UsersPage from "@/pages/UsersPage";
@@ -73,7 +75,9 @@ const App = () => (
               {/* All roles */}
               <Route path="/" element={<DashboardPage />} />
               <Route path="/skill-registry" element={<SkillRegistryPage />} />
+              <Route path="/skill-registry/:submissionId" element={<SkillRegistryDetailPage />} />
               <Route path="/team-registry" element={<RoleGuard allowed={["admin", "manager"]}><TeamRegistryPage /></RoleGuard>} />
+              <Route path="/team-registry/:submissionId" element={<RoleGuard allowed={["admin", "manager"]}><TeamRegistryDetailPage /></RoleGuard>} />
               <Route path="/assessments" element={<AssessmentsPage />} />
               <Route path="/assessment-exec" element={<AssessmentExecPage />} />
               <Route path="/help" element={<UserGuidePage />} />

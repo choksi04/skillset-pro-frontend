@@ -34,6 +34,8 @@ export default function PageHeader() {
   let basePath = location.pathname;
   if (basePath.startsWith('/domains/')) basePath = '/domains';
   else if (basePath.startsWith('/skill-library/')) basePath = '/skill-library';
+  else if (basePath.startsWith('/skill-registry/')) basePath = '/skill-registry';
+  else if (basePath.startsWith('/team-registry/')) basePath = '/team-registry';
 
   const crumb = routeBreadcrumbs[basePath];
   const title = crumb?.title || 'Page';
@@ -47,6 +49,10 @@ export default function PageHeader() {
   const categoryId = isCategoryDetail ? location.pathname.split('/skill-library/')[1] : null;
   const category = categoryId ? categories.find((c) => c.id === categoryId) : null;
 
+  // Registry detail breadcrumbs
+  const isSkillRegistryDetail = location.pathname.startsWith('/skill-registry/') && location.pathname !== '/skill-registry';
+  const isTeamRegistryDetail = location.pathname.startsWith('/team-registry/') && location.pathname !== '/team-registry';
+
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center gap-1.5 text-sm">
@@ -58,19 +64,27 @@ export default function PageHeader() {
         )}
         {isDomainDetail ? (
           <>
-            <Link to="/domains" className="text-muted-foreground hover:text-foreground transition-colors">
-              Domains
-            </Link>
+            <Link to="/domains" className="text-muted-foreground hover:text-foreground transition-colors">Domains</Link>
             <ChevronRight size={14} className="text-muted-foreground" />
             <span className="font-medium text-card-foreground">Domain Detail</span>
           </>
         ) : isCategoryDetail ? (
           <>
-            <Link to="/skill-library" className="text-muted-foreground hover:text-foreground transition-colors">
-              Skill Library
-            </Link>
+            <Link to="/skill-library" className="text-muted-foreground hover:text-foreground transition-colors">Skill Library</Link>
             <ChevronRight size={14} className="text-muted-foreground" />
             <span className="font-medium text-card-foreground">{category?.name || 'Category'}</span>
+          </>
+        ) : isSkillRegistryDetail ? (
+          <>
+            <Link to="/skill-registry" className="text-muted-foreground hover:text-foreground transition-colors">My Registry</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Detail</span>
+          </>
+        ) : isTeamRegistryDetail ? (
+          <>
+            <Link to="/team-registry" className="text-muted-foreground hover:text-foreground transition-colors">Team Registry</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Detail</span>
           </>
         ) : (
           <span className="font-medium text-card-foreground">{title}</span>
