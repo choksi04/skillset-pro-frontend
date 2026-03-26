@@ -609,6 +609,57 @@ export type Database = {
         }
         Relationships: []
       }
+      question_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          label: string
+          level: number
+          min_questions: number
+          modified_at: string | null
+          modified_by: string | null
+          name: string
+          score_range_max: number
+          score_range_min: number
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          label: string
+          level: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name: string
+          score_range_max?: number
+          score_range_min?: number
+          status?: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          label?: string
+          level?: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name?: string
+          score_range_max?: number
+          score_range_min?: number
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       questions: {
         Row: {
           ai_generated: boolean | null
@@ -626,6 +677,7 @@ export type Database = {
           skill_id: string
           status: string
           tenant_id: string
+          topic_id: string | null
           updated_at: string
         }
         Insert: {
@@ -644,6 +696,7 @@ export type Database = {
           skill_id: string
           status?: string
           tenant_id: string
+          topic_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -662,6 +715,7 @@ export type Database = {
           skill_id?: string
           status?: string
           tenant_id?: string
+          topic_id?: string | null
           updated_at?: string
         }
         Relationships: []

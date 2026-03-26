@@ -10,6 +10,7 @@ export interface Question {
   id: string;
   tenant_id: string;
   skill_id: string;
+  topic_id: string | null;
   competency_level: CompetencyLevel;
   question_type: QuestionType;
   question_text: string;
@@ -20,11 +21,28 @@ export interface Question {
   updated_at: string;
 }
 
+export interface QuestionSetting {
+  id: string;
+  tenant_id: string;
+  level: number;
+  name: string;
+  label: string;
+  description: string;
+  score_range_min: number;
+  score_range_max: number;
+  min_questions: number;
+  status: string;
+}
+
 interface QuestionStore {
   questions: Question[];
+  settings: QuestionSetting[];
   loading: boolean;
   initialized: boolean;
+  settingsLoaded: boolean;
   fetchQuestions: () => Promise<void>;
+  fetchSettings: () => Promise<void>;
+  updateSetting: (id: string, updates: Partial<QuestionSetting>) => Promise<void>;
   addQuestion: (q: Omit<Question, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   addQuestions: (qs: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
@@ -36,8 +54,10 @@ interface QuestionStore {
 
 export const useQuestionStore = create<QuestionStore>((set, get) => ({
   questions: [],
+  settings: [],
   loading: false,
   initialized: false,
+  settingsLoaded: false,
 
   fetchQuestions: async () => {
     if (get().initialized) return;
@@ -52,6 +72,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
 
       const questions: Question[] = (data || []).map((q: any) => ({
         id: q.id, tenant_id: q.tenant_id, skill_id: q.skill_id,
+        topic_id: q.topic_id || null,
         competency_level: q.competency_level as CompetencyLevel,
         question_type: q.question_type as QuestionType,
         question_text: q.question_text, evaluation_guidelines: q.evaluation_guidelines || '',
@@ -65,10 +86,43 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
     }
   },
 
+  fetchSettings: async () => {
+    if (get().settingsLoaded) return;
+    try {
+      const { data, error } = await supabase
+        .from('question_settings')
+        .select('*')
+        .order('level');
+      if (error) throw error;
+      const settings: QuestionSetting[] = (data || []).map((s: any) => ({
+        id: s.id, tenant_id: s.tenant_id, level: s.level,
+        name: s.name, label: s.label, description: s.description || '',
+        score_range_min: s.score_range_min, score_range_max: s.score_range_max,
+        min_questions: s.min_questions, status: s.status,
+      }));
+      set({ settings, settingsLoaded: true });
+    } catch (err) {
+      console.error('Failed to fetch question settings:', err);
+    }
+  },
+
+  updateSetting: async (id, updates) => {
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('question_settings').update({
+      ...updates, modified_at: new Date().toISOString(), modified_by: userId,
+    }).eq('id', id);
+    if (error) { console.error('Failed to update setting:', error); return; }
+    set((state) => ({
+      settings: state.settings.map((s) => s.id === id ? { ...s, ...updates } : s),
+    }));
+  },
+
   addQuestion: async (q) => {
     const id = `q-${Date.now()}`;
     const userId = getCurrentUserId();
-    const { data, error } = await supabase.from('questions').insert({ id, ...q, created_by: userId }).select().single();
+    const { data, error } = await supabase.from('questions').insert({
+      id, ...q, topic_id: q.topic_id || null, created_by: userId,
+    }).select().single();
     if (error) { console.error('Failed to add question:', error); return; }
     set((state) => ({
       questions: [...state.questions, {
@@ -79,11 +133,14 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
 
   addQuestions: async (qs) => {
     const userId = getCurrentUserId();
-    const rows = qs.map((q, i) => ({ ...q, id: `q-${Date.now()}-${i}`, created_by: userId }));
+    const rows = qs.map((q, i) => ({
+      ...q, id: `q-${Date.now()}-${i}`, topic_id: q.topic_id || null, created_by: userId,
+    }));
     const { data, error } = await supabase.from('questions').insert(rows).select();
     if (error) { console.error('Failed to add questions:', error); return; }
     const newQuestions: Question[] = (data || []).map((d: any) => ({
       id: d.id, tenant_id: d.tenant_id, skill_id: d.skill_id,
+      topic_id: d.topic_id || null,
       competency_level: d.competency_level as CompetencyLevel,
       question_type: d.question_type as QuestionType,
       question_text: d.question_text, evaluation_guidelines: d.evaluation_guidelines || '',
