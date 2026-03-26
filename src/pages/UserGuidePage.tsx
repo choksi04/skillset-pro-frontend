@@ -68,14 +68,17 @@ const setupFlowGuide: GuideStep[] = [
 const adminGuide: GuideStep[] = [
   {
     title: 'Skill Library',
-    description: 'Skills are reusable building blocks organized into categories with tags for easy filtering.',
+    description: 'Skills follow a Category → Skill → Topic hierarchy. Categories group skills, and topics optionally refine skill coverage for better AI question generation.',
     icon: <Brain size={16} />,
     steps: [
       'Navigate to Settings > Skill Library from the sidebar.',
-      'Create categories first using "Manage Categories" — categories group related skills.',
-      'Click "Add Skill" to create a new skill with category, name, description, and tags.',
-      'Filter skills by category, tag, or status using the toolbar.',
-      'Toggle skill status, edit, or soft-delete skills from the action menu.',
+      'Create categories first using "Create Category" — these are top-level groupings (e.g. Frontend, Backend).',
+      'Click a category row to open it and view its skills.',
+      'Inside a category, click "Add Skill" to create a skill with name, description, and tags.',
+      'Click a skill row to open the detail drawer and manage optional Topics.',
+      'Topics help the AI generate better, more targeted questions — they do not affect scoring.',
+      'Use search and filters to find categories, skills, or topics quickly.',
+      'Categories cannot be deleted if they contain skills. Skills cannot be deleted if mapped to domains, used in questions, or used in registry.',
     ],
   },
   {

@@ -832,6 +832,51 @@ export type Database = {
           },
         ]
       }
+      skill_topics: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
+          description: string | null
+          id: string
+          modified_at: string | null
+          modified_by: string | null
+          name: string
+          skill_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          description?: string | null
+          id: string
+          modified_at?: string | null
+          modified_by?: string | null
+          name: string
+          skill_id: string
+          status?: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          description?: string | null
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          name?: string
+          skill_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       skills: {
         Row: {
           created_at: string

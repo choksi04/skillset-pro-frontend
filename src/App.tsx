@@ -9,6 +9,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
+import CategoryDetailPage from "@/pages/CategoryDetailPage";
 import DomainsPage from "@/pages/DomainsPage";
 import DomainDetailPage from "@/pages/DomainDetailPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
@@ -82,6 +83,7 @@ const App = () => (
 
               {/* Admin + Manager */}
               <Route path="/skill-library" element={<RoleGuard allowed={["admin", "manager"]}><SkillFrameworkPage /></RoleGuard>} />
+              <Route path="/skill-library/:categoryId" element={<RoleGuard allowed={["admin", "manager"]}><CategoryDetailPage /></RoleGuard>} />
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />

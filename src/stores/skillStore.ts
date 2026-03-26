@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
+import { toast } from 'sonner';
 
 export interface SkillCategory {
   id: string;
@@ -23,12 +24,24 @@ export interface Skill {
   updated_at: string;
 }
 
+export interface SkillTopic {
+  id: string;
+  skill_id: string;
+  tenant_id: string;
+  name: string;
+  description: string;
+  status: 'active' | 'disabled';
+  created_at?: string;
+}
+
 interface SkillStore {
   categories: SkillCategory[];
   skills: Skill[];
+  topics: Record<string, SkillTopic[]>; // keyed by skill_id
   loading: boolean;
   initialized: boolean;
   fetchSkills: () => Promise<void>;
+  fetchTopicsForSkill: (skillId: string) => Promise<void>;
   addCategory: (cat: Omit<SkillCategory, 'id' | 'created_at'>) => Promise<void>;
   updateCategory: (id: string, updates: Partial<SkillCategory>) => Promise<void>;
   toggleCategoryStatus: (id: string) => Promise<void>;
@@ -37,11 +50,16 @@ interface SkillStore {
   toggleSkillStatus: (id: string) => Promise<void>;
   deleteSkill: (id: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  addTopic: (topic: Omit<SkillTopic, 'id' | 'created_at'>) => Promise<void>;
+  updateTopic: (id: string, updates: Partial<SkillTopic>) => Promise<void>;
+  deleteTopic: (id: string, skillId: string) => Promise<void>;
+  checkSkillDeletable: (id: string) => Promise<{ deletable: boolean; reason?: string }>;
 }
 
 export const useSkillStore = create<SkillStore>((set, get) => ({
   categories: [],
   skills: [],
+  topics: {},
   loading: false,
   initialized: false,
 
@@ -79,6 +97,32 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     } catch (err) {
       console.error('Failed to fetch skills:', err);
       set({ loading: false, initialized: true });
+    }
+  },
+
+  fetchTopicsForSkill: async (skillId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('skill_topics')
+        .select('*')
+        .eq('skill_id', skillId)
+        .is('deleted_on', null)
+        .order('created_at');
+      if (error) throw error;
+      const topics: SkillTopic[] = (data || []).map((t: any) => ({
+        id: t.id,
+        skill_id: t.skill_id,
+        tenant_id: t.tenant_id,
+        name: t.name,
+        description: t.description || '',
+        status: (t.status || 'active') as 'active' | 'disabled',
+        created_at: t.created_at,
+      }));
+      set((state) => ({
+        topics: { ...state.topics, [skillId]: topics },
+      }));
+    } catch (err) {
+      console.error('Failed to fetch topics:', err);
     }
   },
 
@@ -148,7 +192,45 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     await get().updateSkill(id, { status: newStatus });
   },
 
+  checkSkillDeletable: async (id: string) => {
+    // Check domain mappings
+    const { data: mappings } = await supabase
+      .from('domain_skill_mappings')
+      .select('id')
+      .eq('skill_id', id)
+      .is('deleted_on', null)
+      .limit(1);
+    if (mappings && mappings.length > 0) {
+      return { deletable: false, reason: 'This skill is mapped to a domain. Remove the mapping first.' };
+    }
+    // Check questions
+    const { data: questions } = await supabase
+      .from('questions')
+      .select('id')
+      .eq('skill_id', id)
+      .is('deleted_on', null)
+      .limit(1);
+    if (questions && questions.length > 0) {
+      return { deletable: false, reason: 'This skill has questions in the question bank. Remove them first.' };
+    }
+    // Check registry usage
+    const { data: ratings } = await supabase
+      .from('skill_self_ratings')
+      .select('id')
+      .eq('skill_id', id)
+      .limit(1);
+    if (ratings && ratings.length > 0) {
+      return { deletable: false, reason: 'This skill is used in skill registry submissions.' };
+    }
+    return { deletable: true };
+  },
+
   deleteSkill: async (id) => {
+    const check = await get().checkSkillDeletable(id);
+    if (!check.deletable) {
+      toast.error(check.reason);
+      return;
+    }
     const now = new Date().toISOString();
     const userId = getCurrentUserId();
     const { error } = await supabase.from('skills').update({ deleted_on: now, deleted_by: userId }).eq('id', id);
@@ -157,10 +239,66 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   },
 
   deleteCategory: async (id) => {
+    const cat = get().categories.find((c) => c.id === id);
+    if (cat) {
+      const skillsInCat = get().skills.filter((s) => s.skill_category === cat.name);
+      if (skillsInCat.length > 0) {
+        toast.error(`Cannot delete category with ${skillsInCat.length} skill(s). Remove or reassign them first.`);
+        return;
+      }
+    }
     const now = new Date().toISOString();
     const userId = getCurrentUserId();
     const { error } = await supabase.from('skill_categories').update({ deleted_on: now, deleted_by: userId }).eq('id', id);
     if (error) { console.error('Failed to delete category:', error); return; }
     set((state) => ({ categories: state.categories.filter((c) => c.id !== id) }));
+  },
+
+  addTopic: async (topic) => {
+    const id = `topic-${Date.now()}`;
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_topics').insert({
+      id, skill_id: topic.skill_id, tenant_id: topic.tenant_id,
+      name: topic.name, description: topic.description || '', status: topic.status || 'active',
+      created_by: userId,
+    });
+    if (error) { console.error('Failed to add topic:', error); return; }
+    const newTopic: SkillTopic = { ...topic, id, created_at: new Date().toISOString() };
+    set((state) => ({
+      topics: {
+        ...state.topics,
+        [topic.skill_id]: [...(state.topics[topic.skill_id] || []), newTopic],
+      },
+    }));
+  },
+
+  updateTopic: async (id, updates) => {
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_topics').update({
+      ...updates, modified_at: new Date().toISOString(), modified_by: userId,
+    }).eq('id', id);
+    if (error) { console.error('Failed to update topic:', error); return; }
+    set((state) => {
+      const newTopics = { ...state.topics };
+      for (const skillId of Object.keys(newTopics)) {
+        newTopics[skillId] = newTopics[skillId].map((t) =>
+          t.id === id ? { ...t, ...updates } : t
+        );
+      }
+      return { topics: newTopics };
+    });
+  },
+
+  deleteTopic: async (id, skillId) => {
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_topics').update({ deleted_on: now, deleted_by: userId }).eq('id', id);
+    if (error) { console.error('Failed to delete topic:', error); return; }
+    set((state) => ({
+      topics: {
+        ...state.topics,
+        [skillId]: (state.topics[skillId] || []).filter((t) => t.id !== id),
+      },
+    }));
   },
 }));

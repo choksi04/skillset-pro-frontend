@@ -18,23 +18,19 @@ import { X } from 'lucide-react';
 const skillSchema = z.object({
   skill_name: z.string().trim().min(1, 'Skill name is required').max(100),
   skill_description: z.string().trim().min(1, 'Description is required').max(500),
-  skill_category: z.string().min(1, 'Category is required'),
 });
-
-// Derive tag suggestions from existing skills in the database instead of hardcoding
 
 interface SkillFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editSkill?: Skill | null;
+  categoryName?: string;
 }
 
-export default function SkillFormDialog({ open, onOpenChange, editSkill }: SkillFormDialogProps) {
-  const { categories, skills, addSkill, updateSkill } = useSkillStore();
+export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryName }: SkillFormDialogProps) {
+  const { skills, addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
-  const activeCategories = categories.filter((c) => c.status === 'active');
 
-  // Derive suggested tags from all existing skills in the database
   const existingTags = useMemo(() => {
     const tagSet = new Set<string>();
     skills.forEach((s) => (s.tags || []).forEach((t) => tagSet.add(t)));
@@ -43,7 +39,6 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
@@ -53,7 +48,6 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
     if (open) {
       setName(editSkill?.skill_name ?? '');
       setDescription(editSkill?.skill_description ?? '');
-      setCategory(editSkill?.skill_category ?? '');
       setTags(editSkill?.tags ?? []);
       setStatus(editSkill?.status ?? 'active');
       setTagInput('');
@@ -77,7 +71,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
   };
 
   const handleSubmit = () => {
-    const result = skillSchema.safeParse({ skill_name: name, skill_description: description, skill_category: category });
+    const result = skillSchema.safeParse({ skill_name: name, skill_description: description });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((e) => { if (e.path[0]) fieldErrors[e.path[0] as string] = e.message; });
@@ -85,16 +79,18 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
       return;
     }
 
+    const resolvedCategory = categoryName || editSkill?.skill_category || '';
+
     if (editSkill) {
       updateSkill(editSkill.id, {
         skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-        skill_category: result.data.skill_category, tags, status,
+        skill_category: resolvedCategory, tags, status,
       });
     } else {
       addSkill({
         tenant_id: user?.tenant_id ?? 'tenant-001',
         skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-        skill_category: result.data.skill_category, tags, status,
+        skill_category: resolvedCategory, tags, status,
       });
     }
     onOpenChange(false);
@@ -109,19 +105,13 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill }: Skill
           <DialogTitle>{editSkill ? 'Edit Skill' : 'Create New Skill'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          {/* Category */}
-          <div className="space-y-1.5">
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-              <SelectContent>
-                {activeCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.skill_category && <p className="text-xs text-destructive">{errors.skill_category}</p>}
-          </div>
+          {/* Category indicator */}
+          {categoryName && (
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <p className="text-sm text-muted-foreground">{categoryName}</p>
+            </div>
+          )}
 
           {/* Name */}
           <div className="space-y-1.5">
