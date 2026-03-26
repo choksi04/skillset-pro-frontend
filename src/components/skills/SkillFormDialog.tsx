@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 
 const skillSchema = z.object({
   skill_name: z.string().trim().min(1, 'Skill name is required').max(100),
@@ -36,6 +36,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
   const [tagInput, setTagInput] = useState('');
   const [status, setStatus] = useState<'active' | 'disabled'>('active');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -45,6 +46,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
       setStatus(editSkill?.status ?? 'active');
       setTagInput('');
       setErrors({});
+      setSubmitting(false);
     }
   }, [open, editSkill]);
 
@@ -73,21 +75,25 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
     }
 
     const resolvedCategory = categoryName || editSkill?.skill_category || '';
-
-    if (editSkill) {
-      updateSkill(editSkill.id, {
-        skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-        skill_category: resolvedCategory, tags, status,
-      });
-    } else {
-      const newId = await addSkill({
-        tenant_id: user?.tenant_id ?? 'tenant-001',
-        skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-        skill_category: resolvedCategory, tags, status,
-      });
-      if (newId && onCreated) onCreated(newId);
+    setSubmitting(true);
+    try {
+      if (editSkill) {
+        await updateSkill(editSkill.id, {
+          skill_name: result.data.skill_name, skill_description: result.data.skill_description,
+          skill_category: resolvedCategory, tags, status,
+        });
+      } else {
+        const newId = await addSkill({
+          tenant_id: user?.tenant_id ?? 'tenant-001',
+          skill_name: result.data.skill_name, skill_description: result.data.skill_description,
+          skill_category: resolvedCategory, tags, status,
+        });
+        if (newId && onCreated) onCreated(newId);
+      }
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
     }
-    onOpenChange(false);
   };
 
   const statusOptions = [
@@ -114,13 +120,13 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
 
           <div className="space-y-1.5">
             <Label htmlFor="skill-name">Skill Name</Label>
-            <Input id="skill-name" placeholder="e.g. React, System Design" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+            <Input id="skill-name" placeholder="e.g. React, System Design" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={submitting} />
             {errors.skill_name && <p className="text-xs text-destructive">{errors.skill_name}</p>}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="skill-desc">Description</Label>
-            <Textarea id="skill-desc" placeholder="Describe what this skill covers..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} />
+            <Textarea id="skill-desc" placeholder="Describe what this skill covers..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} disabled={submitting} />
             <div className="flex justify-between">
               {errors.skill_description && <p className="text-xs text-destructive">{errors.skill_description}</p>}
               <p className="text-xs text-muted-foreground ml-auto">{description.length}/500</p>
@@ -133,7 +139,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
               {tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="gap-1 text-xs">
                   {tag}
-                  <button onClick={() => removeTag(tag)} className="ml-0.5 hover:text-destructive"><X size={12} /></button>
+                  <button onClick={() => removeTag(tag)} className="ml-0.5 hover:text-destructive" disabled={submitting}><X size={12} /></button>
                 </Badge>
               ))}
             </div>
@@ -143,6 +149,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleTagKeyDown}
               onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+              disabled={submitting}
             />
           </div>
 
@@ -158,8 +165,11 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>{editSkill ? 'Save Changes' : 'Create Skill'}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting && <Loader2 size={14} className="mr-1.5 animate-spin" />}
+              {editSkill ? 'Save Changes' : 'Create Skill'}
+            </Button>
           </div>
         </div>
       </SheetContent>

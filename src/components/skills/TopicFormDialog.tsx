@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 const topicSchema = z.object({
   name: z.string().trim().min(1, 'Topic name is required').max(100),
@@ -31,16 +32,18 @@ export default function TopicFormDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setName(editTopic?.name ?? '');
       setDescription(editTopic?.description ?? '');
       setErrors({});
+      setSubmitting(false);
     }
   }, [open, editTopic]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const result = topicSchema.safeParse({ name, description });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -59,18 +62,23 @@ export default function TopicFormDialog({
       return;
     }
 
-    if (editTopic) {
-      updateTopic(editTopic.id, { name: result.data.name, description: result.data.description || '' });
-    } else {
-      addTopic({
-        skill_id: skillId,
-        tenant_id: tenantId,
-        name: result.data.name,
-        description: result.data.description || '',
-        status: 'active',
-      });
+    setSubmitting(true);
+    try {
+      if (editTopic) {
+        await updateTopic(editTopic.id, { name: result.data.name, description: result.data.description || '' });
+      } else {
+        await addTopic({
+          skill_id: skillId,
+          tenant_id: tenantId,
+          name: result.data.name,
+          description: result.data.description || '',
+          status: 'active',
+        });
+      }
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -91,6 +99,7 @@ export default function TopicFormDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
+              disabled={submitting}
             />
             {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
@@ -104,13 +113,17 @@ export default function TopicFormDialog({
               onChange={(e) => setDescription(e.target.value)}
               maxLength={300}
               rows={3}
+              disabled={submitting}
             />
             <p className="text-xs text-muted-foreground text-right">{description.length}/300</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>{editTopic ? 'Save Changes' : 'Add Topic'}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting && <Loader2 size={14} className="mr-1.5 animate-spin" />}
+              {editTopic ? 'Save Changes' : 'Add Topic'}
+            </Button>
           </div>
         </div>
       </SheetContent>
