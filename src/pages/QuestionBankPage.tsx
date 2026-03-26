@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import {
-  useQuestionStore, Question, competencyLevels, questionTypes,
+  useQuestionStore, Question, QuestionStatus, competencyLevels, questionTypes,
   competencyLabels, questionTypeLabels, CompetencyLevel, QuestionType,
 } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
