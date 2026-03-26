@@ -152,14 +152,6 @@ function FormattedQuestionContent({ text, guidelines, type }: {
             ))}
           </div>
         </div>
-        {guidelines && (
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
-              <p className="text-sm text-foreground whitespace-pre-wrap">{guidelines}</p>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -253,6 +245,7 @@ export default function QuestionBankPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'ai' | 'manual'>('all');
+  const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent');
   const [formOpen, setFormOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
@@ -286,7 +279,7 @@ export default function QuestionBankPage() {
   }, [topics]);
 
   const filtered = useMemo(() => {
-    return questions.filter((q) => {
+    const result = questions.filter((q) => {
       const { display } = parseQuestionText(q.question_text, q.question_type);
       const matchesSearch = display.toLowerCase().includes(search.toLowerCase());
       const matchesSkill = skillFilter === 'all' || q.skill_id === skillFilter;
@@ -296,7 +289,13 @@ export default function QuestionBankPage() {
       const matchesSource = sourceFilter === 'all' || (sourceFilter === 'ai' ? q.ai_generated : !q.ai_generated);
       return matchesSearch && matchesSkill && matchesLevel && matchesType && matchesStatus && matchesSource;
     });
-  }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter]);
+    result.sort((a, b) => {
+      const da = new Date(a.created_at).getTime();
+      const db = new Date(b.created_at).getTime();
+      return sortOrder === 'recent' ? db - da : da - db;
+    });
+    return result;
+  }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
 
   const stats = useMemo(() => ({
     total: questions.length,
@@ -643,6 +642,13 @@ export default function QuestionBankPage() {
             </SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'recent' | 'oldest')}>
+          <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue placeholder="Sort" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Recent First</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Question Table */}
@@ -804,18 +810,20 @@ export default function QuestionBankPage() {
                 />
               </div>
 
-              {/* Editable evaluation guidelines */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evaluation Guidelines</Label>
-                <Textarea
-                  value={pItem.evaluation_guidelines}
-                  onChange={(e) => {
-                    setPreviews(prev => prev.map((item, idx) => idx === pIdx ? { ...item, evaluation_guidelines: e.target.value } : item));
-                  }}
-                  rows={3}
-                  className="text-sm"
-                />
-              </div>
+              {/* Editable evaluation guidelines (not for MCQ) */}
+              {aiQType !== 'mcq' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evaluation Guidelines</Label>
+                  <Textarea
+                    value={pItem.evaluation_guidelines}
+                    onChange={(e) => {
+                      setPreviews(prev => prev.map((item, idx) => idx === pIdx ? { ...item, evaluation_guidelines: e.target.value } : item));
+                    }}
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+              )}
 
               {/* Read-only formatted preview */}
               <div className="space-y-1.5">
