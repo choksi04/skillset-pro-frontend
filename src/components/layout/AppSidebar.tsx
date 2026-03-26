@@ -59,7 +59,7 @@ const sidebarGroups: SidebarGroup[] = [
       { title: 'Users', href: '/users', icon: <Users size={18} />, roles: ['admin'] },
       { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'manager'] },
       { title: 'Question Settings', href: '/question-settings', icon: <SlidersHorizontal size={18} />, roles: ['admin'] },
-      { title: 'Review Cycles', href: '/review-cycles', icon: <RefreshCw size={18} />, roles: ['admin', 'manager'] },
+      { title: 'Review Cycles', href: '/review-cycles', icon: <RefreshCw size={18} />, roles: ['admin'] },
     ],
   },
   {

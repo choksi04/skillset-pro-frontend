@@ -98,7 +98,7 @@ const App = () => (
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />
-              <Route path="/review-cycles" element={<RoleGuard allowed={["admin", "manager"]}><ReviewCyclesPage /></RoleGuard>} />
+              <Route path="/review-cycles" element={<RoleGuard allowed={["admin"]}><ReviewCyclesPage /></RoleGuard>} />
               <Route path="/manager-reviews" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
 
               {/* Legacy redirects */}
