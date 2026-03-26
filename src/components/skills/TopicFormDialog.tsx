@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useSkillStore, SkillTopic } from '@/stores/skillStore';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,6 @@ export default function TopicFormDialog({
       return;
     }
 
-    // Check uniqueness within skill
     const isDuplicate = existingTopics.some(
       (t) => t.name.toLowerCase() === result.data.name.toLowerCase() && t.id !== editTopic?.id
     );
@@ -75,12 +74,15 @@ export default function TopicFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{editTopic ? 'Edit Topic' : 'Add Topic'}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{editTopic ? 'Edit Topic' : 'Add Topic'}</SheetTitle>
+          <SheetDescription>
+            {editTopic ? 'Update topic details.' : 'Add a new topic to this skill.'}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <Label htmlFor="topic-name">Topic Name</Label>
             <Input
@@ -111,7 +113,7 @@ export default function TopicFormDialog({
             <Button onClick={handleSubmit}>{editTopic ? 'Save Changes' : 'Add Topic'}</Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

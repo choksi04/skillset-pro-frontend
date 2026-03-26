@@ -42,10 +42,10 @@ interface SkillStore {
   initialized: boolean;
   fetchSkills: () => Promise<void>;
   fetchTopicsForSkill: (skillId: string) => Promise<void>;
-  addCategory: (cat: Omit<SkillCategory, 'id' | 'created_at'>) => Promise<void>;
+  addCategory: (cat: Omit<SkillCategory, 'id' | 'created_at'>) => Promise<string | undefined>;
   updateCategory: (id: string, updates: Partial<SkillCategory>) => Promise<void>;
   toggleCategoryStatus: (id: string) => Promise<void>;
-  addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addSkill: (skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>) => Promise<string | undefined>;
   updateSkill: (id: string, updates: Partial<Skill>) => Promise<void>;
   toggleSkillStatus: (id: string) => Promise<void>;
   deleteSkill: (id: string) => Promise<void>;
@@ -133,8 +133,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       id, name: cat.name, description: cat.description || '', tenant_id: cat.tenant_id, status: cat.status || 'active',
       created_by: userId,
     });
-    if (error) { console.error('Failed to add category:', error); return; }
+    if (error) { console.error('Failed to add category:', error); return undefined; }
     set((state) => ({ categories: [...state.categories, { ...cat, id, created_at: new Date().toISOString() }] }));
+    return id;
   },
 
   updateCategory: async (id, updates) => {
@@ -163,13 +164,14 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       skill_category: skill.skill_category, tags: skill.tags || [], status: skill.status,
       tenant_id: skill.tenant_id, created_by: userId,
     }).select().single();
-    if (error) { console.error('Failed to add skill:', error); return; }
+    if (error) { console.error('Failed to add skill:', error); return undefined; }
     set((state) => ({
       skills: [...state.skills, {
         ...skill, id, tags: skill.tags || [],
         created_at: (data as any).created_at, updated_at: (data as any).updated_at,
       }],
     }));
+    return id;
   },
 
   updateSkill: async (id, updates) => {
