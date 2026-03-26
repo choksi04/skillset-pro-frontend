@@ -7,6 +7,7 @@ import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useRegistryStore, ratingLabels, RatingLevel } from '@/stores/registryStore';
 import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,10 +22,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
 import {
   ClipboardCheck, CheckCircle, XCircle, RefreshCw, MessageSquare,
-  ChevronDown, ChevronUp, Bell, Eye, Send, Shield, AlertTriangle,
+  ChevronDown, ChevronUp, Bell, Eye, Send, Shield, AlertTriangle, UserCog,
 } from 'lucide-react';
 
 const levelLabels: Record<number, string> = {
@@ -139,8 +141,9 @@ function CommentInput({ initial, onSave, onCancel }: { initial: string; onSave: 
 function ReviewCard({ review }: { review: ManagerReview }) {
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
-  const { completeReview } = useReviewStore();
+  const { completeReview, reassignReviewer } = useReviewStore();
   const { activeCycle } = useCycleStore();
+  const { currentRole, user } = useAuth();
   const currentCycle = activeCycle?.name || useRegistryStore.getState().currentCycle;
   const { getAttemptForAssessment } = useAttemptStore();
   const { assessments } = useAssessmentStore();
@@ -149,6 +152,10 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   const [overallComment, setOverallComment] = useState(review.overall_comment);
   const [confirmFinalize, setConfirmFinalize] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [tenantUsers, setTenantUsers] = useState<{ value: string; label: string }[]>([]);
+  const [selectedReviewer, setSelectedReviewer] = useState('');
+  const [reviewerName, setReviewerName] = useState<string | null>(null);
 
   const domain = domains.find((d) => d.id === review.domain_id);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
@@ -158,6 +165,38 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   const isCompleted = review.status === 'completed';
   const allActioned = review.skill_reviews.every((sr) => sr.manager_action !== null);
   const hasReassess = review.skill_reviews.some((sr) => sr.manager_action === 'reassess');
+  const isAdmin = currentRole === 'admin';
+
+  // Fetch reviewer name
+  useEffect(() => {
+    const loadReviewerName = async () => {
+      const { data } = await supabase.from('users').select('full_name').eq('id', review.reviewer_id).single();
+      if (data) setReviewerName(data.full_name);
+    };
+    loadReviewerName();
+  }, [review.reviewer_id]);
+
+  const openReassignDialog = async () => {
+    const { data } = await supabase.from('users').select('id, full_name, role').eq('tenant_id', review.tenant_id).eq('status', 'active');
+    const options = (data || [])
+      .filter((u: any) => u.id !== review.employee_id)
+      .map((u: any) => ({ value: u.id, label: `${u.full_name} (${u.role})` }));
+    setTenantUsers(options);
+    setSelectedReviewer(review.reviewer_id);
+    setReassignOpen(true);
+  };
+
+  const handleReassign = async () => {
+    if (!selectedReviewer || selectedReviewer === review.reviewer_id) {
+      setReassignOpen(false);
+      return;
+    }
+    await reassignReviewer(review.id, selectedReviewer);
+    setReassignOpen(false);
+    const newName = tenantUsers.find((u) => u.value === selectedReviewer)?.label ?? '';
+    setReviewerName(newName.replace(/ \(.*\)$/, ''));
+    toast.success(`Reviewer reassigned to ${newName}`);
+  };
 
   const handleFinalize = () => {
     const { setOverallComment: setComment } = useReviewStore.getState();
@@ -183,11 +222,17 @@ function ReviewCard({ review }: { review: ManagerReview }) {
               {domain?.name ?? 'Unknown Domain'} · {review.skill_reviews.length} skills · {attempt?.total_ai_score != null && `AI Score: ${attempt.total_ai_score}%`}
             </p>
             <p className="text-xs text-muted-foreground">
-              Submitted: {attempt?.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : 'N/A'}
+              Reviewer: {reviewerName ?? '...'}{review.reviewer_id === review.employee_id && ' (Self-Review)'}
+              {' · '}Submitted: {attempt?.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : 'N/A'}
               {review.completed_at && ` · Reviewed: ${new Date(review.completed_at).toLocaleString()}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && !isCompleted && (
+              <Button size="sm" variant="outline" className="text-xs gap-1 h-7" onClick={(e) => { e.stopPropagation(); openReassignDialog(); }}>
+                <UserCog size={12} /> Change Reviewer
+              </Button>
+            )}
             {statusBadge[review.status]}
             {expanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
           </div>
@@ -288,6 +333,28 @@ function ReviewCard({ review }: { review: ManagerReview }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Reviewer</DialogTitle>
+            <DialogDescription>Select a new reviewer for {review.employee_name}'s assessment. The new reviewer will be notified.</DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <Label className="text-xs text-muted-foreground mb-2 block">Select Reviewer</Label>
+            <SearchableSelect
+              options={tenantUsers}
+              value={selectedReviewer}
+              onValueChange={setSelectedReviewer}
+              placeholder="Search users..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setReassignOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleReassign}>Assign Reviewer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
