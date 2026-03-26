@@ -27,7 +27,7 @@ import DomainFormDialog from '@/components/domains/DomainFormDialog';
 import DomainSkillManager from '@/components/domains/DomainSkillManager';
 import {
   ArrowLeft, Pencil, Users, UserCircle, FolderOpen, Settings2, Crown,
-  Search, Plus, UserMinus, X,
+  Search, Plus, UserMinus, X, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getCurrentUserId } from '@/lib/audit';
@@ -43,7 +43,7 @@ interface DomainUser {
 export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { domains, mappings, fetchDomains, updateDomain, removeMapping } = useDomainStore();
+  const { domains, mappings, fetchDomains, updateDomain, removeMapping, checkDomainDeletable, deleteDomain } = useDomainStore();
   const { skills, fetchSkills, initialized } = useSkillStore();
   const { currentRole } = useAuth();
   const isAdmin = currentRole === 'admin';
@@ -61,6 +61,9 @@ export default function DomainDetailPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [addingUsers, setAddingUsers] = useState(false);
   const [removeSkillTarget, setRemoveSkillTarget] = useState<{ mappingId: string; skillName: string } | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteCheck, setDeleteCheck] = useState<{ deletable: boolean; reason?: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
@@ -175,6 +178,25 @@ export default function DomainDetailPage() {
     setRemoveSkillTarget(null);
   };
 
+  const handleOpenDelete = async () => {
+    const result = await checkDomainDeletable(id!);
+    setDeleteCheck(result);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteDomain = async () => {
+    setDeleting(true);
+    const success = await deleteDomain(id!);
+    setDeleting(false);
+    if (success) {
+      toast.success('Domain deleted successfully.');
+      navigate('/domains');
+    } else {
+      toast.error('Failed to delete domain.');
+    }
+    setDeleteOpen(false);
+  };
+
   const filteredUnassigned = useMemo(() => {
     if (!unassignedSearch) return unassignedUsers;
     const q = unassignedSearch.toLowerCase();
@@ -228,9 +250,14 @@ export default function DomainDetailPage() {
             </p>
           </div>
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5 shrink-0">
-              <Pencil size={14} /> Edit
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+                <Pencil size={14} /> Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
+                <Trash2 size={14} /> Delete
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -514,6 +541,32 @@ export default function DomainDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemoveSkill}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Domain Confirm */}
+      <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!open) setDeleteOpen(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Domain</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCheck?.deletable
+                ? <>Are you sure you want to delete <strong>{domain?.name}</strong>? This action cannot be undone.</>
+                : deleteCheck?.reason || 'Cannot delete this domain.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {deleteCheck?.deletable && (
+              <AlertDialogAction
+                onClick={handleDeleteDomain}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
