@@ -910,18 +910,21 @@ export type Database = {
       }
       skill_self_ratings: {
         Row: {
+          comment: string | null
           id: string
           rating: number
           skill_id: string
           submission_id: string
         }
         Insert: {
+          comment?: string | null
           id?: string
           rating: number
           skill_id: string
           submission_id: string
         }
         Update: {
+          comment?: string | null
           id?: string
           rating?: number
           skill_id?: string

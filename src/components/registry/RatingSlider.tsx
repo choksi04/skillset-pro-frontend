@@ -4,11 +4,12 @@ interface RatingSliderProps {
   value: RatingLevel | null;
   onChange: (value: RatingLevel) => void;
   disabled?: boolean;
+  previousRating?: RatingLevel;
 }
 
 const levels: RatingLevel[] = [1, 2, 3, 4, 5];
 
-export default function RatingSlider({ value, onChange, disabled }: RatingSliderProps) {
+export default function RatingSlider({ value, onChange, disabled, previousRating }: RatingSliderProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1">
@@ -29,10 +30,19 @@ export default function RatingSlider({ value, onChange, disabled }: RatingSlider
           </button>
         ))}
       </div>
-      {value && (
+      {(value || previousRating) && (
         <div className="rounded-md bg-muted/50 px-3 py-1.5">
-          <p className="text-xs font-medium text-foreground">Level {value} — {ratingLabels[value]}</p>
-          <p className="text-[11px] text-muted-foreground">{ratingDescriptions[value]}</p>
+          {value && (
+            <>
+              <p className="text-xs font-medium text-foreground">Level {value} — {ratingLabels[value]}</p>
+              <p className="text-[11px] text-muted-foreground">{ratingDescriptions[value]}</p>
+            </>
+          )}
+          {previousRating && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Last cycle: <span className="font-medium text-foreground">L{previousRating} — {ratingLabels[previousRating]}</span>
+            </p>
+          )}
         </div>
       )}
     </div>

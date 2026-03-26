@@ -1,0 +1,1 @@
+ALTER TABLE public.skill_self_ratings ADD COLUMN comment text;
