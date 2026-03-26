@@ -94,7 +94,7 @@ const App = () => (
               <Route path="/ai-generate" element={<Navigate to="/questions" replace />} />
               <Route path="/skills" element={<Navigate to="/skill-library" replace />} />
               <Route path="/registry" element={<Navigate to="/skill-registry" replace />} />
-              <Route path="/reviews" element={<Navigate to="/review-cycles" replace />} />
+              <Route path="/reviews" element={<Navigate to="/manager-reviews" replace />} />
               <Route path="/guide" element={<Navigate to="/help" replace />} />
               <Route path="/skill-analytics" element={<Navigate to="/all-registries" replace />} />
               <Route path="/organization" element={<Navigate to="/" replace />} />
