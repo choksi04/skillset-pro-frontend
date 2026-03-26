@@ -1,33 +1,37 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useDomainStore, Domain } from '@/stores/domainStore';
-import { useSkillStore } from '@/stores/skillStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import DomainFormDialog from '@/components/domains/DomainFormDialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import SearchableSelect from '@/components/ui/searchable-select';
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useDomainStore, Domain } from "@/stores/domainStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import DomainFormDialog from "@/components/domains/DomainFormDialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import SearchableSelect from "@/components/ui/searchable-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network, MoreHorizontal } from 'lucide-react';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, Network, MoreHorizontal } from "lucide-react";
 
 export default function DomainsPage() {
   const navigate = useNavigate();
   const { domains, mappings, toggleDomainStatus, fetchDomains, loading, initialized } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
   const { currentRole } = useAuth();
-  const isAdmin = currentRole === 'admin';
-  useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
+  const isAdmin = currentRole === "admin";
+  useEffect(() => {
+    fetchDomains();
+    fetchSkills();
+  }, [fetchDomains, fetchSkills]);
 
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editDomain, setEditDomain] = useState<Domain | null>(null);
   const [userCounts, setUserCounts] = useState<Record<string, number>>({});
@@ -35,10 +39,10 @@ export default function DomainsPage() {
   useEffect(() => {
     const fetchCounts = async () => {
       const { data } = await supabase
-        .from('users')
-        .select('domain_id')
-        .is('deleted_on', null)
-        .not('domain_id', 'is', null);
+        .from("users")
+        .select("domain_id")
+        .is("deleted_on", null)
+        .not("domain_id", "is", null);
       if (data) {
         const counts: Record<string, number> = {};
         (data as any[]).forEach((u) => {
@@ -50,14 +54,17 @@ export default function DomainsPage() {
     fetchCounts();
   }, []);
 
-  const filtered = useMemo(() =>
-    domains.filter((d) => {
-      const matchesSearch =
-        d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.description.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    }), [domains, search, statusFilter]);
+  const filtered = useMemo(
+    () =>
+      domains.filter((d) => {
+        const matchesSearch =
+          d.name.toLowerCase().includes(search.toLowerCase()) ||
+          d.description.toLowerCase().includes(search.toLowerCase());
+        const matchesStatus = statusFilter === "all" || d.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      }),
+    [domains, search, statusFilter],
+  );
 
   const getSkillCount = (domainId: string) => mappings.filter((m) => m.domain_id === domainId).length;
 
@@ -65,13 +72,19 @@ export default function DomainsPage() {
     navigate(`/domains/${newId}`);
   };
 
-  const handleCreateDomain = () => { setEditDomain(null); setFormOpen(true); };
-  const handleEditDomain = (domain: Domain) => { setEditDomain(domain); setFormOpen(true); };
+  const handleCreateDomain = () => {
+    setEditDomain(null);
+    setFormOpen(true);
+  };
+  const handleEditDomain = (domain: Domain) => {
+    setEditDomain(domain);
+    setFormOpen(true);
+  };
 
   const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'active', label: 'Active' },
-    { value: 'disabled', label: 'Disabled' },
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "disabled", label: "Disabled" },
   ];
 
   return (
@@ -89,6 +102,20 @@ export default function DomainsPage() {
             <Plus size={14} /> Add Domain
           </Button>
         )}
+      </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          { label: "Total Domains", value: domains.length, icon: <Network size={18} /> },
+          { label: "Active", value: domains.filter((d) => d.status === "active").length, color: "text-success" },
+          { label: "Total Mappings", value: mappings.length },
+          { label: "Avg Skills/Domain", value: domains.length ? (mappings.length / domains.length).toFixed(1) : "0" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">{s.label}</p>
+            <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? "text-card-foreground"}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Toolbar */}
@@ -129,8 +156,8 @@ export default function DomainsPage() {
           <Network size={32} className="mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">
             {domains.length === 0
-              ? 'No domains yet. Create your first domain to get started.'
-              : 'No domains match your filters.'}
+              ? "No domains yet. Create your first domain to get started."
+              : "No domains match your filters."}
           </p>
         </div>
       ) : (
@@ -153,7 +180,7 @@ export default function DomainsPage() {
                 return (
                   <TableRow
                     key={domain.id}
-                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${domain.status === 'disabled' ? 'opacity-60' : ''}`}
+                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${domain.status === "disabled" ? "opacity-60" : ""}`}
                     onClick={() => navigate(`/domains/${domain.id}`)}
                   >
                     <TableCell>
@@ -163,20 +190,22 @@ export default function DomainsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {domain.description || '—'}
-                      </p>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{domain.description || "—"}</p>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="text-xs font-normal">{uCount}</Badge>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {uCount}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="text-xs font-normal">{skillCount}</Badge>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {skillCount}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={domain.status === 'active' ? 'default' : 'outline'}
-                        className={`text-xs ${domain.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
+                        variant={domain.status === "active" ? "default" : "outline"}
+                        className={`text-xs ${domain.status === "active" ? "bg-success/15 text-success border-success/20 hover:bg-success/20" : ""}`}
                       >
                         {domain.status}
                       </Badge>
@@ -194,8 +223,12 @@ export default function DomainsPage() {
                               <Pencil size={14} className="mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => toggleDomainStatus(domain.id)}>
-                              {domain.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
-                              {domain.status === 'active' ? 'Disable' : 'Enable'}
+                              {domain.status === "active" ? (
+                                <ToggleLeft size={14} className="mr-2" />
+                              ) : (
+                                <ToggleRight size={14} className="mr-2" />
+                              )}
+                              {domain.status === "active" ? "Disable" : "Enable"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
