@@ -39,6 +39,7 @@ import {
 import {
   CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
   ClipboardCheck, Clock, Eye, MessageSquare, ArrowLeft, Loader2,
+  BarChart3, Award, UserCheck, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -63,16 +64,26 @@ export default function SkillRegistryDetailPage() {
     fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry(); fetchCycles(); fetchAttempts(); fetchReviews();
   }, []);
 
-  // Find submission
   const submission = useMemo(
     () => submissions.find((s) => s.id === submissionId),
     [submissions, submissionId]
   );
 
-  // Derive status
-  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews);
+  // Closed cycle check
+  const isCycleClosed = useMemo(() => {
+    if (!submission) return false;
+    if (!activeCycle) return true; // no active cycle means it's closed
+    return submission.cycle !== activeCycle.name;
+  }, [submission, activeCycle]);
+
   const isDraft = submission?.status === 'draft';
   const isLocked = submission?.status === 'submitted' || submission?.status === 'assessment_generated';
+  const isIncomplete = isDraft && isCycleClosed;
+
+  const employeeStatus = useMemo(() => {
+    if (isIncomplete) return 'incomplete' as const;
+    return deriveStatus(submission, assessments, attempts, reviews);
+  }, [isIncomplete, submission, assessments, attempts, reviews]);
 
   // Domain
   const assignedDomain = useMemo(() => {
@@ -103,7 +114,7 @@ export default function SkillRegistryDetailPage() {
     });
   }, [reviews, employeeId]);
 
-  // Build enriched data
+  // Enriched data
   const enriched = useMemo<EnrichedSubmission | null>(() => {
     if (!submission) return null;
     const selfAvg = avgRound(submission.ratings.map((r) => r.rating));
@@ -170,7 +181,7 @@ export default function SkillRegistryDetailPage() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const triggerAutoSave = useCallback(() => {
-    if (isLocked || !assignedDomain) return;
+    if (isLocked || isIncomplete || !assignedDomain) return;
     isDirtyRef.current = true;
     setSaveStatus('idle');
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -185,16 +196,16 @@ export default function SkillRegistryDetailPage() {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     }, 2000);
-  }, [isLocked, assignedDomain, ratings, comments, employeeId, tenantId, createOrUpdateDraft]);
+  }, [isLocked, isIncomplete, assignedDomain, ratings, comments, employeeId, tenantId, createOrUpdateDraft]);
 
   const handleRatingChange = useCallback((skillId: string, rating: RatingLevel) => {
-    if (isLocked) return;
+    if (isLocked || isIncomplete) return;
     setRatings((prev) => {
       const next = { ...prev, [skillId]: rating };
       setTimeout(() => triggerAutoSave(), 0);
       return next;
     });
-  }, [isLocked, triggerAutoSave]);
+  }, [isLocked, isIncomplete, triggerAutoSave]);
 
   const handleCommentChange = useCallback((skillId: string, comment: string) => {
     setComments((prev) => {
@@ -295,20 +306,42 @@ export default function SkillRegistryDetailPage() {
     );
   }
 
+  // ── Page header (consistent across draft & read-only) ──
+  const pageTitle = isDraft && !isIncomplete ? `Self Review — ${submission.cycle}` : submission.cycle;
+  const pageDescription = [
+    assignedDomain?.name ?? 'Unknown domain',
+    submission.submitted_at ? `Submitted ${new Date(submission.submitted_at).toLocaleDateString()}` : `Created ${new Date(submission.created_at).toLocaleDateString()}`,
+  ].join(' · ');
+
+  const header = (
+    <div className="space-y-1">
+      <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
+        <ArrowLeft size={14} /> Back to My Registry
+      </Button>
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-semibold text-foreground">{pageTitle}</h2>
+        <Badge className={`text-xs ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">{pageDescription}</p>
+    </div>
+  );
+
   // ── DRAFT / IN PROGRESS → Show Self Review Form ──
   if (isDraft) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5">
-            <ArrowLeft size={14} /> Back
-          </Button>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Self Review — {submission.cycle}</h2>
-            <p className="text-xs text-muted-foreground">{assignedDomain?.name ?? 'Unknown domain'}</p>
+        {header}
+
+        {/* Incomplete banner */}
+        {isIncomplete && (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 flex items-start gap-3">
+            <AlertTriangle size={18} className="text-destructive mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Review cycle has closed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Your draft was not submitted in time. This submission is now locked and no assessment will be generated.</p>
+            </div>
           </div>
-          <Badge className={`text-xs ml-2 ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
-        </div>
+        )}
 
         <SelfReviewForm
           domainSkills={domainSkills}
@@ -317,8 +350,8 @@ export default function SkillRegistryDetailPage() {
           ratings={ratings}
           comments={comments}
           previousRatings={previousRatings}
-          isLocked={false}
-          submissionAllowed={submissionAllowed}
+          isLocked={isIncomplete}
+          submissionAllowed={submissionAllowed && !isIncomplete}
           ratedCount={ratedCount}
           allRated={allRated}
           search={search}
@@ -388,38 +421,42 @@ export default function SkillRegistryDetailPage() {
   // ── SUBMITTED / LOCKED / COMPLETED → Read-only detail view ──
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5">
-          <ArrowLeft size={14} /> Back
-        </Button>
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">{submission.cycle}</h2>
-          <p className="text-xs text-muted-foreground">Submitted {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : '—'}</p>
-        </div>
-        <Badge className={`text-xs ml-2 ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
-      </div>
+      {header}
 
-      {/* Score cards + Manager */}
+      {/* Score tiles with icons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <ScoreCard label="Self Score (avg)" value={enriched?.selfAvg ?? null} />
-        <ScoreCard label="Assessment Score (avg)" value={enriched?.assessmentAvg ?? null} />
-        <ScoreCard label="Final Score (avg)" value={enriched?.finalAvg ?? null} />
-        <Card className="border-border">
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <span className="text-xs text-muted-foreground">Manager</span>
-            {enriched?.reviewer ? (
-              <div className="flex flex-col items-center gap-1">
-                <ManagerAvatar reviewer={enriched.reviewer} />
-                <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
-              </div>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-            {review?.overall_comment && (
-              <p className="text-xs text-muted-foreground italic mt-1 text-center">"{review.overall_comment}"</p>
-            )}
-          </CardContent>
-        </Card>
+        <ScoreCard
+          label="Self Score (avg)"
+          value={enriched?.selfAvg ?? null}
+          icon={<BarChart3 size={20} className="text-primary" />}
+        />
+        <ScoreCard
+          label="Assessment Score (avg)"
+          value={enriched?.assessmentAvg ?? null}
+          icon={<ClipboardCheck size={20} className="text-primary" />}
+        />
+        <ScoreCard
+          label="Final Score (avg)"
+          value={enriched?.finalAvg ?? null}
+          icon={<Award size={20} className="text-primary" />}
+        />
+        <ScoreCard
+          label="Manager"
+          value={null}
+          icon={<UserCheck size={20} className="text-primary" />}
+        >
+          {enriched?.reviewer ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <ManagerAvatar reviewer={enriched.reviewer} />
+              <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
+              {review?.overall_comment && (
+                <p className="text-[10px] text-muted-foreground italic text-center line-clamp-2">"{review.overall_comment}"</p>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+        </ScoreCard>
       </div>
 
       {/* Skill table */}
@@ -434,7 +471,7 @@ export default function SkillRegistryDetailPage() {
   );
 }
 
-// ── Self Review Form (kept here since it's only used in this detail page) ──
+// ── Self Review Form ──
 function SelfReviewForm({
   domainSkills, filteredSkills, groupedSkills, ratings, comments, previousRatings,
   isLocked, submissionAllowed, ratedCount, allRated, search, saveStatus,
@@ -480,26 +517,12 @@ function SelfReviewForm({
           )}
         </div>
 
-        {!isLocked && (
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Rating Scale</p>
-            <div className="grid grid-cols-5 gap-2">
-              {([1, 2, 3, 4, 5] as RatingLevel[]).map((l) => (
-                <div key={l} className="text-center">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">L{l}</span>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{ratingLabels[l]}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {domainSkills.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">No skills mapped to this domain yet.</div>
         ) : groupedSkills.size === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">No skills match your search.</div>
         ) : (
-          <Accordion type="multiple" defaultValue={isLocked ? [] : Array.from(groupedSkills.keys())} className="space-y-3">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-3">
             {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => {
               const catRatedCount = catSkills.filter((s) => ratings[s.id] != null).length;
               const allCatRated = catRatedCount === catSkills.length;
@@ -593,7 +616,7 @@ function SelfReviewForm({
           </div>
         )}
 
-        {isLocked && (
+        {isLocked && !submissionAllowed && (
           <div className="rounded-xl border border-success/20 bg-success/5 p-4 flex items-start gap-3">
             <CheckCircle size={18} className="text-success mt-0.5 shrink-0" />
             <div>

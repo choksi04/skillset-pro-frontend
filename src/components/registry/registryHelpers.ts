@@ -9,7 +9,8 @@ export type EmployeeStatus =
   | 'assessment_pending'
   | 'assessment_completed'
   | 'review_pending'
-  | 'approved';
+  | 'approved'
+  | 'incomplete';
 
 export interface EnrichedSubmission {
   submission: SkillRegistrySubmission;
@@ -47,6 +48,7 @@ export const statusConfig: Record<EmployeeStatus, { label: string; color: string
   assessment_completed: { label: 'Assessment Completed', color: 'bg-success/15 text-success border-success/20', cta: 'View Assessment Results' },
   review_pending: { label: 'Manager Review Pending', color: 'bg-warning/15 text-warning border-warning/20', cta: 'Waiting for Review', ctaDisabled: true },
   approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20', cta: 'View Final Results' },
+  incomplete: { label: 'Incomplete — Cycle Closed', color: 'bg-destructive/15 text-destructive border-destructive/20', cta: 'View Draft' },
 };
 
 export const statusLabel = (status: EmployeeStatus) => statusConfig[status].label;

@@ -53,7 +53,7 @@ export function RegistrySkillTable({
         </div>
       )}
 
-      <Accordion type="multiple" defaultValue={Array.from(grouped.keys())} className="space-y-3">
+      <Accordion type="multiple" defaultValue={[]} className="space-y-3">
         {Array.from(grouped.entries()).map(([catName, catSkills]) => (
           <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
             <AccordionTrigger className="px-5 py-3 hover:no-underline">

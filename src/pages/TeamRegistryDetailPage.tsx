@@ -14,8 +14,9 @@ import { RegistrySkillTable } from '@/components/registry/RegistrySkillTable';
 import { deriveStatus, statusLabel, statusColor, avgRound, EnrichedSubmission } from '@/components/registry/registryHelpers';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft, BarChart3, ClipboardCheck, Award, UserCheck,
+} from 'lucide-react';
 
 export default function TeamRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
@@ -116,6 +117,14 @@ export default function TeamRegistryDetailPage() {
   const ratingMap: Record<string, RatingLevel> = {};
   submission?.ratings.forEach((r) => { ratingMap[r.skill_id] = r.rating; });
 
+  // Trend calculations (vs self score)
+  const assessmentTrend = enriched?.selfAvg && enriched?.assessmentAvg
+    ? Math.round((enriched.assessmentAvg - enriched.selfAvg) * 10) / 10
+    : null;
+  const finalTrend = enriched?.selfAvg && enriched?.finalAvg
+    ? Math.round((enriched.finalAvg - enriched.selfAvg) * 10) / 10
+    : null;
+
   if (!submission) {
     return (
       <div className="space-y-6">
@@ -127,42 +136,62 @@ export default function TeamRegistryDetailPage() {
     );
   }
 
+  const pageDescription = [
+    domain?.name ?? 'Unknown domain',
+    submission.cycle,
+    submission.submitted_at ? `Submitted ${new Date(submission.submitted_at).toLocaleDateString()}` : `Created ${new Date(submission.created_at).toLocaleDateString()}`,
+  ].join(' · ');
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/team-registry')} className="gap-1.5">
-          <ArrowLeft size={14} /> Back
+      {/* Header */}
+      <div className="space-y-1">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/team-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
+          <ArrowLeft size={14} /> Back to Team Registry
         </Button>
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">{employeeName || submission.employee_id}</h2>
-          <p className="text-xs text-muted-foreground">
-            {domain?.name ?? 'Unknown domain'} · {submission.cycle} · Submitted {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : '—'}
-          </p>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold text-foreground">{employeeName || submission.employee_id}</h2>
+          <Badge className={`text-xs ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
         </div>
-        <Badge className={`text-xs ml-2 ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
+        <p className="text-sm text-muted-foreground">{pageDescription}</p>
       </div>
 
-      {/* Score cards + Manager */}
+      {/* Score tiles with icons + trends */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <ScoreCard label="Self Score (avg)" value={enriched?.selfAvg ?? null} />
-        <ScoreCard label="Assessment Score (avg)" value={enriched?.assessmentAvg ?? null} />
-        <ScoreCard label="Final Score (avg)" value={enriched?.finalAvg ?? null} />
-        <Card className="border-border">
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <span className="text-xs text-muted-foreground">Manager</span>
-            {enriched?.reviewer ? (
-              <div className="flex flex-col items-center gap-1">
-                <ManagerAvatar reviewer={enriched.reviewer} />
-                <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
-              </div>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-            {review?.overall_comment && (
-              <p className="text-xs text-muted-foreground italic mt-1 text-center">"{review.overall_comment}"</p>
-            )}
-          </CardContent>
-        </Card>
+        <ScoreCard
+          label="Self Score (avg)"
+          value={enriched?.selfAvg ?? null}
+          icon={<BarChart3 size={20} className="text-primary" />}
+        />
+        <ScoreCard
+          label="Assessment Score (avg)"
+          value={enriched?.assessmentAvg ?? null}
+          icon={<ClipboardCheck size={20} className="text-primary" />}
+          trend={assessmentTrend}
+        />
+        <ScoreCard
+          label="Final Score (avg)"
+          value={enriched?.finalAvg ?? null}
+          icon={<Award size={20} className="text-primary" />}
+          trend={finalTrend}
+        />
+        <ScoreCard
+          label="Manager"
+          value={null}
+          icon={<UserCheck size={20} className="text-primary" />}
+        >
+          {enriched?.reviewer ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <ManagerAvatar reviewer={enriched.reviewer} />
+              <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
+              {review?.overall_comment && (
+                <p className="text-[10px] text-muted-foreground italic text-center line-clamp-2">"{review.overall_comment}"</p>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+        </ScoreCard>
       </div>
 
       {/* Skill table */}
