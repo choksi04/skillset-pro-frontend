@@ -59,7 +59,8 @@ export default function TeamRegistryDetailPage() {
   }, [reviews]);
 
   const domain = useMemo(() => submission ? domains.find((d) => d.id === submission.domain_id) : null, [submission, domains]);
-  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews);
+  const isCycleClosed = !activeCycle || (submission ? submission.cycle !== activeCycle.name : false);
+  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews, submission?.status === 'draft' ? isCycleClosed : false);
 
   // Enriched
   const enriched = useMemo<EnrichedSubmission | null>(() => {

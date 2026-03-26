@@ -27,7 +27,7 @@ export default function TeamRegistryPage() {
   const { reviews, officialEntries, fetchReviews } = useReviewStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
-  const { fetchCycles } = useCycleStore();
+  const { activeCycle, fetchCycles } = useCycleStore();
   const [userNames, setUserNames] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
   const [reviewerMap, setReviewerMap] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
 
