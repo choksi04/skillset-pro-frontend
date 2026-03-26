@@ -31,7 +31,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from '@/components/ui/sheet';
 import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
@@ -751,30 +751,108 @@ export default function QuestionBankPage() {
       )}
 
       {/* AI Preview Detail Sheet */}
-      {previewDetailIndex !== null && previews[previewDetailIndex] && (
+      {previewDetailIndex !== null && previews[previewDetailIndex] && (() => {
+        const pIdx = previewDetailIndex;
+        const pItem = previews[pIdx];
+        return (
         <Sheet open onOpenChange={(open) => { if (!open) setPreviewDetailIndex(null); }}>
-          <SheetContent className="sm:max-w-lg overflow-y-auto">
+          <SheetContent className="sm:max-w-lg overflow-y-auto flex flex-col">
             <SheetHeader>
               <SheetTitle>AI Generated Question</SheetTitle>
               <SheetDescription>
                 {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {competencyLabels[aiLevel as CompetencyLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
               </SheetDescription>
             </SheetHeader>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-4 mt-4 flex-1">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
                 <Badge variant="secondary" className="text-xs">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
                 <Badge variant="outline" className="text-xs">{competencyLabels[aiLevel as CompetencyLevel] || aiLevel}</Badge>
+                {pItem.accepted ? (
+                  <Badge className="text-xs border border-success/20 bg-success/15 text-success">Accepted</Badge>
+                ) : (
+                  <Badge className="text-xs border border-destructive/20 bg-destructive/15 text-destructive">Rejected</Badge>
+                )}
               </div>
-              <FormattedQuestionContent
-                text={previews[previewDetailIndex].question_text}
-                guidelines={previews[previewDetailIndex].evaluation_guidelines}
-                type={aiQType}
-              />
+
+              {/* Editable question text */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Question Text</Label>
+                <Textarea
+                  value={(() => {
+                    try {
+                      const p = JSON.parse(pItem.question_text);
+                      if (aiQType === 'mcq' && p?.questionText) return p.questionText;
+                      if (aiQType === 'coding' && p?.problemStatement) return p.problemStatement;
+                    } catch {}
+                    return pItem.question_text;
+                  })()}
+                  onChange={(e) => {
+                    setPreviews(prev => prev.map((item, idx) => {
+                      if (idx !== pIdx) return item;
+                      const val = e.target.value;
+                      try {
+                        const p = JSON.parse(item.question_text);
+                        if (aiQType === 'mcq' && p?.questionText) return { ...item, question_text: JSON.stringify({ ...p, questionText: val }) };
+                        if (aiQType === 'coding' && p?.problemStatement) return { ...item, question_text: JSON.stringify({ ...p, problemStatement: val }) };
+                      } catch {}
+                      return { ...item, question_text: val };
+                    }));
+                  }}
+                  rows={4}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Editable evaluation guidelines */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evaluation Guidelines</Label>
+                <Textarea
+                  value={pItem.evaluation_guidelines}
+                  onChange={(e) => {
+                    setPreviews(prev => prev.map((item, idx) => idx === pIdx ? { ...item, evaluation_guidelines: e.target.value } : item));
+                  }}
+                  rows={3}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Read-only formatted preview */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preview</Label>
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <FormattedQuestionContent
+                    text={pItem.question_text}
+                    guidelines={pItem.evaluation_guidelines}
+                    type={aiQType}
+                  />
+                </div>
+              </div>
             </div>
+
+            <SheetFooter className="mt-6 flex-row gap-2 sm:justify-between">
+              <Button
+                variant={pItem.accepted ? 'destructive' : 'default'}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  togglePreview(pIdx);
+                }}
+              >
+                {pItem.accepted ? (
+                  <><Trash2 size={14} /> Reject</>
+                ) : (
+                  <><CheckCircle size={14} /> Accept</>
+                )}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPreviewDetailIndex(null)}>
+                Done
+              </Button>
+            </SheetFooter>
           </SheetContent>
         </Sheet>
-      )}
+        );
+      })()}
 
       {/* Form Sheet */}
       <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
