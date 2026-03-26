@@ -6,6 +6,7 @@ import { useAttemptStore } from '@/stores/attemptStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
+import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ScoreCard } from '@/components/registry/ScoreCard';
@@ -28,9 +29,10 @@ export default function TeamRegistryDetailPage() {
   const { reviews, officialEntries, fetchReviews } = useReviewStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
+  const { activeCycle, fetchCycles } = useCycleStore();
 
   useEffect(() => {
-    fetchRegistry(); fetchDomains(); fetchSkills(); fetchAssessments(); fetchAttempts(); fetchReviews();
+    fetchRegistry(); fetchDomains(); fetchSkills(); fetchAssessments(); fetchAttempts(); fetchReviews(); fetchCycles();
   }, []);
 
   const submission = useMemo(() => submissions.find((s) => s.id === submissionId), [submissions, submissionId]);
