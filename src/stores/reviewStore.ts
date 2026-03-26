@@ -92,6 +92,7 @@ interface ReviewStore {
 
   getReviewsForManager: (reviewerId: string) => ManagerReview[];
   getReviewForAssessment: (assessmentId: string) => ManagerReview | undefined;
+  reassignReviewer: (reviewId: string, newReviewerId: string) => Promise<void>;
 }
 
 export const useReviewStore = create<ReviewStore>((set, get) => ({
@@ -338,4 +339,38 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   getUnreadCount: (role) => get().notifications.filter((n) => n.target_role === role && !n.read).length,
   getReviewsForManager: (reviewerId) => get().reviews.filter((r) => r.reviewer_id === reviewerId),
   getReviewForAssessment: (assessmentId) => get().reviews.find((r) => r.assessment_id === assessmentId),
+
+  reassignReviewer: async (reviewId, newReviewerId) => {
+    const review = get().reviews.find((r) => r.id === reviewId);
+    if (!review) return;
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+
+    await supabase.from('manager_reviews').update({
+      reviewer_id: newReviewerId, modified_by: userId, modified_at: now,
+    }).eq('id', reviewId);
+
+    // Notify new reviewer
+    const notifId = `notif-reassign-${Date.now()}`;
+    await supabase.from('notifications').insert({
+      id: notifId, tenant_id: review.tenant_id, target_role: 'manager',
+      target_user_id: newReviewerId,
+      message: `You have been assigned to review ${review.employee_name}'s assessment.`,
+      type: 'assessment_completed', reference_id: reviewId,
+      action_link: '/reviews', read: false,
+    });
+
+    set((state) => ({
+      reviews: state.reviews.map((r) =>
+        r.id === reviewId ? { ...r, reviewer_id: newReviewerId } : r
+      ),
+      notifications: [...state.notifications, {
+        id: notifId, tenant_id: review.tenant_id, target_role: 'manager',
+        target_user_id: newReviewerId,
+        message: `You have been assigned to review ${review.employee_name}'s assessment.`,
+        type: 'assessment_completed' as const, reference_id: reviewId,
+        action_link: '/reviews', read: false, created_at: now,
+      }],
+    }));
+  },
 }));

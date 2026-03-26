@@ -193,10 +193,11 @@ function MyAssessmentsView() {
       const submission = submissions.find((s) => s.employee_id === employeeId);
       const selfRatings = submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
 
-      // Find the domain lead for this assessment's domain
+      // Find reviewer: if employee IS the domain lead → self-review; otherwise domain lead; fallback admin
       let reviewerId = '';
       const { data: domainRow } = await supabase.from('domains').select('domain_lead_id').eq('id', activeAssessment.domain_id).single();
       if (domainRow?.domain_lead_id) {
+        // Domain lead exists — assign them (even if it's the current user = self-review)
         reviewerId = domainRow.domain_lead_id;
       } else {
         // Fallback: find any admin
