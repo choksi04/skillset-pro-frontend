@@ -25,7 +25,6 @@ const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
   '/manager-reviews': { group: 'Operations', title: 'Manager Reviews' },
   '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
   '/help': { group: 'Support', title: 'Help & Tutorial' },
-  '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
 };
 
 export default function PageHeader() {
