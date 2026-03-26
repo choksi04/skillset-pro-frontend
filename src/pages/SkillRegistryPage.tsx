@@ -157,7 +157,7 @@ export default function SkillRegistryPage() {
       return;
     }
     if (employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') {
-      navigate('/assessments');
+      if (submission) navigate(`/skill-registry/${submission.id}`);
       return;
     }
     if (employeeStatus === 'assessment_completed' || employeeStatus === 'approved') {
