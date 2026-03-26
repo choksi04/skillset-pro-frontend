@@ -350,7 +350,7 @@ export default function AssessmentExecPage() {
                       ) : isPendingEval ? (
                         <>
                           <Button size="sm" variant="outline" onClick={async () => {
-                            const qMap = new Map(assessment.assessment_questions.map((aq) => [aq.question_id, questionMap.get(aq.question_id)!]).filter(([, q]) => q != null));
+                            const qMap = new Map<string, Question>(assessment.assessment_questions.map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question]).filter(([, q]) => q != null));
                             await retryEvaluation(attempt!.id, qMap as Map<string, any>, assessment.assessment_questions);
                             toast.info('Retrying AI evaluation...');
                           }} className="gap-1.5">
