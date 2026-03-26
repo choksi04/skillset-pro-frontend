@@ -15,7 +15,6 @@ import { deriveStatus, statusConfig, statusLabel, statusColor, avgRound, Enriche
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle, ClipboardCheck, Clock, Eye, Award,
   Calendar, ArrowRight, Play, FileText,
