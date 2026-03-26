@@ -158,15 +158,19 @@ const managerGuide: GuideStep[] = [
 
 const employeeGuide: GuideStep[] = [
   {
-    title: 'Skill Registry',
-    description: 'Rate your proficiency in skills grouped by category.',
+    title: 'My Skill Registry',
+    description: 'Self-assess your skills during an active review cycle. Your ratings drive the assessment pipeline.',
     icon: <BarChart3 size={16} />,
     steps: [
-      'Navigate to Operations > Skill Registry from the sidebar.',
-      'Skills are grouped by category with progress tracking per section.',
-      'Rate each skill on a 1-5 scale (Basic Awareness to Expert).',
-      'Save as draft to continue later — your ratings are preserved.',
-      'Submit when all skills are rated — this triggers assessment generation.',
+      'Navigate to Operations > My Registry from the sidebar.',
+      'The Active Cycle Card shows your current status and a dynamic action button.',
+      'Click the CTA to start or continue your self-review.',
+      'Skills are grouped by category — rate each on a 1–5 scale (Basic Awareness to Expert).',
+      'Your previous cycle rating is shown inline for reference (e.g. "Last cycle: L3").',
+      'Optionally add comments per skill to explain your experience.',
+      'Drafts auto-save every 2 seconds — look for the "Saving..." / "Saved" indicator.',
+      'Submit when all skills are rated — this locks your ratings and generates an assessment.',
+      'Past registries are shown in a table below for historical reference.',
     ],
   },
   {
