@@ -81,8 +81,7 @@ export default function SkillRegistryDetailPage() {
   const isIncomplete = isDraft && isCycleClosed;
 
   const employeeStatus = useMemo(() => {
-    if (isIncomplete) return 'incomplete' as const;
-    return deriveStatus(submission, assessments, attempts, reviews);
+    return deriveStatus(submission, assessments, attempts, reviews, isIncomplete);
   }, [isIncomplete, submission, assessments, attempts, reviews]);
 
   // Domain

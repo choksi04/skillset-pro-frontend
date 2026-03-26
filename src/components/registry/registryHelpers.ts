@@ -27,9 +27,12 @@ export function deriveStatus(
   assessments: { submission_id: string; id: string }[],
   attempts: { assessment_id: string; id: string; status: string }[],
   reviews: { attempt_id: string; id: string; status: string }[],
+  isCycleClosed?: boolean,
 ): EmployeeStatus {
   if (!submission) return 'not_started';
-  if (submission.status === 'draft') return 'in_progress';
+  if (submission.status === 'draft') {
+    return isCycleClosed ? 'incomplete' : 'in_progress';
+  }
   const assessment = assessments.find((a) => a.submission_id === submission.id);
   if (!assessment) return 'submitted';
   const attempt = attempts.find((a) => a.assessment_id === assessment.id);

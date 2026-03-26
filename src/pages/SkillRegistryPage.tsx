@@ -83,7 +83,8 @@ export default function SkillRegistryPage() {
   );
 
   const submission = getSubmission(employeeId, currentCycle);
-  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews);
+  const isCycleClosedForActive = !activeCycle || (submission ? submission.cycle !== activeCycle.name : false);
+  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews, submission?.status === 'draft' ? isCycleClosedForActive : false);
   const isLocked = submission?.status === 'submitted' || submission?.status === 'assessment_generated';
 
   const enrichedSubmissions = useMemo<EnrichedSubmission[]>(() => {
@@ -109,7 +110,8 @@ export default function SkillRegistryPage() {
         finalAvg = avgRound(officialForCycle.map((oe) => oe.final_level));
       }
 
-      const status = deriveStatus(sub, assessments, attempts, reviews);
+      const subCycleClosed = !activeCycle || sub.cycle !== activeCycle.name;
+      const status = deriveStatus(sub, assessments, attempts, reviews, sub.status === 'draft' ? subCycleClosed : false);
 
       let reviewer: EnrichedSubmission['reviewer'] = null;
       if (assessment) {
