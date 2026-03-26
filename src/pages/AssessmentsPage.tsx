@@ -90,7 +90,7 @@ function AssessmentCard({ assessment, employeeName, isOwner, expandedId, onToggl
             </Button>
           )}
           {!isOwner && isCompleted && (
-            <Button size="sm" variant="outline" onClick={() => navigate('/reviews')} className="gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => navigate('/review-cycles')} className="gap-1.5">
               <FileSearch size={14} /> Review
             </Button>
           )}

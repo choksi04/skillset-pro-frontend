@@ -1,31 +1,60 @@
-import { useLocation } from "react-router-dom";
-import { Bell, Search } from "lucide-react";
-import HelpButton from "@/components/onboarding/HelpButton";
+import { useLocation, Link } from 'react-router-dom';
+import { Bell, Search, ChevronRight } from 'lucide-react';
+import HelpButton from '@/components/onboarding/HelpButton';
 
-const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
-  "/organization": "Organization Setup",
-  "/skills": "Skill Framework",
-  "/domains": "Domain Management",
-  "/domain-skills": "Domain-Skill Mapping",
-  "/questions": "Question Bank",
-  "/ai-generate": "AI Question Generation",
-  "/assessments": "Assessment Management",
-  "/assessment-exec": "Take Assessment",
-  "/reviews": "Manager Reviews",
-  "/registry": "Skill Registry",
-  "/skill-analytics": "Skill Analytics",
-  "/users": "Users",
-  "/guide": "User Guide",
+interface BreadcrumbEntry {
+  group: string;
+  title: string;
+}
+
+const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
+  '/': { group: 'Insights', title: 'Dashboard' },
+  '/all-registries': { group: 'Insights', title: 'All Registries' },
+  '/skill-registry': { group: 'Operations', title: 'Skill Registry' },
+  '/assessments': { group: 'Operations', title: 'Assessments' },
+  '/skill-library': { group: 'Settings', title: 'Skill Library' },
+  '/domains': { group: 'Settings', title: 'Domains' },
+  '/users': { group: 'Settings', title: 'Users' },
+  '/questions': { group: 'Settings', title: 'Question Bank' },
+  '/question-settings': { group: 'Settings', title: 'Question Settings' },
+  '/review-cycles': { group: 'Settings', title: 'Review Cycles' },
+  '/help': { group: 'Support', title: 'Help & Tutorial' },
+  '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
 };
 
 export default function PageHeader() {
   const location = useLocation();
-  const title = pageTitles[location.pathname] || "Page";
+
+  // Handle dynamic routes like /domains/:id
+  const basePath = location.pathname.startsWith('/domains/') ? '/domains' : location.pathname;
+  const crumb = routeBreadcrumbs[basePath];
+  const title = crumb?.title || 'Page';
+  const group = crumb?.group;
+
+  // For domain detail pages, add extra breadcrumb
+  const isDomainDetail = location.pathname.startsWith('/domains/') && location.pathname !== '/domains';
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
-      <h1 className="text-lg font-semibold text-card-foreground">{title}</h1>
+      <div className="flex items-center gap-1.5 text-sm">
+        {group && (
+          <>
+            <span className="text-muted-foreground">{group}</span>
+            <ChevronRight size={14} className="text-muted-foreground" />
+          </>
+        )}
+        {isDomainDetail ? (
+          <>
+            <Link to="/domains" className="text-muted-foreground hover:text-foreground transition-colors">
+              Domains
+            </Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Domain Detail</span>
+          </>
+        ) : (
+          <span className="font-medium text-card-foreground">{title}</span>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <button className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <Search size={16} />

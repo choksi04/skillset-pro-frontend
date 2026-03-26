@@ -8,11 +8,9 @@ import { UserRole } from "@/types/models";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
-import OrganizationPage from "@/pages/OrganizationPage";
 import SkillFrameworkPage from "@/pages/SkillFrameworkPage";
 import DomainsPage from "@/pages/DomainsPage";
 import DomainDetailPage from "@/pages/DomainDetailPage";
-import DomainSkillMappingPage from "@/pages/DomainSkillMappingPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
 import AIGenerationPage from "@/pages/AIGenerationPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
@@ -22,6 +20,8 @@ import SkillRegistryPage from "@/pages/SkillRegistryPage";
 import HRDashboardPage from "@/pages/HRDashboardPage";
 import UserGuidePage from "@/pages/UserGuidePage";
 import UsersPage from "@/pages/UsersPage";
+import QuestionSettingsPage from "@/pages/QuestionSettingsPage";
+import AllRegistriesPage from "@/pages/AllRegistriesPage";
 import NotFound from "@/pages/NotFound";
 import { toast } from "sonner";
 import { useEffect } from "react";
@@ -70,24 +70,32 @@ const App = () => (
             >
               {/* All roles */}
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/registry" element={<SkillRegistryPage />} />
+              <Route path="/skill-registry" element={<SkillRegistryPage />} />
               <Route path="/assessments" element={<AssessmentsPage />} />
               <Route path="/assessment-exec" element={<AssessmentExecPage />} />
-              <Route path="/guide" element={<UserGuidePage />} />
+              <Route path="/help" element={<UserGuidePage />} />
 
               {/* Admin only */}
-              <Route path="/organization" element={<RoleGuard allowed={["admin"]}><OrganizationPage /></RoleGuard>} />
               <Route path="/users" element={<RoleGuard allowed={["admin"]}><UsersPage /></RoleGuard>} />
-              <Route path="/skill-analytics" element={<RoleGuard allowed={["admin"]}><HRDashboardPage /></RoleGuard>} />
-              <Route path="/ai-generate" element={<RoleGuard allowed={["admin", "manager"]}><AIGenerationPage /></RoleGuard>} />
+              <Route path="/question-settings" element={<RoleGuard allowed={["admin"]}><QuestionSettingsPage /></RoleGuard>} />
+              <Route path="/all-registries" element={<RoleGuard allowed={["admin"]}><AllRegistriesPage /></RoleGuard>} />
 
               {/* Admin + Manager */}
-              <Route path="/skills" element={<RoleGuard allowed={["admin", "manager"]}><SkillFrameworkPage /></RoleGuard>} />
+              <Route path="/skill-library" element={<RoleGuard allowed={["admin", "manager"]}><SkillFrameworkPage /></RoleGuard>} />
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
-              <Route path="/domain-skills" element={<RoleGuard allowed={["admin", "manager"]}><DomainSkillMappingPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />
-              <Route path="/reviews" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
+              <Route path="/ai-generate" element={<RoleGuard allowed={["admin", "manager"]}><AIGenerationPage /></RoleGuard>} />
+              <Route path="/review-cycles" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
+
+              {/* Legacy redirects */}
+              <Route path="/skills" element={<Navigate to="/skill-library" replace />} />
+              <Route path="/registry" element={<Navigate to="/skill-registry" replace />} />
+              <Route path="/reviews" element={<Navigate to="/review-cycles" replace />} />
+              <Route path="/guide" element={<Navigate to="/help" replace />} />
+              <Route path="/skill-analytics" element={<Navigate to="/all-registries" replace />} />
+              <Route path="/organization" element={<Navigate to="/" replace />} />
+              <Route path="/domain-skills" element={<Navigate to="/domains" replace />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

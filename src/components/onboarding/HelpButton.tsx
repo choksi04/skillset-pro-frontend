@@ -23,7 +23,7 @@ export default function HelpButton() {
         <DropdownMenuItem className="gap-2 text-xs cursor-pointer" onClick={restartTour}>
           <Play size={14} /> Restart Product Tour
         </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2 text-xs cursor-pointer" onClick={() => navigate('/guide')}>
+        <DropdownMenuItem className="gap-2 text-xs cursor-pointer" onClick={() => navigate('/help')}>
           <BookOpen size={14} /> Open User Guide
         </DropdownMenuItem>
         <DropdownMenuSeparator />
