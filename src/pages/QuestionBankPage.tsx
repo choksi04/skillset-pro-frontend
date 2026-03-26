@@ -642,6 +642,13 @@ export default function QuestionBankPage() {
             </SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'recent' | 'oldest')}>
+          <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue placeholder="Sort" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Recent First</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Question Table */}
@@ -803,18 +810,20 @@ export default function QuestionBankPage() {
                 />
               </div>
 
-              {/* Editable evaluation guidelines */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evaluation Guidelines</Label>
-                <Textarea
-                  value={pItem.evaluation_guidelines}
-                  onChange={(e) => {
-                    setPreviews(prev => prev.map((item, idx) => idx === pIdx ? { ...item, evaluation_guidelines: e.target.value } : item));
-                  }}
-                  rows={3}
-                  className="text-sm"
-                />
-              </div>
+              {/* Editable evaluation guidelines (not for MCQ) */}
+              {aiQType !== 'mcq' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evaluation Guidelines</Label>
+                  <Textarea
+                    value={pItem.evaluation_guidelines}
+                    onChange={(e) => {
+                      setPreviews(prev => prev.map((item, idx) => idx === pIdx ? { ...item, evaluation_guidelines: e.target.value } : item));
+                    }}
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+              )}
 
               {/* Read-only formatted preview */}
               <div className="space-y-1.5">
