@@ -1,204 +1,166 @@
-## Plan: Full Application Navigation, Layout & Dark Mode Refactor
 
-This is a major structural refactor covering sidebar reorganization, route cleanup, role-adaptive dashboard, dark mode toggle, setup progress indicator, breadcrumb navigation, and documentation updates.
 
-No database or data model changes are required.
+## Plan: Redesign Skill Library Module
 
----
-
-### New Sidebar Structure
-
-```text
-INSIGHTS                       [varies]
-  Dashboard                    [all]
-  All Registries               [admin]
-
----------------------------
-[need better label]
-  Skillset Registry            [all]
-  Assessments                  [all]
-------------------------------
-Setting         [admin, manager where noted]
-  Skill Library                [admin, manager]
-  Domains                      [admin, manager]
-  Users                        [admin]
-  Question Bank                [admin, manager]
-  Question Settings            [admin]
-  Review Cycles                [admin, manager]
------------------------------------------------
-SUPPORT
-  Help & Tutorial              [all]
-```
-
-Employee sees: Skillset Registry, Assessments, Dashboard, Help & Tutorial (flat, no group headers needed for such a short list).
+Redesign the Skill Library into a hierarchical Category → Skill → Topic system with a new database table, updated store, and completely rewritten UI pages.
 
 ---
 
-### Step 1: Rewrite AppSidebar with collapsible groups
+### Database Change
 
-**File: `src/components/layout/AppSidebar.tsx**`
+**New table: `skill_topics`**
 
-- Replace flat item list with grouped structure using section labels (small uppercase text).
-- Each group: `{ label, items: { title, href, icon, roles }[] }`.
-- Groups only render if the user's role matches at least one item.
-- Add dark mode toggle button at the bottom (moon/sun icon) that toggles `.dark` class on `<html>`.
-- Add a "Setup Progress" indicator in the Setup section header for admin role — shows completed steps count (skills exist, domains exist, users exist, questions exist, cycle exists) as a small `3/5` badge.
-- Remove: Organization, Domain-Skill Map, Take Assessment (merged into Assessments), Skill Analytics (renamed to Dashboard insights).
+```sql
+CREATE TABLE public.skill_topics (
+  id text NOT NULL PRIMARY KEY,
+  skill_id text NOT NULL,
+  tenant_id text NOT NULL DEFAULT 'tenant-001',
+  name text NOT NULL,
+  description text DEFAULT '',
+  status text NOT NULL DEFAULT 'active',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  modified_at timestamptz,
+  deleted_on timestamptz,
+  created_by text,
+  modified_by text,
+  deleted_by text
+);
 
-### Step 2: Update routes in App.tsx
+ALTER TABLE public.skill_topics ENABLE ROW LEVEL SECURITY;
 
-**File: `src/App.tsx**`
-
-Route mapping changes:
-
-- `/skills` → `/skill-library`
-- `/registry` → `/skill-registry`
-- `/skill-analytics` → remove (merge into Dashboard)
-- `/reviews` → `/review-cycles`
-- `/guide` → `/help`
-- `/assessment-exec` → remove as standalone route (merge into `/assessments`)
-- `/organization` → remove
-- `/domain-skills` → remove
-- Add `/question-settings` route (admin only)
-- Add `/all-registries` route (admin only)
-
-Update all `RoleGuard` `allowed` arrays per new role visibility.
-
-### Step 3: Add breadcrumb navigation to PageHeader
-
-**File: `src/components/layout/PageHeader.tsx**`
-
-- Replace static `h1` with breadcrumbs built from `location.pathname`.
-- Map each route to `[groupLabel, pageTitle]` for two-level breadcrumbs.
-- Example: `/skill-library` → `Setup & Configuration > Skill Library`.
-- Keep the right-side actions (search, help, notifications).
-
-### Step 4: Dark mode toggle
-
-**File: `src/components/layout/AppSidebar.tsx**` (toggle button in sidebar footer)
-
-- Create a small `useTheme` hook or inline logic:
-  - Read initial state from `localStorage('siap-theme')` or `prefers-color-scheme`.
-  - Toggle `document.documentElement.classList.toggle('dark')`.
-  - Persist to `localStorage`.
-- Dark mode CSS variables already exist in `index.css` — no changes needed there.
-
-### Step 5: Role-adaptive Dashboard
-
-**File: `src/pages/DashboardPage.tsx**`
-
-Rewrite to render different sections by role:
-
-- **Admin**: Org stats (total users, skills, domains, active assessments from stores), cycle status, completion metrics, setup progress prompt if incomplete.
-- **Manager**: Team assessments pending, team skill overview, action items.
-- **Employee**: Active cycle status, pending actions (submit registry, take assessment), recent results, "Contact admin to assign domain" message if no domain assigned.
-
-Pull real data from existing stores instead of hardcoded values.
-
-### Step 6: Setup Progress Indicator
-
-**New component: `src/components/layout/SetupProgress.tsx**`
-
-- Shows for admin only, in the sidebar's Setup section.
-- 5 steps: Skills created, Domains created, Users added, Questions added, Cycle started.
-- Check completion from stores (skills.length > 0, domains.length > 0, etc.).
-- Renders as a compact horizontal progress bar with `3/5` label.
-
-### Step 7: Create Question Settings page
-
-**New file: `src/pages/QuestionSettingsPage.tsx**`
-
-- Admin-only page for managing question difficulty levels and experience levels.
-- For now, display the current level definitions (beginner/intermediate/advanced/expert) as editable cards.
-- This is a configuration page — uses card-based layout with the standard page template (Header, Description, Action, Content).
-
-### Step 8: Create All Registries page
-
-**New file: `src/pages/AllRegistriesPage.tsx**`
-
-- Extract the registry table from `HRDashboardPage.tsx` into a standalone admin page.
-- Includes search, domain filter, CSV export.
-- Follows standard page template.
-
-### Step 9: Merge assessment execution into AssessmentsPage
-
-**File: `src/pages/AssessmentsPage.tsx**`
-
-- Import assessment execution components from `AssessmentExecPage.tsx`.
-- When employee clicks "Start/Resume", render the execution view inline (or as a full-page takeover within the same route) instead of navigating to `/assessment-exec`.
-
-### Step 10: Page template consistency
-
-Apply to all page components the pattern:
-
-```text
-<div className="space-y-6">
-  <div className="flex items-center justify-between">
-    <div>
-      <h2>Page Title</h2>
-      <p>Description</p>
-    </div>
-    <PrimaryActionButton />  {/* if applicable */}
-  </div>
-  <Content />
-</div>
+CREATE POLICY "Allow all" ON public.skill_topics FOR ALL TO public USING (true) WITH CHECK (true);
 ```
 
-Audit and fix: `SkillFrameworkPage`, `DomainsPage`, `QuestionBankPage`, `UsersPage`, `SkillRegistryPage`, `ReviewsPage`.
+---
 
-### Step 11: Update internal route references
+### Store Changes
 
-Search and replace all old paths across the codebase:
+**File: `src/stores/skillStore.ts`**
 
-- `/skills` → `/skill-library`
-- `/registry` → `/skill-registry`
-- `/reviews` → `/review-cycles`
-- `/guide` → `/help`
-- `/skill-analytics` → `/analytics` or dashboard
-- `/assessment-exec` → `/assessments`
-- `/organization` → remove references
+- Add `SkillTopic` interface and `topics: SkillTopic[]` to store state.
+- Add `fetchTopicsForSkill(skillId)` — lazy-loads topics for a single skill (not fetched upfront).
+- Add `addTopic`, `updateTopic`, `deleteTopic` actions.
+- Update `deleteSkill` to check for domain mappings, question bank usage, and registry usage before allowing deletion (show toast error if blocked).
+- Categories and skills continue to load as they do now.
 
-Files affected: `onboardingStore.ts`, `QuickStartChecklist.tsx`, `AssessmentExecPage.tsx`, `SkillRegistryPage.tsx`, any `navigate()` or `<Link>` calls.
+---
 
-### Step 12: Update User Guide
+### UI Restructure (3 files)
 
-**File: `src/pages/UserGuidePage.tsx**`
+#### 1. Skill Library Landing Page (`src/pages/SkillFrameworkPage.tsx`) — Category List
 
-- Update all module names and navigation references.
-- Add section explaining the 3-group navigation structure.
-- Update role-based access explanation.
-- Add setup flow explanation (5-step process).
+Complete rewrite. Shows **only categories** in a clean table:
 
-### Step 13: Cleanup
+| Category Name | Description | Skills Count | Status | Actions |
+|---|---|---|---|---|
 
-- Remove `src/pages/OrganizationPage.tsx` (placeholder only).
-- Remove `src/pages/DomainSkillMappingPage.tsx` (redundant — accessible from domain detail).
-- Keep `src/pages/AssessmentExecPage.tsx` but refactor as an importable component, not a routed page.
-- Remove `/assessment-exec` and `/organization` and `/domain-skills` routes from `App.tsx`.
+- "Create Category" primary CTA button.
+- Search bar filters categories by name/description.
+- Status filter (active/disabled).
+- Clicking a row navigates to `/skill-library/:categoryId`.
+- Admin-only edit/delete actions inline (dropdown menu).
+- Delete blocked if category has skills (toast error).
+
+#### 2. Category Detail Page (`src/pages/CategoryDetailPage.tsx`) — NEW
+
+Route: `/skill-library/:categoryId`
+
+- Header: Category name + description + back link to `/skill-library`.
+- Skills table for this category:
+
+| Skill Name | Description | Tags | Topics | Status | Actions |
+
+- "Add Skill" primary CTA.
+- Search + tag filter + status filter.
+- Clicking a skill row opens a **Sheet (side drawer)** with skill details + topics.
+- Admin edit/delete/toggle actions via dropdown.
+- Delete checks: blocked if skill is mapped to a domain, used in questions, or used in registry.
+
+#### 3. Skill Detail Drawer (`src/components/skills/SkillDetailDrawer.tsx`) — NEW
+
+Opens as a right-side `Sheet` when a skill row is clicked.
+
+- Shows: Skill name, description, tags, status.
+- Topics section below with a small table:
+
+| Topic Name | Description | Actions |
+
+- "Add Topic" button.
+- Inline add/edit via a small dialog or inline form.
+- Topics lazy-loaded when drawer opens (`fetchTopicsForSkill`).
+- Topics deletable anytime (no restrictions).
+
+---
+
+### Form Updates
+
+**`src/components/skills/SkillFormDialog.tsx`**
+- Remove category selector (category is now implicit from the detail page context).
+- Accept `categoryName` as a prop instead.
+
+**`src/components/skills/CategoryFormDialog.tsx`**
+- No changes needed (already works).
+
+**New: `src/components/skills/TopicFormDialog.tsx`**
+- Simple dialog: name (required, max 100) + description (optional, max 300).
+- Validates uniqueness within the skill.
+
+---
+
+### Route Changes
+
+**File: `src/App.tsx`**
+- Add route: `/skill-library/:categoryId` → `CategoryDetailPage` (admin, manager).
+- Import new `CategoryDetailPage`.
+
+---
+
+### Breadcrumb Updates
+
+**File: `src/components/layout/PageHeader.tsx`**
+- Add breadcrumb mapping for `/skill-library/:categoryId` → `Settings > Skill Library > [Category Name]`.
+
+---
+
+### Delete Safety Rules (in store)
+
+- **Category**: Cannot delete if `skills.filter(s => s.skill_category === cat.name).length > 0`.
+- **Skill**: Cannot delete if:
+  - Mapped to any domain (`domain_skill_mappings` table, check via supabase query).
+  - Used in question bank (`questions` table where `skill_id = id`).
+  - Used in registry (`skill_self_ratings` or `official_skill_entries` where `skill_id = id`).
+- **Topic**: Can always be deleted (soft delete).
+
+---
+
+### Performance
+
+- Landing page loads only categories + skill counts (already in store).
+- Category detail page filters skills from store by category name.
+- Topics loaded lazily per skill when drawer opens.
+
+---
+
+### Documentation
+
+**File: `src/pages/UserGuidePage.tsx`**
+- Update Skill Library section with hierarchy explanation (Category → Skill → Topic).
+- Add instructions for creating categories, skills, and topics.
 
 ---
 
 ### Files Summary
 
+| Action | File |
+|--------|------|
+| Migration | `skill_topics` table |
+| Rewrite | `src/pages/SkillFrameworkPage.tsx` (category list) |
+| Create | `src/pages/CategoryDetailPage.tsx` |
+| Create | `src/components/skills/SkillDetailDrawer.tsx` |
+| Create | `src/components/skills/TopicFormDialog.tsx` |
+| Modify | `src/stores/skillStore.ts` (add topics) |
+| Modify | `src/components/skills/SkillFormDialog.tsx` |
+| Modify | `src/App.tsx` (add route) |
+| Modify | `src/components/layout/PageHeader.tsx` (breadcrumb) |
+| Modify | `src/pages/UserGuidePage.tsx` |
 
-| Action  | File                                                |
-| ------- | --------------------------------------------------- |
-| Rewrite | `src/components/layout/AppSidebar.tsx`              |
-| Rewrite | `src/components/layout/PageHeader.tsx`              |
-| Rewrite | `src/components/layout/AppLayout.tsx`               |
-| Rewrite | `src/pages/DashboardPage.tsx`                       |
-| Modify  | `src/App.tsx`                                       |
-| Modify  | `src/pages/AssessmentsPage.tsx`                     |
-| Modify  | `src/pages/AssessmentExecPage.tsx`                  |
-| Modify  | `src/pages/UserGuidePage.tsx`                       |
-| Modify  | `src/stores/onboardingStore.ts`                     |
-| Modify  | `src/components/onboarding/QuickStartChecklist.tsx` |
-| Modify  | `src/pages/SkillFrameworkPage.tsx` (rename refs)    |
-| Modify  | `src/pages/SkillRegistryPage.tsx` (rename refs)     |
-| Modify  | `src/pages/ReviewsPage.tsx` (route update)          |
-| Create  | `src/components/layout/SetupProgress.tsx`           |
-| Create  | `src/pages/QuestionSettingsPage.tsx`                |
-| Create  | `src/pages/AllRegistriesPage.tsx`                   |
-| Create  | `src/hooks/useTheme.ts`                             |
-| Delete  | `src/pages/OrganizationPage.tsx`                    |
-| Delete  | `src/pages/DomainSkillMappingPage.tsx`              |
