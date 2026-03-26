@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels, SkillRegistrySubmission } from '@/stores/registryStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useReviewStore } from '@/stores/reviewStore';
@@ -8,6 +8,7 @@ import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useQuestionStore } from '@/stores/questionStore';
 import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -31,12 +34,9 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
   CheckCircle, Lock, AlertTriangle, Send, Search, Info, FolderOpen, Tag,
-  ClipboardCheck, Clock, Eye, TrendingUp, Award, BarChart3, MessageSquare,
-  Calendar, ArrowRight, Save, Loader2, Play, FileText,
+  ClipboardCheck, Clock, Eye, Award, MessageSquare,
+  Calendar, ArrowRight, Play, FileText, Loader2, ArrowLeft, User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -52,23 +52,17 @@ type EmployeeStatus =
   | 'approved';
 
 function deriveStatus(
-  submission: ReturnType<typeof useRegistryStore.getState>['submissions'][0] | undefined,
+  submission: SkillRegistrySubmission | undefined,
   assessments: ReturnType<typeof useAssessmentStore.getState>['assessments'],
   attempts: ReturnType<typeof useAttemptStore.getState>['attempts'],
   reviews: ReturnType<typeof useReviewStore.getState>['reviews'],
 ): EmployeeStatus {
   if (!submission) return 'not_started';
   if (submission.status === 'draft') return 'in_progress';
-
-  // Find assessment for this submission
   const assessment = assessments.find((a) => a.submission_id === submission.id);
   if (!assessment) return 'submitted';
-
-  // Find attempt for this assessment
   const attempt = attempts.find((a) => a.assessment_id === assessment.id);
   if (!attempt || attempt.status === 'in_progress') return 'assessment_pending';
-
-  // Find review
   const review = reviews.find((r) => r.attempt_id === attempt.id);
   if (!review) return 'assessment_completed';
   if (review.status === 'completed') return 'approved';
@@ -85,6 +79,26 @@ const statusConfig: Record<EmployeeStatus, { label: string; color: string; cta: 
   approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20', cta: 'View Final Results' },
 };
 
+const statusLabel = (status: EmployeeStatus) => statusConfig[status].label;
+const statusColor = (status: EmployeeStatus) => statusConfig[status].color;
+
+// ── Helper: compute avg ──
+function avgRound(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
+}
+
+// ── Types for enriched submission ──
+interface EnrichedSubmission {
+  submission: SkillRegistrySubmission;
+  selfAvg: number;
+  assessmentAvg: number | null;
+  finalAvg: number | null;
+  status: EmployeeStatus;
+  reviewer: { id: string; name: string; email: string; avatar_url: string } | null;
+  isActive: boolean;
+}
+
 // ── Page ──
 export default function SkillRegistryPage() {
   const { user } = useAuth();
@@ -94,7 +108,7 @@ export default function SkillRegistryPage() {
   const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry, setCurrentCycle } = useRegistryStore();
   const { assessments, addAssessment, fetchAssessments } = useAssessmentStore();
   const { attempts, fetchAttempts } = useAttemptStore();
-  const { reviews, fetchReviews } = useReviewStore();
+  const { reviews, officialEntries, fetchReviews } = useReviewStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, categories, fetchSkills } = useSkillStore();
   const { questions, fetchQuestions } = useQuestionStore();
@@ -111,6 +125,20 @@ export default function SkillRegistryPage() {
   useEffect(() => {
     if (activeCycle) setCurrentCycle(activeCycle.name);
   }, [activeCycle, setCurrentCycle]);
+
+  // Reviewer data fetched from users table
+  const [reviewerMap, setReviewerMap] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
+
+  useEffect(() => {
+    const reviewerIds = [...new Set(reviews.filter((r) => r.employee_id === employeeId).map((r) => r.reviewer_id))];
+    if (reviewerIds.length === 0) return;
+    supabase.from('users').select('id, full_name, email, avatar_url').in('id', reviewerIds).then(({ data }) => {
+      if (!data) return;
+      const map: Record<string, { name: string; email: string; avatar_url: string }> = {};
+      data.forEach((u: any) => { map[u.id] = { name: u.full_name, email: u.email, avatar_url: u.avatar_url || '' }; });
+      setReviewerMap(map);
+    });
+  }, [reviews, employeeId]);
 
   // Domain
   const assignedDomain = useMemo(() => {
@@ -134,12 +162,64 @@ export default function SkillRegistryPage() {
   const employeeStatus = deriveStatus(submission, assessments, attempts, reviews);
   const isLocked = submission?.status === 'submitted' || submission?.status === 'assessment_generated';
 
+  // ── Build enriched submissions list ──
+  const enrichedSubmissions = useMemo<EnrichedSubmission[]>(() => {
+    const mySubmissions = submissions.filter((s) => s.employee_id === employeeId);
+    return mySubmissions.map((sub) => {
+      const isActive = activeCycle ? sub.cycle === activeCycle.name : false;
+
+      // Self avg
+      const selfAvg = avgRound(sub.ratings.map((r) => r.rating));
+
+      // Assessment avg: submission → assessment → attempt → skill_scores
+      let assessmentAvg: number | null = null;
+      const assessment = assessments.find((a) => a.submission_id === sub.id);
+      if (assessment) {
+        const attempt = attempts.find((a) => a.assessment_id === assessment.id);
+        if (attempt && attempt.skill_scores.length > 0) {
+          assessmentAvg = avgRound(attempt.skill_scores.map((ss) => ss.calculated_level));
+        }
+      }
+
+      // Final avg: from officialEntries for this employee + cycle
+      let finalAvg: number | null = null;
+      const officialForCycle = (officialEntries || []).filter(
+        (oe) => oe.employee_id === sub.employee_id && oe.cycle === sub.cycle
+      );
+      if (officialForCycle.length > 0) {
+        finalAvg = avgRound(officialForCycle.map((oe) => oe.final_level));
+      }
+
+      // Status
+      const status = deriveStatus(sub, assessments, attempts, reviews);
+
+      // Reviewer
+      let reviewer: EnrichedSubmission['reviewer'] = null;
+      if (assessment) {
+        const attempt = attempts.find((a) => a.assessment_id === assessment.id);
+        if (attempt) {
+          const review = reviews.find((r) => r.attempt_id === attempt.id);
+          if (review && reviewerMap[review.reviewer_id]) {
+            reviewer = { id: review.reviewer_id, ...reviewerMap[review.reviewer_id] };
+          }
+        }
+      }
+
+      return { submission: sub, selfAvg, assessmentAvg, finalAvg, status, reviewer, isActive };
+    }).sort((a, b) => {
+      // Active first, then by date desc
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return new Date(b.submission.created_at).getTime() - new Date(a.submission.created_at).getTime();
+    });
+  }, [submissions, employeeId, activeCycle, assessments, attempts, reviews, officialEntries, reviewerMap]);
+
   // Previous cycle ratings
   const previousRatings = useMemo<Record<string, RatingLevel>>(() => {
     if (!activeCycle) return {};
     const pastSubs = submissions.filter((s) => s.employee_id === employeeId && s.cycle !== activeCycle.name);
     if (pastSubs.length === 0) return {};
-    const latest = pastSubs[0]; // already sorted desc
+    const latest = pastSubs[0];
     const map: Record<string, RatingLevel> = {};
     latest.ratings.forEach((r) => { map[r.skill_id] = r.rating; });
     return map;
@@ -189,7 +269,6 @@ export default function SkillRegistryPage() {
     if (isLocked) return;
     setRatings((prev) => {
       const next = { ...prev, [skillId]: rating };
-      // schedule auto-save after state updates
       setTimeout(() => triggerAutoSave(), 0);
       return next;
     });
@@ -208,6 +287,7 @@ export default function SkillRegistryPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [detailSubmissionId, setDetailSubmissionId] = useState<string | null>(null);
 
   const allRated = domainSkills.length > 0 && domainSkills.every((s) => ratings[s.id] != null);
   const ratedCount = domainSkills.filter((s) => ratings[s.id] != null).length;
@@ -232,12 +312,6 @@ export default function SkillRegistryPage() {
     return map;
   }, [filteredSkills]);
 
-  // Past registries
-  const pastSubmissions = useMemo(() => {
-    if (!activeCycle) return [];
-    return submissions.filter((s) => s.employee_id === employeeId && s.cycle !== activeCycle.name);
-  }, [submissions, employeeId, activeCycle]);
-
   // CTA handler
   const handleCTA = () => {
     switch (employeeStatus) {
@@ -247,8 +321,6 @@ export default function SkillRegistryPage() {
         break;
       case 'submitted':
       case 'assessment_pending':
-        navigate('/assessments');
-        break;
       case 'assessment_completed':
       case 'approved':
         navigate('/assessments');
@@ -289,30 +361,30 @@ export default function SkillRegistryPage() {
   const submissionAllowed = isSubmissionAllowed();
   const daysRemaining = getDaysRemaining();
 
-  // ── RENDER ──
+  // ── Detail view for past registry ──
+  const detailEnriched = detailSubmissionId
+    ? enrichedSubmissions.find((e) => e.submission.id === detailSubmissionId)
+    : null;
 
-  // No active cycle
-  if (!activeCycle) {
+  if (detailEnriched) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">My Skill Registry</h2>
-          <p className="text-sm text-muted-foreground mt-1">Submit your self-assessed skill ratings and track your progress.</p>
-        </div>
-        <div className="flex flex-col items-center justify-center py-16">
-          <Clock size={32} className="text-muted-foreground mb-3" />
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Active Review Cycle</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            There is no active review cycle at the moment. Please wait for your admin to start a cycle.
-          </p>
-        </div>
-        {pastSubmissions.length > 0 && <PastRegistriesTable submissions={pastSubmissions} skills={skills} />}
-      </div>
+      <RegistryDetailView
+        enriched={detailEnriched}
+        skills={skills}
+        assessments={assessments}
+        attempts={attempts}
+        reviews={reviews}
+        officialEntries={officialEntries || []}
+        onBack={() => setDetailSubmissionId(null)}
+      />
     );
   }
 
-  // No domain
-  if (!assignedDomain) {
+  // ── RENDER ──
+  const config = employeeStatus ? statusConfig[employeeStatus] : null;
+
+  // No domain warning
+  if (activeCycle && !assignedDomain) {
     return (
       <div className="space-y-6">
         <div>
@@ -326,11 +398,15 @@ export default function SkillRegistryPage() {
             You have not been assigned to a domain yet. Please contact your manager or admin.
           </p>
         </div>
+        {enrichedSubmissions.filter((e) => !e.isActive).length > 0 && (
+          <RegistryCardList
+            enrichedList={enrichedSubmissions.filter((e) => !e.isActive)}
+            onViewDetail={(id) => setDetailSubmissionId(id)}
+          />
+        )}
       </div>
     );
   }
-
-  const config = statusConfig[employeeStatus];
 
   return (
     <div className="space-y-6">
@@ -341,54 +417,73 @@ export default function SkillRegistryPage() {
       </div>
 
       {/* Section 1: Active Cycle Card */}
-      <Card className="border-primary/20">
-        <CardContent className="p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar size={16} className="text-primary" />
-                <h3 className="text-base font-semibold text-foreground">{activeCycle.name}</h3>
-                <Badge className={`text-xs ${config.color}`}>{config.label}</Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span>Domain: <span className="font-medium text-foreground">{assignedDomain.name}</span></span>
-                <span>•</span>
-                <span>{new Date(activeCycle.start_date).toLocaleDateString()} – {new Date(activeCycle.end_date).toLocaleDateString()}</span>
-                {daysRemaining !== null && submissionAllowed && !isLocked && (
-                  <>
-                    <span>•</span>
-                    <span className={`font-medium ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-muted-foreground'}`}>
-                      {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? 'Ends today' : 'Grace period active'}
-                    </span>
-                  </>
+      {activeCycle && assignedDomain && config && (
+        <Card className="border-primary/20">
+          <CardContent className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-primary" />
+                  <h3 className="text-base font-semibold text-foreground">{activeCycle.name}</h3>
+                  <Badge className={`text-xs ${config.color}`}>{config.label}</Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span>Domain: <span className="font-medium text-foreground">{assignedDomain.name}</span></span>
+                  <span>•</span>
+                  <span>{new Date(activeCycle.start_date).toLocaleDateString()} – {new Date(activeCycle.end_date).toLocaleDateString()}</span>
+                  {daysRemaining !== null && submissionAllowed && !isLocked && (
+                    <>
+                      <span>•</span>
+                      <span className={`font-medium ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-muted-foreground'}`}>
+                        {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? 'Ends today' : 'Grace period active'}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* Inline scores for active cycle */}
+                {submission && (
+                  <div className="flex flex-wrap gap-4 mt-1">
+                    <ScoreChip label="Self" value={enrichedSubmissions.find((e) => e.isActive)?.selfAvg ?? null} />
+                    <ScoreChip label="Assessment" value={enrichedSubmissions.find((e) => e.isActive)?.assessmentAvg ?? null} />
+                    <ScoreChip label="Final" value={enrichedSubmissions.find((e) => e.isActive)?.finalAvg ?? null} />
+                  </div>
+                )}
+                {ratedCount > 0 && employeeStatus !== 'not_started' && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Progress value={(ratedCount / domainSkills.length) * 100} className="h-1.5 w-32" />
+                    <span className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</span>
+                  </div>
                 )}
               </div>
-              {ratedCount > 0 && employeeStatus !== 'not_started' && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Progress value={(ratedCount / domainSkills.length) * 100} className="h-1.5 w-32" />
-                  <span className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</span>
-                </div>
-              )}
+              <Button onClick={handleCTA} disabled={config.ctaDisabled} className="gap-1.5 shrink-0">
+                {employeeStatus === 'not_started' && <Play size={14} />}
+                {employeeStatus === 'in_progress' && <ArrowRight size={14} />}
+                {(employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') && <ClipboardCheck size={14} />}
+                {employeeStatus === 'assessment_completed' && <Eye size={14} />}
+                {employeeStatus === 'review_pending' && <Clock size={14} />}
+                {employeeStatus === 'approved' && <Award size={14} />}
+                {config.cta}
+              </Button>
             </div>
-            <Button
-              onClick={handleCTA}
-              disabled={config.ctaDisabled}
-              className="gap-1.5 shrink-0"
-            >
-              {employeeStatus === 'not_started' && <Play size={14} />}
-              {employeeStatus === 'in_progress' && <ArrowRight size={14} />}
-              {(employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') && <ClipboardCheck size={14} />}
-              {employeeStatus === 'assessment_completed' && <Eye size={14} />}
-              {employeeStatus === 'review_pending' && <Clock size={14} />}
-              {employeeStatus === 'approved' && <Award size={14} />}
-              {config.cta}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No active cycle message */}
+      {!activeCycle && (
+        <Card className="border-border">
+          <CardContent className="p-5 flex items-center gap-3">
+            <Clock size={20} className="text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium text-foreground">No Active Review Cycle</p>
+              <p className="text-xs text-muted-foreground">There is no active review cycle at the moment. Your past registries are shown below.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Section 2: Self Review Form */}
-      {(showForm || employeeStatus === 'in_progress' || isLocked) && (
+      {activeCycle && assignedDomain && (showForm || employeeStatus === 'in_progress' || isLocked) && (
         <SelfReviewForm
           domainSkills={domainSkills}
           filteredSkills={filteredSkills}
@@ -410,8 +505,24 @@ export default function SkillRegistryPage() {
         />
       )}
 
-      {/* Section 3: Past Registries */}
-      {pastSubmissions.length > 0 && <PastRegistriesTable submissions={pastSubmissions} skills={skills} />}
+      {/* Section 3: Past Registries listing */}
+      {enrichedSubmissions.filter((e) => !e.isActive).length > 0 && (
+        <RegistryCardList
+          enrichedList={enrichedSubmissions.filter((e) => !e.isActive)}
+          onViewDetail={(id) => setDetailSubmissionId(id)}
+        />
+      )}
+
+      {/* No submissions at all */}
+      {enrichedSubmissions.length === 0 && !activeCycle && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <FileText size={32} className="text-muted-foreground mb-3" />
+          <h3 className="text-lg font-semibold text-foreground mb-1">No Skill Registry Records</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            You don't have any skill registry submissions yet.
+          </p>
+        </div>
+      )}
 
       {/* Confirm Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -465,6 +576,289 @@ export default function SkillRegistryPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// ── Score chip ──
+function ScoreChip({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-muted-foreground">{label}:</span>
+      {value !== null ? (
+        <Badge variant="secondary" className="text-xs font-semibold">L{value}</Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      )}
+    </div>
+  );
+}
+
+// ── Manager avatar with hover card ──
+function ManagerAvatar({ reviewer }: { reviewer: EnrichedSubmission['reviewer'] }) {
+  if (!reviewer) return <span className="text-xs text-muted-foreground">—</span>;
+  const initials = reviewer.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <button className="focus:outline-none">
+          <Avatar className="h-7 w-7 cursor-pointer">
+            {reviewer.avatar_url ? <AvatarImage src={reviewer.avatar_url} alt={reviewer.name} /> : null}
+            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{initials}</AvatarFallback>
+          </Avatar>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-64" side="top">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10">
+            {reviewer.avatar_url ? <AvatarImage src={reviewer.avatar_url} alt={reviewer.name} /> : null}
+            <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm font-medium text-foreground">{reviewer.name}</p>
+            <p className="text-xs text-muted-foreground">{reviewer.email}</p>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+// ── Registry card list (past registries) ──
+function RegistryCardList({
+  enrichedList,
+  onViewDetail,
+}: {
+  enrichedList: EnrichedSubmission[];
+  onViewDetail: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+        <FileText size={14} className="text-muted-foreground" /> Past Registries
+      </h3>
+      <div className="space-y-2">
+        {enrichedList.map((item) => (
+          <Card
+            key={item.submission.id}
+            className="border-border hover:border-primary/30 transition-colors cursor-pointer"
+            onClick={() => onViewDetail(item.submission.id)}
+          >
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{item.submission.cycle}</p>
+                      <Badge className={`text-[10px] ${statusColor(item.status)}`}>{statusLabel(item.status)}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date(item.submission.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-5">
+                  <ScoreChip label="Self" value={item.selfAvg || null} />
+                  <ScoreChip label="Assessment" value={item.assessmentAvg} />
+                  <ScoreChip label="Final" value={item.finalAvg} />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Manager:</span>
+                    <ManagerAvatar reviewer={item.reviewer} />
+                  </div>
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs shrink-0" onClick={(e) => { e.stopPropagation(); onViewDetail(item.submission.id); }}>
+                    <Eye size={13} /> View
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Detail view for a past registry ──
+function RegistryDetailView({
+  enriched,
+  skills,
+  assessments,
+  attempts,
+  reviews,
+  officialEntries,
+  onBack,
+}: {
+  enriched: EnrichedSubmission;
+  skills: Skill[];
+  assessments: ReturnType<typeof useAssessmentStore.getState>['assessments'];
+  attempts: ReturnType<typeof useAttemptStore.getState>['attempts'];
+  reviews: ReturnType<typeof useReviewStore.getState>['reviews'];
+  officialEntries: ReturnType<typeof useReviewStore.getState>['officialEntries'];
+  onBack: () => void;
+}) {
+  const [detailSearch, setDetailSearch] = useState('');
+  const sub = enriched.submission;
+
+  // Build per-skill score maps
+  const assessment = assessments.find((a) => a.submission_id === sub.id);
+  const attempt = assessment ? attempts.find((a) => a.assessment_id === assessment.id) : null;
+
+  const assessmentScoreMap = useMemo<Record<string, number>>(() => {
+    if (!attempt) return {};
+    const map: Record<string, number> = {};
+    attempt.skill_scores.forEach((ss) => { map[ss.skill_id] = ss.calculated_level; });
+    return map;
+  }, [attempt]);
+
+  const finalScoreMap = useMemo<Record<string, number>>(() => {
+    const entries = (officialEntries || []).filter(
+      (oe) => oe.employee_id === sub.employee_id && oe.cycle === sub.cycle
+    );
+    const map: Record<string, number> = {};
+    entries.forEach((oe) => { map[oe.skill_id] = oe.final_level; });
+    return map;
+  }, [officialEntries, sub]);
+
+  const review = attempt ? reviews.find((r) => r.attempt_id === attempt.id) : null;
+
+  // Skills from ratings
+  const ratedSkillIds = sub.ratings.map((r) => r.skill_id);
+  const ratedSkills = skills.filter((s) => ratedSkillIds.includes(s.id));
+
+  const filtered = useMemo(() => {
+    if (!detailSearch.trim()) return ratedSkills;
+    const q = detailSearch.toLowerCase();
+    return ratedSkills.filter((s) =>
+      s.skill_name.toLowerCase().includes(q) || (s.skill_category || '').toLowerCase().includes(q)
+    );
+  }, [ratedSkills, detailSearch]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Skill[]>();
+    filtered.forEach((s) => {
+      const cat = s.skill_category || 'Uncategorized';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(s);
+    });
+    return map;
+  }, [filtered]);
+
+  const ratingMap: Record<string, RatingLevel> = {};
+  sub.ratings.forEach((r) => { ratingMap[r.skill_id] = r.rating; });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+          <ArrowLeft size={14} /> Back
+        </Button>
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">{sub.cycle}</h2>
+          <p className="text-xs text-muted-foreground">Submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '—'}</p>
+        </div>
+        <Badge className={`text-xs ml-2 ${statusColor(enriched.status)}`}>{statusLabel(enriched.status)}</Badge>
+      </div>
+
+      {/* Score cards + Manager */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <ScoreCard label="Self Score (avg)" value={enriched.selfAvg} />
+        <ScoreCard label="Assessment Score (avg)" value={enriched.assessmentAvg} />
+        <ScoreCard label="Final Score (avg)" value={enriched.finalAvg} />
+        <Card className="border-border">
+          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
+            <span className="text-xs text-muted-foreground">Manager</span>
+            {enriched.reviewer ? (
+              <div className="flex flex-col items-center gap-1">
+                <ManagerAvatar reviewer={enriched.reviewer} />
+                <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
+            {review?.overall_comment && (
+              <p className="text-xs text-muted-foreground italic mt-1 text-center">"{review.overall_comment}"</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      {ratedSkills.length > 4 && (
+        <div className="relative max-w-xs">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search skills..." value={detailSearch} onChange={(e) => setDetailSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+        </div>
+      )}
+
+      {/* Skills grouped by category */}
+      <Accordion type="multiple" defaultValue={Array.from(grouped.keys())} className="space-y-3">
+        {Array.from(grouped.entries()).map(([catName, catSkills]) => (
+          <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
+            <AccordionTrigger className="px-5 py-3 hover:no-underline">
+              <div className="flex items-center gap-3 text-left flex-1">
+                <FolderOpen size={16} className="text-primary shrink-0" />
+                <span className="font-semibold text-card-foreground">{catName}</span>
+                <span className="text-xs text-muted-foreground">({catSkills.length})</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-0 pb-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-5 py-2 text-xs font-medium text-muted-foreground">Skill</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground">Self</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground">Assessment</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground">Final</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground">Gap</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {catSkills.map((skill) => {
+                      const selfR = ratingMap[skill.id] ?? null;
+                      const assessR = assessmentScoreMap[skill.id] ?? null;
+                      const finalR = finalScoreMap[skill.id] ?? null;
+                      const gap = selfR !== null && finalR !== null ? finalR - selfR : null;
+                      return (
+                        <tr key={skill.id} className="hover:bg-muted/20">
+                          <td className="px-5 py-3 font-medium text-foreground">{skill.skill_name}</td>
+                          <td className="text-center px-3 py-3">{selfR !== null ? <Badge variant="secondary" className="text-xs">L{selfR}</Badge> : '—'}</td>
+                          <td className="text-center px-3 py-3">{assessR !== null ? <Badge variant="outline" className="text-xs">L{assessR}</Badge> : '—'}</td>
+                          <td className="text-center px-3 py-3">{finalR !== null ? <Badge className="text-xs bg-primary/10 text-primary border-primary/20">L{finalR}</Badge> : '—'}</td>
+                          <td className="text-center px-3 py-3">
+                            {gap !== null ? (
+                              <span className={`text-xs font-semibold ${gap > 0 ? 'text-success' : gap < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                {gap > 0 ? `+${gap}` : gap}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </div>
+  );
+}
+
+// ── Score card for detail header ──
+function ScoreCard({ label, value }: { label: string; value: number | null }) {
+  return (
+    <Card className="border-border">
+      <CardContent className="p-4 flex flex-col items-center justify-center gap-1">
+        <span className="text-xs text-muted-foreground text-center">{label}</span>
+        {value !== null ? (
+          <span className="text-2xl font-bold text-foreground">L{value}</span>
+        ) : (
+          <span className="text-lg text-muted-foreground">—</span>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -591,7 +985,6 @@ function SelfReviewForm({
                             disabled={isLocked}
                             previousRating={previousRatings[skill.id]}
                           />
-                          {/* Optional comment */}
                           {!isLocked && (
                             <Collapsible className="mt-2">
                               <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -643,59 +1036,5 @@ function SelfReviewForm({
         )}
       </div>
     </TooltipProvider>
-  );
-}
-
-// ── Past Registries Table ──
-function PastRegistriesTable({
-  submissions,
-  skills,
-}: {
-  submissions: ReturnType<typeof useRegistryStore.getState>['submissions'];
-  skills: Skill[];
-}) {
-  return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <FileText size={14} className="text-muted-foreground" /> Past Registries
-      </h3>
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Cycle</TableHead>
-              <TableHead className="text-xs">Skills Rated</TableHead>
-              <TableHead className="text-xs">Avg Score</TableHead>
-              <TableHead className="text-xs">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {submissions.map((sub) => {
-              const avgRating = sub.ratings.length > 0
-                ? Math.round((sub.ratings.reduce((sum, r) => sum + r.rating, 0) / sub.ratings.length) * 10) / 10
-                : 0;
-              return (
-                <TableRow key={sub.id}>
-                  <TableCell className="text-sm font-medium">{sub.cycle}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{sub.ratings.length}</TableCell>
-                  <TableCell className="text-sm">
-                    {avgRating > 0 ? <Badge variant="secondary" className="text-xs">L{avgRating}</Badge> : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${
-                      sub.status === 'assessment_generated' ? 'bg-success/15 text-success border-success/20'
-                        : sub.status === 'submitted' ? 'bg-primary/15 text-primary border-primary/20'
-                        : 'bg-warning/15 text-warning border-warning/20'
-                    }`}>
-                      {sub.status === 'assessment_generated' ? 'Completed' : sub.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
   );
 }
