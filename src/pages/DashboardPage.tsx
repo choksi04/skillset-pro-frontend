@@ -44,7 +44,7 @@ function AdminDashboard() {
 
   const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
   const completedAssessments = attempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length;
-  const activeAssessments = assessments.filter((a) => a.status === 'active' || a.status === 'pending').length;
+  const activeAssessments = assessments.filter((a) => a.status === 'pending' || a.status === 'in_progress').length;
 
   return (
     <>
