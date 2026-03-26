@@ -128,26 +128,38 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
       status: 'active', modified_at: now, modified_by: userId,
     }).eq('id', cycleId);
 
-    // Send notifications to all employees in tenant
-    const { data: employees } = await supabase
+    // Send notifications to ALL active users in tenant (role-specific messages)
+    const { data: allUsers } = await supabase
       .from('users')
-      .select('id')
+      .select('id, role')
       .eq('tenant_id', cycle.tenant_id)
-      .eq('role', 'employee')
       .eq('status', 'active');
 
-    if (employees && employees.length > 0) {
-      const notifications = employees.map((emp: any) => ({
-        id: `notif-cycle-${Date.now()}-${emp.id}`,
-        tenant_id: cycle.tenant_id,
-        target_role: 'employee',
-        target_user_id: emp.id,
-        message: `A new review cycle '${cycle.name}' has started. Submit your skill ratings by ${format(parseISO(cycle.end_date), 'MMM d, yyyy')}.`,
-        type: 'cycle_activated',
-        reference_id: cycleId,
-        action_link: '/skill-registry',
-        read: false,
-      }));
+    if (allUsers && allUsers.length > 0) {
+      const notifications = allUsers.map((u: any) => {
+        let message = '';
+        let actionLink = '/skill-registry';
+        if (u.role === 'employee') {
+          message = `A new review cycle '${cycle.name}' has started. Submit your skill ratings by ${format(parseISO(cycle.end_date), 'MMM d, yyyy')}.`;
+        } else if (u.role === 'manager') {
+          message = `A new review cycle '${cycle.name}' has started. Monitor your team's progress.`;
+          actionLink = '/review-cycles';
+        } else {
+          message = `Review cycle '${cycle.name}' is now active.`;
+          actionLink = '/review-cycles';
+        }
+        return {
+          id: `notif-cycle-${Date.now()}-${u.id}`,
+          tenant_id: cycle.tenant_id,
+          target_role: u.role,
+          target_user_id: u.id,
+          message,
+          type: 'cycle_activated',
+          reference_id: cycleId,
+          action_link: actionLink,
+          read: false,
+        };
+      });
       await supabase.from('notifications').insert(notifications);
     }
 
