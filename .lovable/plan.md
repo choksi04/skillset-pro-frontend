@@ -1,166 +1,94 @@
+## Plan: Skill Library Micro-Feature Improvements
 
-
-## Plan: Redesign Skill Library Module
-
-Redesign the Skill Library into a hierarchical Category → Skill → Topic system with a new database table, updated store, and completely rewritten UI pages.
+Seven targeted changes to improve forms, topic display, delete confirmations, and dropdown styling across the Skill Library module.
 
 ---
 
-### Database Change
+### 1. Convert CategoryFormDialog to Sheet
 
-**New table: `skill_topics`**
+**File: `src/components/skills/CategoryFormDialog.tsx**`
 
-```sql
-CREATE TABLE public.skill_topics (
-  id text NOT NULL PRIMARY KEY,
-  skill_id text NOT NULL,
-  tenant_id text NOT NULL DEFAULT 'tenant-001',
-  name text NOT NULL,
-  description text DEFAULT '',
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  modified_at timestamptz,
-  deleted_on timestamptz,
-  created_by text,
-  modified_by text,
-  deleted_by text
-);
+- Replace `Dialog/DialogContent/DialogHeader/DialogTitle` with `Sheet/SheetContent/SheetHeader/SheetTitle` from `@/components/ui/sheet`.
+- Sheet opens from the right (`side="right"`), max-width `sm:max-w-md`.
+- Same form fields, same validation logic — just a different container.
 
-ALTER TABLE public.skill_topics ENABLE ROW LEVEL SECURITY;
+### 2. Navigate to new category after creation
 
-CREATE POLICY "Allow all" ON public.skill_topics FOR ALL TO public USING (true) WITH CHECK (true);
-```
+**File: `src/pages/SkillFrameworkPage.tsx**`
 
----
+- Pass a callback `onCreated?: (categoryId: string) => void` to `CategoryFormDialog`.
+- In `CategoryFormDialog`, after `addCategory()` succeeds, call `onCreated(newCategoryId)`.
+- In `SkillFrameworkPage`, the callback calls `navigate(\`/skill-library/{id})`.
+- The store's `addCategory` must return the new category ID — update its return type from `Promise<void>` to `Promise<string>` in `skillStore.ts`.
 
-### Store Changes
+### 3. Convert SkillFormDialog to Sheet + auto-open detail
 
-**File: `src/stores/skillStore.ts`**
+**File: `src/components/skills/SkillFormDialog.tsx**`
 
-- Add `SkillTopic` interface and `topics: SkillTopic[]` to store state.
-- Add `fetchTopicsForSkill(skillId)` — lazy-loads topics for a single skill (not fetched upfront).
-- Add `addTopic`, `updateTopic`, `deleteTopic` actions.
-- Update `deleteSkill` to check for domain mappings, question bank usage, and registry usage before allowing deletion (show toast error if blocked).
-- Categories and skills continue to load as they do now.
+- Replace `Dialog` with `Sheet` (right drawer).
+- Remove the "existing tags suggestions" section below the tag input field (per requirement).
+- Add `onCreated?: (skillId: string) => void` callback prop.
 
----
+**File: `src/pages/CategoryDetailPage.tsx**`
 
-### UI Restructure (3 files)
+- After skill creation, call `setSelectedSkill(newSkill)` to auto-open the detail drawer.
+- Store's `addSkill` must return the new skill ID — update return type from `Promise<void>` to `Promise<string>`.
 
-#### 1. Skill Library Landing Page (`src/pages/SkillFrameworkPage.tsx`) — Category List
+### 4. Convert TopicFormDialog to Sheet
 
-Complete rewrite. Shows **only categories** in a clean table:
+**File: `src/components/skills/TopicFormDialog.tsx**`
 
-| Category Name | Description | Skills Count | Status | Actions |
-|---|---|---|---|---|
+- Replace `Dialog` with `Sheet` (right drawer).
+- Same form fields, same validation.
 
-- "Create Category" primary CTA button.
-- Search bar filters categories by name/description.
-- Status filter (active/disabled).
-- Clicking a row navigates to `/skill-library/:categoryId`.
-- Admin-only edit/delete actions inline (dropdown menu).
-- Delete blocked if category has skills (toast error).
+### 5. Delete Topic confirmation alert
 
-#### 2. Category Detail Page (`src/pages/CategoryDetailPage.tsx`) — NEW
+**File: `src/components/skills/SkillDetailDrawer.tsx**`
 
-Route: `/skill-library/:categoryId`
+- Add an `AlertDialog` for topic deletion (same pattern as category/skill delete alerts).
+- On click "Delete" in topic dropdown, set a `deleteTopicTarget` state instead of calling `deleteTopic` directly.
+- Show confirmation dialog: "Are you sure you want to delete [topic name]?"
 
-- Header: Category name + description + back link to `/skill-library`.
-- Skills table for this category:
+### 6. Topics as cards instead of table
 
-| Skill Name | Description | Tags | Topics | Status | Actions |
+**File: `src/components/skills/SkillDetailDrawer.tsx**`
 
-- "Add Skill" primary CTA.
-- Search + tag filter + status filter.
-- Clicking a skill row opens a **Sheet (side drawer)** with skill details + topics.
-- Admin edit/delete/toggle actions via dropdown.
-- Delete checks: blocked if skill is mapped to a domain, used in questions, or used in registry.
+- Replace the `Table` rendering of topics with a grid of cards.
+- Each card: title (bold), description (2 lines max with `line-clamp-2`), actions dropdown in top-right corner.
+- Use `title` attribute on the description `<p>` for native browser tooltip on hover.
+- Layout: `grid grid-cols-1 gap-3` (cards stack vertically in the drawer).
+- Card structure: `rounded-lg border border-border p-3` with title and description stacked.
 
-#### 3. Skill Detail Drawer (`src/components/skills/SkillDetailDrawer.tsx`) — NEW
+### 7. Searchable Select dropdowns with proper theme colors
 
-Opens as a right-side `Sheet` when a skill row is clicked.
+**File: Multiple files** — All `Select` dropdowns in Skill Library pages need to be replaced with a searchable `Command`-based popover pattern (Popover + Command from shadcn).
 
-- Shows: Skill name, description, tags, status.
-- Topics section below with a small table:
+Create a reusable `SearchableSelect` component at `src/components/ui/searchable-select.tsx`:
 
-| Topic Name | Description | Actions |
+- Props: `options: {value, label}[]`, `value`, `onValueChange`, `placeholder`, `className`.
+- Uses `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandItem`.
+- Styled with theme colors (`bg-popover`, `text-popover-foreground`, `border-input`) — no green accents.
 
-- "Add Topic" button.
-- Inline add/edit via a small dialog or inline form.
-- Topics lazy-loaded when drawer opens (`fetchTopicsForSkill`).
-- Topics deletable anytime (no restrictions).
+Replace `Select` usage in:
 
----
+- `src/pages/SkillFrameworkPage.tsx` (status filter)
+- `src/pages/CategoryDetailPage.tsx` (tag filter, status filter)
+- `src/components/skills/SkillFormDialog.tsx` (status dropdown)
 
-### Form Updates
-
-**`src/components/skills/SkillFormDialog.tsx`**
-- Remove category selector (category is now implicit from the detail page context).
-- Accept `categoryName` as a prop instead.
-
-**`src/components/skills/CategoryFormDialog.tsx`**
-- No changes needed (already works).
-
-**New: `src/components/skills/TopicFormDialog.tsx`**
-- Simple dialog: name (required, max 100) + description (optional, max 300).
-- Validates uniqueness within the skill.
-
----
-
-### Route Changes
-
-**File: `src/App.tsx`**
-- Add route: `/skill-library/:categoryId` → `CategoryDetailPage` (admin, manager).
-- Import new `CategoryDetailPage`.
-
----
-
-### Breadcrumb Updates
-
-**File: `src/components/layout/PageHeader.tsx`**
-- Add breadcrumb mapping for `/skill-library/:categoryId` → `Settings > Skill Library > [Category Name]`.
-
----
-
-### Delete Safety Rules (in store)
-
-- **Category**: Cannot delete if `skills.filter(s => s.skill_category === cat.name).length > 0`.
-- **Skill**: Cannot delete if:
-  - Mapped to any domain (`domain_skill_mappings` table, check via supabase query).
-  - Used in question bank (`questions` table where `skill_id = id`).
-  - Used in registry (`skill_self_ratings` or `official_skill_entries` where `skill_id = id`).
-- **Topic**: Can always be deleted (soft delete).
-
----
-
-### Performance
-
-- Landing page loads only categories + skill counts (already in store).
-- Category detail page filters skills from store by category name.
-- Topics loaded lazily per skill when drawer opens.
-
----
-
-### Documentation
-
-**File: `src/pages/UserGuidePage.tsx`**
-- Update Skill Library section with hierarchy explanation (Category → Skill → Topic).
-- Add instructions for creating categories, skills, and topics.
+Status badge color can have green color to provide proper context as green for success, and so on. No need to replace green with blue or primary for status badges.
 
 ---
 
 ### Files Summary
 
-| Action | File |
-|--------|------|
-| Migration | `skill_topics` table |
-| Rewrite | `src/pages/SkillFrameworkPage.tsx` (category list) |
-| Create | `src/pages/CategoryDetailPage.tsx` |
-| Create | `src/components/skills/SkillDetailDrawer.tsx` |
-| Create | `src/components/skills/TopicFormDialog.tsx` |
-| Modify | `src/stores/skillStore.ts` (add topics) |
-| Modify | `src/components/skills/SkillFormDialog.tsx` |
-| Modify | `src/App.tsx` (add route) |
-| Modify | `src/components/layout/PageHeader.tsx` (breadcrumb) |
-| Modify | `src/pages/UserGuidePage.tsx` |
 
+| Action  | File                                                                                              |
+| ------- | ------------------------------------------------------------------------------------------------- |
+| Rewrite | `src/components/skills/CategoryFormDialog.tsx` (Dialog → Sheet + onCreated callback)              |
+| Rewrite | `src/components/skills/SkillFormDialog.tsx` (Dialog → Sheet + remove tag suggestions + onCreated) |
+| Rewrite | `src/components/skills/TopicFormDialog.tsx` (Dialog → Sheet)                                      |
+| Rewrite | `src/components/skills/SkillDetailDrawer.tsx` (topic cards + delete alert)                        |
+| Modify  | `src/pages/SkillFrameworkPage.tsx` (navigate after create + searchable select)                    |
+| Modify  | `src/pages/CategoryDetailPage.tsx` (auto-open skill detail + searchable select)                   |
+| Modify  | `src/stores/skillStore.ts` (addCategory/addSkill return ID)                                       |
+| Create  | `src/components/ui/searchable-select.tsx`                                                         |
