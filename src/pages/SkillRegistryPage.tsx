@@ -14,7 +14,7 @@ import { ManagerAvatar } from '@/components/registry/ManagerAvatar';
 import { deriveStatus, statusConfig, statusLabel, statusColor, avgRound, EnrichedSubmission } from '@/components/registry/registryHelpers';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent } from '@/components/ui/card';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle, ClipboardCheck, Clock, Eye, Award,
