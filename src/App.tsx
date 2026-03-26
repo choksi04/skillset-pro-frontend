@@ -14,6 +14,8 @@ import DomainsPage from "@/pages/DomainsPage";
 import DomainDetailPage from "@/pages/DomainDetailPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
+import TeamAssessmentsPage from "@/pages/TeamAssessmentsPage";
+import AssessmentDetailPage from "@/pages/AssessmentDetailPage";
 import AssessmentExecPage from "@/pages/AssessmentExecPage";
 import ReviewsPage from "@/pages/ReviewsPage";
 import ReviewCyclesPage from "@/pages/ReviewCyclesPage";
@@ -79,6 +81,9 @@ const App = () => (
               <Route path="/team-registry" element={<RoleGuard allowed={["admin", "manager"]}><TeamRegistryPage /></RoleGuard>} />
               <Route path="/team-registry/:submissionId" element={<RoleGuard allowed={["admin", "manager"]}><TeamRegistryDetailPage /></RoleGuard>} />
               <Route path="/assessments" element={<AssessmentsPage />} />
+              <Route path="/assessments/:assessmentId" element={<AssessmentDetailPage />} />
+              <Route path="/team-assessments" element={<RoleGuard allowed={["admin", "manager"]}><TeamAssessmentsPage /></RoleGuard>} />
+              <Route path="/team-assessments/:assessmentId" element={<RoleGuard allowed={["admin", "manager"]}><AssessmentDetailPage /></RoleGuard>} />
               <Route path="/assessment-exec" element={<AssessmentExecPage />} />
               <Route path="/help" element={<UserGuidePage />} />
 
