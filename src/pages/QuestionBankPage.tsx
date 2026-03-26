@@ -31,9 +31,12 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
+import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
   Sparkles, Trash2, MoreHorizontal, Loader2, ChevronDown, ChevronRight,
-  AlertTriangle, Copy, Eye,
+  AlertTriangle, Copy, Eye, Bot, User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,6 +55,56 @@ function parseQuestionText(text: string, type: string): { display: string; parse
   return { display: text, parsed: null };
 }
 
+/** Try to extract structured data from AI-generated text even if not JSON */
+function tryParseAiText(text: string, type: string): any | null {
+  // First try JSON
+  try {
+    const parsed = JSON.parse(text);
+    return parsed;
+  } catch { /* not JSON */ }
+
+  // For MCQ: try to detect options pattern in plain text
+  if (type === 'mcq') {
+    const lines = text.split('\n').filter(l => l.trim());
+    // Look for lines starting with A) B) C) D) or a) b) c) d) or 1. 2. 3. 4.
+    const optionPatterns = [
+      /^[A-D]\)\s*(.+)/i,
+      /^[A-D]\.\s*(.+)/i,
+      /^[1-4]\)\s*(.+)/i,
+      /^[1-4]\.\s*(.+)/i,
+    ];
+    const options: string[] = [];
+    let questionText = '';
+    let correctIndex = 0;
+
+    for (const line of lines) {
+      let matched = false;
+      for (const pat of optionPatterns) {
+        const m = line.trim().match(pat);
+        if (m) {
+          let optText = m[1].trim();
+          // Check for correct answer marker
+          if (optText.includes('✓') || optText.includes('(correct)') || optText.includes('*')) {
+            correctIndex = options.length;
+            optText = optText.replace(/[✓*]|\(correct\)/gi, '').trim();
+          }
+          options.push(optText);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && options.length === 0) {
+        questionText += (questionText ? '\n' : '') + line.trim();
+      }
+    }
+    if (options.length >= 2) {
+      return { questionText: questionText || text.split('\n')[0], options, correctIndex };
+    }
+  }
+
+  return null;
+}
+
 // AI generation validation
 const genSchema = z.object({
   skill_id: z.string().min(1, 'Skill is required'),
@@ -65,6 +118,121 @@ interface GeneratedPreview {
   question_text: string;
   evaluation_guidelines: string;
   accepted: boolean;
+}
+
+// ─── Formatted Question Content Component ───
+function FormattedQuestionContent({ text, guidelines, type }: {
+  text: string;
+  guidelines?: string;
+  type: string;
+}) {
+  const { display, parsed: jsonParsed } = parseQuestionText(text, type);
+  const parsed = jsonParsed || tryParseAiText(text, type);
+
+  if (type === 'mcq' && parsed) {
+    return (
+      <div className="space-y-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
+          <p className="text-sm text-foreground">{parsed.questionText || display}</p>
+        </div>
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Options</h4>
+          <div className="space-y-1.5">
+            {(parsed.options || []).map((opt: string, idx: number) => (
+              <div key={idx} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                idx === parsed.correctIndex ? 'border-success/40 bg-success/5' : 'border-border'
+              }`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                  idx === parsed.correctIndex ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+                }`}>{String.fromCharCode(65 + idx)}</span>
+                <span>{opt}</span>
+                {idx === parsed.correctIndex && <CheckCircle size={14} className="ml-auto text-success" />}
+              </div>
+            ))}
+          </div>
+        </div>
+        {guidelines && (
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <p className="text-sm text-foreground whitespace-pre-wrap">{guidelines}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'coding' && parsed) {
+    return (
+      <div className="space-y-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Problem Statement</h4>
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{parsed.problemStatement}</p>
+          </div>
+        </div>
+        {(parsed.exampleInput || parsed.exampleOutput) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {parsed.exampleInput && (
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Input</h4>
+                <pre className="text-xs rounded-lg p-3 font-mono whitespace-pre-wrap bg-[hsl(var(--foreground)/0.05)] border border-border text-foreground">{parsed.exampleInput}</pre>
+              </div>
+            )}
+            {parsed.exampleOutput && (
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Output</h4>
+                <pre className="text-xs rounded-lg p-3 font-mono whitespace-pre-wrap bg-[hsl(var(--foreground)/0.05)] border border-border text-foreground">{parsed.exampleOutput}</pre>
+              </div>
+            )}
+          </div>
+        )}
+        {guidelines && (
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <p className="text-sm text-foreground whitespace-pre-wrap">{guidelines}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Scenario or fallback
+  return (
+    <div className="space-y-3">
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{display}</p>
+        </div>
+      </div>
+      {guidelines && (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
+          <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+            {guidelines.split('\n').map((line, i) => {
+              const trimmed = line.trim();
+              if (!trimmed) return <br key={i} />;
+              // Detect bullet points
+              if (/^[-•]\s/.test(trimmed)) {
+                return <p key={i} className="text-sm text-foreground pl-3 flex gap-1.5 items-start"><span className="text-muted-foreground mt-0.5">•</span><span>{trimmed.replace(/^[-•]\s*/, '')}</span></p>;
+              }
+              // Detect numbered items
+              if (/^\d+[.)]\s/.test(trimmed)) {
+                const num = trimmed.match(/^(\d+)[.)]\s*/)?.[1];
+                return <p key={i} className="text-sm text-foreground pl-3 flex gap-1.5 items-start"><span className="text-muted-foreground font-medium mt-0.5">{num}.</span><span>{trimmed.replace(/^\d+[.)]\s*/, '')}</span></p>;
+              }
+              return <p key={i} className="text-sm text-foreground">{trimmed}</p>;
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function QuestionBankPage() {
@@ -84,6 +252,7 @@ export default function QuestionBankPage() {
   const [levelFilter, setLevelFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'ai' | 'manual'>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
@@ -101,6 +270,7 @@ export default function QuestionBankPage() {
   const [aiErrors, setAiErrors] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
   const [previews, setPreviews] = useState<GeneratedPreview[]>([]);
+  const [expandedPreview, setExpandedPreview] = useState<number | null>(null);
 
   // Load topics when AI skill changes
   useEffect(() => {
@@ -123,9 +293,10 @@ export default function QuestionBankPage() {
       const matchesLevel = levelFilter === 'all' || q.competency_level === levelFilter;
       const matchesType = typeFilter === 'all' || q.question_type === typeFilter;
       const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
-      return matchesSearch && matchesSkill && matchesLevel && matchesType && matchesStatus;
+      const matchesSource = sourceFilter === 'all' || (sourceFilter === 'ai' ? q.ai_generated : !q.ai_generated);
+      return matchesSearch && matchesSkill && matchesLevel && matchesType && matchesStatus && matchesSource;
     });
-  }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter]);
+  }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter]);
 
   const stats = useMemo(() => ({
     total: questions.length,
@@ -172,6 +343,7 @@ export default function QuestionBankPage() {
     setAiErrors({});
     setGenerating(true);
     setPreviews([]);
+    setExpandedPreview(null);
 
     const skill = skills.find((s) => s.id === aiSkillId);
     const topic = aiTopicId ? topicMap.get(aiTopicId) : undefined;
@@ -224,7 +396,6 @@ export default function QuestionBankPage() {
 
   const handleDuplicate = (q: Question) => {
     setEditQuestion(null);
-    // Pre-fill a new form with the same data
     const dup = { ...q, id: '', status: 'draft' as QuestionStatus, ai_generated: false };
     setEditQuestion(dup);
     setFormOpen(true);
@@ -346,7 +517,7 @@ export default function QuestionBankPage() {
                   {generating ? 'Generating...' : 'Generate Questions'}
                 </Button>
 
-                {/* Preview */}
+                {/* Preview — title-only with expandable details */}
                 {previews.length > 0 && (
                   <div className="space-y-3 pt-2 border-t border-primary/10">
                     <div className="flex items-center justify-between">
@@ -357,22 +528,38 @@ export default function QuestionBankPage() {
                     </div>
                     {previews.map((p, i) => {
                       const { display } = parseQuestionText(p.question_text, aiQType);
+                      const isExpanded = expandedPreview === i;
                       return (
-                        <div key={i} className={`rounded-lg border bg-card p-3 flex items-start gap-3 transition-all ${p.accepted ? 'border-success/30' : 'border-border opacity-50'}`}>
-                          <button
-                            onClick={() => togglePreview(i)}
-                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                              p.accepted ? 'bg-success border-success text-success-foreground' : 'border-border hover:border-foreground'
-                            }`}
-                          >
-                            {p.accepted && <CheckCircle size={12} />}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-foreground line-clamp-3">{display}</p>
-                            {p.evaluation_guidelines && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.evaluation_guidelines}</p>
-                            )}
+                        <div key={i} className={`rounded-lg border bg-card overflow-hidden transition-all ${p.accepted ? 'border-success/30' : 'border-border opacity-50'}`}>
+                          {/* Collapsed row: checkbox + title + expand */}
+                          <div className="flex items-center gap-3 p-3">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePreview(i); }}
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                                p.accepted ? 'bg-success border-success text-success-foreground' : 'border-border hover:border-foreground'
+                              }`}
+                            >
+                              {p.accepted && <CheckCircle size={12} />}
+                            </button>
+                            <button
+                              className="flex-1 min-w-0 text-left flex items-center gap-2"
+                              onClick={() => setExpandedPreview(isExpanded ? null : i)}
+                            >
+                              <Badge variant="secondary" className="text-[10px] shrink-0">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
+                              <span className="text-sm text-foreground truncate">{display}</span>
+                              {isExpanded ? <ChevronDown size={14} className="text-muted-foreground shrink-0 ml-auto" /> : <ChevronRight size={14} className="text-muted-foreground shrink-0 ml-auto" />}
+                            </button>
                           </div>
+                          {/* Expanded detail */}
+                          {isExpanded && (
+                            <div className="border-t border-border px-4 py-3">
+                              <FormattedQuestionContent
+                                text={p.question_text}
+                                guidelines={p.evaluation_guidelines}
+                                type={aiQType}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -456,6 +643,18 @@ export default function QuestionBankPage() {
             <SelectItem value="disabled">Disabled</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as 'all' | 'ai' | 'manual')}>
+          <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Source" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="ai">
+              <span className="flex items-center gap-1.5"><Bot size={12} /> AI Generated</span>
+            </SelectItem>
+            <SelectItem value="manual">
+              <span className="flex items-center gap-1.5"><User size={12} /> Manual</span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Question Table */}
@@ -468,6 +667,7 @@ export default function QuestionBankPage() {
               <TableHead className="w-[110px]">Level</TableHead>
               <TableHead className="w-[80px]">Type</TableHead>
               <TableHead>Question</TableHead>
+              <TableHead className="w-[80px]">Source</TableHead>
               <TableHead className="w-[90px]">Status</TableHead>
               {canEdit && <TableHead className="w-[60px]" />}
             </TableRow>
@@ -475,7 +675,7 @@ export default function QuestionBankPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canEdit ? 7 : 6} className="text-center py-16 text-sm text-muted-foreground">
+                <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-16 text-sm text-muted-foreground">
                   No questions found matching your filters.
                 </TableCell>
               </TableRow>
@@ -491,9 +691,8 @@ export default function QuestionBankPage() {
                       <Badge variant="outline" className="text-xs font-normal">{competencyLabels[q.competency_level]}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-xs font-normal gap-1">
+                      <Badge variant="secondary" className="text-xs font-normal">
                         {questionTypeLabels[q.question_type]}
-                        {q.ai_generated && <Sparkles size={10} className="text-primary" />}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -503,6 +702,13 @@ export default function QuestionBankPage() {
                       >
                         {display}
                       </button>
+                    </TableCell>
+                    <TableCell>
+                      {q.ai_generated ? (
+                        <Badge variant="outline" className="text-[10px] gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] gap-1 border-border text-muted-foreground"><User size={10} /> Manual</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className={`text-xs border ${statusStyles[q.status]}`}>{q.status}</Badge>
@@ -597,15 +803,9 @@ export default function QuestionBankPage() {
 }
 
 // ─── Question Detail Sheet ───
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from '@/components/ui/sheet';
-
 function QuestionDetailSheet({
   question, skillName, topicName, onClose,
 }: { question: Question; skillName: string; topicName: string | null; onClose: () => void }) {
-  const { display, parsed } = parseQuestionText(question.question_text, question.question_type);
-
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
@@ -616,81 +816,28 @@ function QuestionDetailSheet({
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 mt-4">
-          <div className="flex gap-2">
+          {/* Badges */}
+          <div className="flex flex-wrap gap-2">
             <Badge className={`text-xs border ${statusStyles[question.status]}`}>{question.status}</Badge>
-            {question.ai_generated && (
+            {question.ai_generated ? (
               <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs gap-1 border-border text-muted-foreground"><User size={10} /> Manual</Badge>
             )}
+            <Badge variant="secondary" className="text-xs">{questionTypeLabels[question.question_type]}</Badge>
           </div>
 
-          {question.question_type === 'scenario' && (
-            <>
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{display}</p>
-              </div>
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Evaluation Guidelines</h4>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{question.evaluation_guidelines}</p>
-              </div>
-            </>
-          )}
+          {/* Created date */}
+          <p className="text-xs text-muted-foreground">
+            Created {new Date(question.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+          </p>
 
-          {question.question_type === 'mcq' && parsed && (
-            <>
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
-                <p className="text-sm text-foreground">{parsed.questionText || display}</p>
-              </div>
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Options</h4>
-                <div className="space-y-1.5">
-                  {(parsed.options || []).map((opt: string, idx: number) => (
-                    <div key={idx} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                      idx === parsed.correctIndex ? 'border-success/40 bg-success/5' : 'border-border'
-                    }`}>
-                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
-                        idx === parsed.correctIndex ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-                      }`}>{String.fromCharCode(65 + idx)}</span>
-                      <span>{opt}</span>
-                      {idx === parsed.correctIndex && <CheckCircle size={14} className="ml-auto text-success" />}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {question.question_type === 'coding' && parsed && (
-            <>
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Problem Statement</h4>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{parsed.problemStatement}</p>
-              </div>
-              {parsed.exampleInput && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Input</h4>
-                    <pre className="text-xs bg-muted rounded-lg p-2 font-mono whitespace-pre-wrap">{parsed.exampleInput}</pre>
-                  </div>
-                  {parsed.exampleOutput && (
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Example Output</h4>
-                      <pre className="text-xs bg-muted rounded-lg p-2 font-mono whitespace-pre-wrap">{parsed.exampleOutput}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Fallback for unparsed */}
-          {(question.question_type === 'mcq' || question.question_type === 'coding') && !parsed && (
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Question</h4>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{question.question_text}</p>
-            </div>
-          )}
+          {/* Formatted content using shared component */}
+          <FormattedQuestionContent
+            text={question.question_text}
+            guidelines={question.evaluation_guidelines}
+            type={question.question_type}
+          />
         </div>
       </SheetContent>
     </Sheet>
