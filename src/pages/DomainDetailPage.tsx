@@ -13,6 +13,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
@@ -181,7 +184,7 @@ export default function DomainDetailPage() {
   // Not found
   if (!domain && initialized) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/domains')} className="gap-1.5">
           <ArrowLeft size={14} /> Back to Domains
         </Button>
@@ -203,17 +206,16 @@ export default function DomainDetailPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/domains')} className="gap-1.5 -ml-2">
-        <ArrowLeft size={14} /> Back to Domains
-      </Button>
-
-      {/* Header Card */}
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-card-foreground tracking-tight">{domain.name}</h1>
+    <div className="space-y-6">
+      {/* Page Header — matches CategoryDetailPage pattern */}
+      <div>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/domains')} className="gap-1.5 mb-3 -ml-2">
+          <ArrowLeft size={14} /> Domains
+        </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold text-foreground">{domain.name}</h2>
               <Badge
                 variant={domain.status === 'active' ? 'default' : 'outline'}
                 className={`text-xs capitalize ${domain.status === 'active' ? 'bg-success/15 text-success border-success/20' : 'text-muted-foreground'}`}
@@ -221,7 +223,7 @@ export default function DomainDetailPage() {
                 {domain.status}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+            <p className="text-sm text-muted-foreground mt-1">
               {domain.description || 'No description provided.'}
             </p>
           </div>
@@ -231,34 +233,34 @@ export default function DomainDetailPage() {
             </Button>
           )}
         </div>
+      </div>
 
-        {/* Domain Lead */}
-        <div className="mt-4 pt-4 border-t border-border flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Crown size={14} className="text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Domain Lead:</span>
-          </div>
-          {domainLead ? (
-            <span className="text-sm font-medium text-card-foreground">{domainLead.full_name}</span>
-          ) : (
-            <span className="text-sm text-muted-foreground italic">No lead assigned</span>
-          )}
-          {isAdmin && (
-            <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
-              <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
-                <SelectValue placeholder="Assign lead…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No lead</SelectItem>
-                {eligibleLeads.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.full_name} ({u.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+      {/* Domain Lead */}
+      <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Crown size={14} className="text-primary" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Domain Lead:</span>
         </div>
+        {domainLead ? (
+          <span className="text-sm font-medium text-card-foreground">{domainLead.full_name}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground italic">No lead assigned</span>
+        )}
+        {isAdmin && (
+          <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
+            <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
+              <SelectValue placeholder="Assign lead…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No lead</SelectItem>
+              {eligibleLeads.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.full_name} ({u.role})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Tabs */}
@@ -347,54 +349,52 @@ export default function DomainDetailPage() {
                 <p>{userSearch ? 'No matching users.' : 'No users assigned to this domain yet.'}</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/40">
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Name</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Email</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[100px]">Role</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[80px]">Status</th>
-                      {isAdmin && <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground w-[70px]">Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredDomainUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
-                          <span className="flex items-center gap-1.5">
-                            {u.id === domain.domain_lead_id && <Crown size={12} className="text-primary" />}
-                            {u.full_name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground text-xs">{u.email}</td>
-                        <td className="px-4 py-2.5">
-                          <Badge variant="outline" className="text-[10px] capitalize">{u.role}</Badge>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] ${u.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="w-[100px]">Role</TableHead>
+                    <TableHead className="w-[80px]">Status</TableHead>
+                    {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDomainUsers.map((u) => (
+                    <TableRow key={u.id} className="hover:bg-muted/50 transition-colors">
+                      <TableCell className="font-medium text-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          {u.id === domain.domain_lead_id && <Crown size={12} className="text-primary" />}
+                          {u.full_name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{u.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] capitalize">{u.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${u.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}
+                        >
+                          {u.status}
+                        </Badge>
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <button
+                            onClick={() => setRemoveTarget(u)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors ml-auto"
+                            title="Remove from domain"
                           >
-                            {u.status}
-                          </Badge>
-                        </td>
-                        {isAdmin && (
-                          <td className="px-4 py-2.5 text-right">
-                            <button
-                              onClick={() => setRemoveTarget(u)}
-                              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors ml-auto"
-                              title="Remove from domain"
-                            >
-                              <UserMinus size={14} />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            <UserMinus size={14} />
+                          </button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
         </TabsContent>
@@ -432,33 +432,33 @@ export default function DomainDetailPage() {
                       <Badge variant="secondary" className="text-xs">{catSkills.length}</Badge>
                     </div>
                     <div className="ml-6 border border-border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted/40">
-                            <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Skill Name</th>
-                            <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Tags</th>
-                            <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[80px]">Status</th>
-                            {isAdmin && <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground w-[70px]">Actions</th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Skill Name</TableHead>
+                            <TableHead>Tags</TableHead>
+                            <TableHead className="w-[80px]">Status</TableHead>
+                            {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {catSkills.map((skill) => (
-                            <tr key={skill.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{skill.skill_name}</td>
-                              <td className="px-4 py-2.5">
+                            <TableRow key={skill.id} className="hover:bg-muted/50 transition-colors">
+                              <TableCell className="font-medium text-foreground whitespace-nowrap">{skill.skill_name}</TableCell>
+                              <TableCell>
                                 <div className="flex gap-1 flex-wrap">
                                   {skill.tags && skill.tags.length > 0 ? skill.tags.slice(0, 3).map((t) => (
                                     <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
                                   )) : <span className="text-xs text-muted-foreground">—</span>}
                                 </div>
-                              </td>
-                              <td className="px-4 py-2.5">
+                              </TableCell>
+                              <TableCell>
                                 <Badge variant="outline" className={`text-[10px] ${skill.status === 'active' ? 'text-success border-success/30' : 'text-muted-foreground'}`}>
                                   {skill.status}
                                 </Badge>
-                              </td>
+                              </TableCell>
                               {isAdmin && (
-                                <td className="px-4 py-2.5 text-right">
+                                <TableCell className="text-right">
                                   <button
                                     onClick={() => setRemoveSkillTarget({ mappingId: skill.mappingId, skillName: skill.skill_name })}
                                     className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors ml-auto"
@@ -466,12 +466,12 @@ export default function DomainDetailPage() {
                                   >
                                     <X size={14} />
                                   </button>
-                                </td>
+                                </TableCell>
                               )}
-                            </tr>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 ))}
