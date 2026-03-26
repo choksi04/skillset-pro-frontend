@@ -19,6 +19,7 @@ export const ratingDescriptions: Record<RatingLevel, string> = {
 export interface SkillSelfRating {
   skill_id: string;
   rating: RatingLevel;
+  comment?: string;
 }
 
 export interface SkillRegistrySubmission {
@@ -85,7 +86,7 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
         id: s.id, tenant_id: s.tenant_id, employee_id: s.employee_id, domain_id: s.domain_id,
         cycle: s.cycle, status: s.status as any,
         ratings: ratingsData.filter((r: any) => r.submission_id === s.id).map((r: any) => ({
-          skill_id: r.skill_id, rating: r.rating as RatingLevel,
+          skill_id: r.skill_id, rating: r.rating as RatingLevel, comment: r.comment || undefined,
         })),
         submitted_at: s.submitted_at, created_at: s.created_at, updated_at: s.updated_at,
       }));
@@ -122,7 +123,7 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
       await supabase.from('skill_self_ratings').delete().eq('submission_id', existing.id);
       if (ratings.length > 0) {
         await supabase.from('skill_self_ratings').insert(
-          ratings.map((r) => ({ submission_id: existing.id, skill_id: r.skill_id, rating: r.rating }))
+          ratings.map((r) => ({ submission_id: existing.id, skill_id: r.skill_id, rating: r.rating, comment: r.comment || null }))
         );
       }
 
@@ -141,7 +142,7 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
 
       if (ratings.length > 0) {
         await supabase.from('skill_self_ratings').insert(
-          ratings.map((r) => ({ submission_id: id, skill_id: r.skill_id, rating: r.rating }))
+          ratings.map((r) => ({ submission_id: id, skill_id: r.skill_id, rating: r.rating, comment: r.comment || null }))
         );
       }
 
