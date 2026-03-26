@@ -1,94 +1,80 @@
-## Plan: Skill Library Micro-Feature Improvements
 
-Seven targeted changes to improve forms, topic display, delete confirmations, and dropdown styling across the Skill Library module.
+
+## Plan: Redesign Domain Management Module
+
+Redesign the Domain detail page with tab-based Users/Skills sections, inline user assignment/removal, and domain form as a Sheet. Add user count to the list page and enforce deletion safety.
 
 ---
 
-### 1. Convert CategoryFormDialog to Sheet
+### Technical Details
 
-**File: `src/components/skills/CategoryFormDialog.tsx**`
+#### 1. DomainFormDialog → Sheet + loading + onCreated
 
-- Replace `Dialog/DialogContent/DialogHeader/DialogTitle` with `Sheet/SheetContent/SheetHeader/SheetTitle` from `@/components/ui/sheet`.
-- Sheet opens from the right (`side="right"`), max-width `sm:max-w-md`.
-- Same form fields, same validation logic — just a different container.
+**File: `src/components/domains/DomainFormDialog.tsx`**
 
-### 2. Navigate to new category after creation
+- Replace `Dialog` with `Sheet` (right drawer), matching Skill Library pattern.
+- Add `submitting` loading state with `Loader2` on submit button.
+- Add `onCreated?: (domainId: string) => void` callback.
+- Store's `addDomain` returns the new ID (`Promise<string | undefined>`).
 
-**File: `src/pages/SkillFrameworkPage.tsx**`
+#### 2. DomainsPage — add User Count column + navigate on create
 
-- Pass a callback `onCreated?: (categoryId: string) => void` to `CategoryFormDialog`.
-- In `CategoryFormDialog`, after `addCategory()` succeeds, call `onCreated(newCategoryId)`.
-- In `SkillFrameworkPage`, the callback calls `navigate(\`/skill-library/{id})`.
-- The store's `addCategory` must return the new category ID — update its return type from `Promise<void>` to `Promise<string>` in `skillStore.ts`.
+**File: `src/pages/DomainsPage.tsx`**
 
-### 3. Convert SkillFormDialog to Sheet + auto-open detail
+- Fetch user counts per domain lazily (single query: `SELECT domain_id, COUNT(*) FROM users WHERE deleted_on IS NULL GROUP BY domain_id`).
+- Add "Users" column between "Domain" and "Mapped Skills".
+- On domain creation, navigate to `/domains/${newId}` via `onCreated` callback.
 
-**File: `src/components/skills/SkillFormDialog.tsx**`
+#### 3. DomainDetailPage — Tab-based redesign with inline user management
 
-- Replace `Dialog` with `Sheet` (right drawer).
-- Remove the "existing tags suggestions" section below the tag input field (per requirement).
-- Add `onCreated?: (skillId: string) => void` callback prop.
+**File: `src/pages/DomainDetailPage.tsx`** — Major rewrite.
 
-**File: `src/pages/CategoryDetailPage.tsx**`
+Header stays (domain name, description, status, edit button).
 
-- After skill creation, call `setSelectedSkill(newSkill)` to auto-open the detail drawer.
-- Store's `addSkill` must return the new skill ID — update return type from `Promise<void>` to `Promise<string>`.
+Replace the flat sections with **Tabs**: `Users (count)` | `Skills (count)`
 
-### 4. Convert TopicFormDialog to Sheet
+**Users Tab:**
+- Search bar for filtering users in this domain.
+- Table: Name | Email | Role | Status | Actions (Remove button).
+- "Add User" button opens a multi-select popover (searchable) showing unassigned users from same tenant. Only users with `domain_id = null` or already in this domain shown for adding.
+- Remove user: sets `domain_id = null` on that user (with confirmation AlertDialog).
+- Domain Lead selector stays in header area (above tabs).
 
-**File: `src/components/skills/TopicFormDialog.tsx**`
+**Skills Tab:**
+- Current skills display (grouped by category) stays.
+- "Manage Skills" opens existing `DomainSkillManager`.
+- Add inline remove button per skill row.
 
-- Replace `Dialog` with `Sheet` (right drawer).
-- Same form fields, same validation.
+#### 4. Domain deletion safety
 
-### 5. Delete Topic confirmation alert
+**File: `src/stores/domainStore.ts`**
 
-**File: `src/components/skills/SkillDetailDrawer.tsx**`
+- Add `checkDomainDeletable(id: string): Promise<{deletable: boolean; reason?: string}>` — checks if users exist or skills are mapped.
+- Update `addDomain` return type to `Promise<string | undefined>`.
 
-- Add an `AlertDialog` for topic deletion (same pattern as category/skill delete alerts).
-- On click "Delete" in topic dropdown, set a `deleteTopicTarget` state instead of calling `deleteTopic` directly.
-- Show confirmation dialog: "Are you sure you want to delete [topic name]?"
+#### 5. DomainSkillManager → Sheet
 
-### 6. Topics as cards instead of table
+**File: `src/components/domains/DomainSkillManager.tsx`**
 
-**File: `src/components/skills/SkillDetailDrawer.tsx**`
+- Replace `Dialog` with `Sheet` (right drawer) for consistency.
 
-- Replace the `Table` rendering of topics with a grid of cards.
-- Each card: title (bold), description (2 lines max with `line-clamp-2`), actions dropdown in top-right corner.
-- Use `title` attribute on the description `<p>` for native browser tooltip on hover.
-- Layout: `grid grid-cols-1 gap-3` (cards stack vertically in the drawer).
-- Card structure: `rounded-lg border border-border p-3` with title and description stacked.
+#### 6. User form domain validation
 
-### 7. Searchable Select dropdowns with proper theme colors
+**File: `src/pages/UsersPage.tsx`**
 
-**File: Multiple files** — All `Select` dropdowns in Skill Library pages need to be replaced with a searchable `Command`-based popover pattern (Popover + Command from shadcn).
-
-Create a reusable `SearchableSelect` component at `src/components/ui/searchable-select.tsx`:
-
-- Props: `options: {value, label}[]`, `value`, `onValueChange`, `placeholder`, `className`.
-- Uses `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandItem`.
-- Styled with theme colors (`bg-popover`, `text-popover-foreground`, `border-input`) — no green accents.
-
-Replace `Select` usage in:
-
-- `src/pages/SkillFrameworkPage.tsx` (status filter)
-- `src/pages/CategoryDetailPage.tsx` (tag filter, status filter)
-- `src/components/skills/SkillFormDialog.tsx` (status dropdown)
-
-Status badge color can have green color to provide proper context as green for success, and so on. No need to replace green with blue or primary for status badges.
+- When role is `employee` or `manager`, show domain as required (warning if empty).
+- Admin role: domain remains optional.
 
 ---
 
 ### Files Summary
 
+| Action | File |
+|--------|------|
+| Rewrite | `src/components/domains/DomainFormDialog.tsx` (Dialog → Sheet + loading + onCreated) |
+| Rewrite | `src/pages/DomainDetailPage.tsx` (tab layout, inline user add/remove) |
+| Modify | `src/pages/DomainsPage.tsx` (user count column, navigate on create) |
+| Modify | `src/stores/domainStore.ts` (addDomain returns ID, checkDomainDeletable) |
+| Modify | `src/components/domains/DomainSkillManager.tsx` (Dialog → Sheet) |
+| Modify | `src/pages/UsersPage.tsx` (domain required for employee/manager) |
 
-| Action  | File                                                                                              |
-| ------- | ------------------------------------------------------------------------------------------------- |
-| Rewrite | `src/components/skills/CategoryFormDialog.tsx` (Dialog → Sheet + onCreated callback)              |
-| Rewrite | `src/components/skills/SkillFormDialog.tsx` (Dialog → Sheet + remove tag suggestions + onCreated) |
-| Rewrite | `src/components/skills/TopicFormDialog.tsx` (Dialog → Sheet)                                      |
-| Rewrite | `src/components/skills/SkillDetailDrawer.tsx` (topic cards + delete alert)                        |
-| Modify  | `src/pages/SkillFrameworkPage.tsx` (navigate after create + searchable select)                    |
-| Modify  | `src/pages/CategoryDetailPage.tsx` (auto-open skill detail + searchable select)                   |
-| Modify  | `src/stores/skillStore.ts` (addCategory/addSkill return ID)                                       |
-| Create  | `src/components/ui/searchable-select.tsx`                                                         |
