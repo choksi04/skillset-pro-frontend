@@ -37,6 +37,8 @@ export default function PageHeader() {
   else if (basePath.startsWith('/skill-library/')) basePath = '/skill-library';
   else if (basePath.startsWith('/skill-registry/')) basePath = '/skill-registry';
   else if (basePath.startsWith('/team-registry/')) basePath = '/team-registry';
+  else if (basePath.startsWith('/assessments/')) basePath = '/assessments';
+  else if (basePath.startsWith('/team-assessments/')) basePath = '/team-assessments';
 
   const crumb = routeBreadcrumbs[basePath];
   const title = crumb?.title || 'Page';
@@ -53,6 +55,8 @@ export default function PageHeader() {
   // Registry detail breadcrumbs
   const isSkillRegistryDetail = location.pathname.startsWith('/skill-registry/') && location.pathname !== '/skill-registry';
   const isTeamRegistryDetail = location.pathname.startsWith('/team-registry/') && location.pathname !== '/team-registry';
+  const isAssessmentDetail = location.pathname.startsWith('/assessments/') && location.pathname !== '/assessments';
+  const isTeamAssessmentDetail = location.pathname.startsWith('/team-assessments/') && location.pathname !== '/team-assessments';
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
@@ -84,6 +88,18 @@ export default function PageHeader() {
         ) : isTeamRegistryDetail ? (
           <>
             <Link to="/team-registry" className="text-muted-foreground hover:text-foreground transition-colors">Team Registry</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Detail</span>
+          </>
+        ) : isAssessmentDetail ? (
+          <>
+            <Link to="/assessments" className="text-muted-foreground hover:text-foreground transition-colors">My Assessments</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Detail</span>
+          </>
+        ) : isTeamAssessmentDetail ? (
+          <>
+            <Link to="/team-assessments" className="text-muted-foreground hover:text-foreground transition-colors">Team Assessments</Link>
             <ChevronRight size={14} className="text-muted-foreground" />
             <span className="font-medium text-card-foreground">Detail</span>
           </>
