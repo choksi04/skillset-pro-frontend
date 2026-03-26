@@ -14,7 +14,6 @@ import { ManagerAvatar } from '@/components/registry/ManagerAvatar';
 import { deriveStatus, statusConfig, statusLabel, statusColor, avgRound, EnrichedSubmission } from '@/components/registry/registryHelpers';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle, ClipboardCheck, Clock, Eye, Award,
@@ -197,63 +196,82 @@ export default function SkillRegistryPage() {
         <p className="text-sm text-muted-foreground mt-1">Submit your self-assessed skill ratings and track your progress.</p>
       </div>
 
-      {/* Active Cycle Card */}
+      {/* Active Registry Section */}
       {activeCycle && assignedDomain && config && (
-        <Card className="border-primary/20">
-          <CardContent className="p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-primary" />
-                  <h3 className="text-base font-semibold text-foreground">{activeCycle.name}</h3>
-                  <Badge className={`text-xs ${config.color}`}>{config.label}</Badge>
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Calendar size={14} className="text-primary" /> Active Registry
+          </h3>
+
+          {/* Cycle info bar */}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground px-1">
+            <span>Domain: <span className="font-medium text-foreground">{assignedDomain.name}</span></span>
+            <span>•</span>
+            <span>{new Date(activeCycle.start_date).toLocaleDateString()} – {new Date(activeCycle.end_date).toLocaleDateString()}</span>
+            {daysRemaining !== null && submissionAllowed && !isLocked && (
+              <>
+                <span>•</span>
+                <span className={`font-medium ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-muted-foreground'}`}>
+                  {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? 'Ends today' : 'Grace period active'}
+                </span>
+              </>
+            )}
+            {ratedCount > 0 && employeeStatus !== 'not_started' && (
+              <>
+                <span>•</span>
+                <span>{ratedCount}/{domainSkills.length} skills rated</span>
+              </>
+            )}
+          </div>
+
+          {/* Active registry card — same format as past registry cards */}
+          <Card
+            className="border-primary/20 hover:border-primary/40 transition-colors cursor-pointer"
+            onClick={handleCTA}
+          >
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{activeCycle.name}</p>
+                      <Badge className={`text-[10px] ${config.color}`}>{config.label}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {submission ? new Date(submission.created_at).toLocaleDateString() : 'Not started'}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span>Domain: <span className="font-medium text-foreground">{assignedDomain.name}</span></span>
-                  <span>•</span>
-                  <span>{new Date(activeCycle.start_date).toLocaleDateString()} – {new Date(activeCycle.end_date).toLocaleDateString()}</span>
-                  {daysRemaining !== null && submissionAllowed && !isLocked && (
-                    <>
-                      <span>•</span>
-                      <span className={`font-medium ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-muted-foreground'}`}>
-                        {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? 'Ends today' : 'Grace period active'}
-                      </span>
-                    </>
+                <div className="flex items-center gap-5">
+                  <ScoreChip label="Self" value={activeEnriched?.selfAvg || null} />
+                  <ScoreChip label="Assessment" value={activeEnriched?.assessmentAvg ?? null} />
+                  <ScoreChip label="Final" value={activeEnriched?.finalAvg ?? null} />
+                  {activeEnriched?.reviewer && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">Manager:</span>
+                      <ManagerAvatar reviewer={activeEnriched.reviewer} />
+                    </div>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-xs shrink-0"
+                    disabled={config.ctaDisabled}
+                    onClick={(e) => { e.stopPropagation(); handleCTA(); }}
+                  >
+                    {employeeStatus === 'not_started' && <Play size={13} />}
+                    {employeeStatus === 'in_progress' && <ArrowRight size={13} />}
+                    {(employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') && <ClipboardCheck size={13} />}
+                    {employeeStatus === 'assessment_completed' && <Eye size={13} />}
+                    {employeeStatus === 'review_pending' && <Clock size={13} />}
+                    {employeeStatus === 'approved' && <Award size={13} />}
+                    {config.cta}
+                  </Button>
                 </div>
-                {/* Inline scores */}
-                {activeEnriched && (
-                  <div className="flex flex-wrap gap-4 mt-1">
-                    <ScoreChip label="Self" value={activeEnriched.selfAvg || null} />
-                    <ScoreChip label="Assessment" value={activeEnriched.assessmentAvg} />
-                    <ScoreChip label="Final" value={activeEnriched.finalAvg} />
-                    {activeEnriched.reviewer && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">Manager:</span>
-                        <ManagerAvatar reviewer={activeEnriched.reviewer} />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {ratedCount > 0 && employeeStatus !== 'not_started' && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <Progress value={(ratedCount / domainSkills.length) * 100} className="h-1.5 w-32" />
-                    <span className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</span>
-                  </div>
-                )}
               </div>
-              <Button onClick={handleCTA} disabled={config.ctaDisabled} className="gap-1.5 shrink-0">
-                {employeeStatus === 'not_started' && <Play size={14} />}
-                {employeeStatus === 'in_progress' && <ArrowRight size={14} />}
-                {(employeeStatus === 'submitted' || employeeStatus === 'assessment_pending') && <ClipboardCheck size={14} />}
-                {employeeStatus === 'assessment_completed' && <Eye size={14} />}
-                {employeeStatus === 'review_pending' && <Clock size={14} />}
-                {employeeStatus === 'approved' && <Award size={14} />}
-                {config.cta}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* No active cycle */}
