@@ -4,10 +4,19 @@ import { Question, CompetencyLevel } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
 import { getCurrentUserId } from '@/lib/audit';
 
-export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
+export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'evaluated' | 'review_pending' | 'approved';
 
-// Map self-rating levels (1-5) to question competency levels
-const ratingToCompetency: Record<RatingLevel, CompetencyLevel> = {
+export const assessmentStatusConfig: Record<string, { label: string; color: string }> = {
+  pending: { label: 'Not Started', color: 'bg-muted text-muted-foreground' },
+  in_progress: { label: 'In Progress', color: 'bg-info/15 text-info border-info/20' },
+  completed: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' },
+  evaluated: { label: 'Evaluated', color: 'bg-success/15 text-success border-success/20' },
+  review_pending: { label: 'Under Review', color: 'bg-warning/15 text-warning border-warning/20' },
+  approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' },
+};
+
+// Rating level (1-5) to competency level name mapping
+const levelToCompetency: Record<number, CompetencyLevel> = {
   1: 'beginner',
   2: 'beginner',
   3: 'intermediate',
@@ -15,9 +24,20 @@ const ratingToCompetency: Record<RatingLevel, CompetencyLevel> = {
   5: 'expert',
 };
 
+const competencyToLevel: Record<CompetencyLevel, number> = {
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+  expert: 4,
+};
+
+/**
+ * For a self-rating of n, get target competency levels: n, n-1, n-2
+ * Maps rating levels to competency level names.
+ */
 function getTargetCompetencyLevels(rating: RatingLevel): CompetencyLevel[] {
   const allLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
-  const primary = ratingToCompetency[rating];
+  const primary = levelToCompetency[rating];
   const primaryIdx = allLevels.indexOf(primary);
   const targets = new Set<CompetencyLevel>();
   targets.add(primary);
@@ -47,9 +67,12 @@ export interface Assessment {
   employee_id: string;
   submission_id: string;
   domain_id: string;
+  cycle_id: string | null;
+  is_reassessment: boolean;
+  parent_assessment_id: string | null;
   skill_ids: string[];
   assessment_questions: AssessmentQuestion[];
-  status: AssessmentStatus;
+  status: string;
   duration_minutes: number;
   created_at: string;
   updated_at: string;
@@ -60,24 +83,78 @@ export interface GenerateAssessmentParams {
   employee_id: string;
   submission_id: string;
   domain_id: string;
+  cycle_id?: string;
   ratings: SkillSelfRating[];
   publishedQuestions: Question[];
   maxQuestionsPerSkill?: number;
+  excludeQuestionIds?: string[];
 }
 
-export function generateAssessmentQuestions(
+export interface ValidationResult {
+  valid: boolean;
+  message?: string;
+  details?: { skill_id: string; skill_name?: string; available: number; required: number }[];
+}
+
+/**
+ * Validate that enough published questions exist for each skill/level combo.
+ */
+export async function validateQuestionAvailability(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
-  maxPerSkill: number = 3,
-): AssessmentQuestion[] {
-  const selected: AssessmentQuestion[] = [];
+  minQuestionsPerSkill: number = 3,
+): Promise<ValidationResult> {
+  const issues: { skill_id: string; available: number; required: number }[] = [];
+
   for (const { skill_id, rating } of ratings) {
     const targetLevels = getTargetCompetencyLevels(rating);
     const candidates = publishedQuestions.filter(
       (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level)
     );
-    const picked = shuffle(candidates).slice(0, maxPerSkill);
+    if (candidates.length < minQuestionsPerSkill) {
+      issues.push({ skill_id, available: candidates.length, required: minQuestionsPerSkill });
+    }
+  }
+
+  if (issues.length > 0) {
+    return {
+      valid: false,
+      message: 'Assessment is not available at the moment. Please contact your manager.',
+      details: issues,
+    };
+  }
+  return { valid: true };
+}
+
+/**
+ * Generate assessment questions using level-based selection:
+ * For each skill rated at level n, pick questions at n, n-1, n-2.
+ * Respects topic_id when available (prefers matching topics).
+ * Deduplicates questions.
+ */
+export function generateAssessmentQuestions(
+  ratings: SkillSelfRating[],
+  publishedQuestions: Question[],
+  maxPerSkill: number = 3,
+  excludeIds: string[] = [],
+): AssessmentQuestion[] {
+  const selected: AssessmentQuestion[] = [];
+  const usedIds = new Set(excludeIds);
+
+  for (const { skill_id, rating } of ratings) {
+    const targetLevels = getTargetCompetencyLevels(rating);
+    const candidates = publishedQuestions.filter(
+      (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level) && !usedIds.has(q.id)
+    );
+
+    // Prefer questions with matching topics first, then others
+    const withTopic = candidates.filter((q) => q.topic_id);
+    const withoutTopic = candidates.filter((q) => !q.topic_id);
+    const ordered = [...shuffle(withTopic), ...shuffle(withoutTopic)];
+
+    const picked = ordered.slice(0, maxPerSkill);
     for (const q of picked) {
+      usedIds.add(q.id);
       selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: q.competency_level });
     }
   }
@@ -91,7 +168,7 @@ interface AssessmentStore {
   fetchAssessments: () => Promise<void>;
   addAssessment: (params: GenerateAssessmentParams) => Promise<string>;
   getAssessmentsForEmployee: (employeeId: string) => Assessment[];
-  updateAssessmentStatus: (id: string, status: AssessmentStatus) => Promise<void>;
+  updateAssessmentStatus: (id: string, status: string) => Promise<void>;
 }
 
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
@@ -106,6 +183,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       const { data: assessmentRows, error } = await supabase
         .from('assessments')
         .select('*')
+        .is('deleted_on', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -136,9 +214,12 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
           employee_id: a.employee_id,
           submission_id: a.submission_id,
           domain_id: a.domain_id,
+          cycle_id: a.cycle_id ?? null,
+          is_reassessment: a.is_reassessment ?? false,
+          parent_assessment_id: a.parent_assessment_id ?? null,
           skill_ids: skillIds,
           assessment_questions: aqs,
-          status: a.status as AssessmentStatus,
+          status: a.status,
           duration_minutes: a.duration_minutes,
           created_at: a.created_at,
           updated_at: a.updated_at,
@@ -153,8 +234,8 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
   },
 
   addAssessment: async (params) => {
-    const { tenant_id, employee_id, submission_id, domain_id, ratings, publishedQuestions, maxQuestionsPerSkill } = params;
-    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill);
+    const { tenant_id, employee_id, submission_id, domain_id, cycle_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
+    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds);
     const skillIds = [...new Set(ratings.map((r) => r.skill_id))];
     const durationMinutes = Math.max(30, assessmentQuestions.length * 10);
     const userId = getCurrentUserId();
@@ -166,6 +247,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         employee_id,
         submission_id,
         domain_id,
+        cycle_id: cycle_id ?? null,
         status: 'pending',
         duration_minutes: durationMinutes,
         created_by: userId,
@@ -201,6 +283,9 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       employee_id,
       submission_id,
       domain_id,
+      cycle_id: cycle_id ?? null,
+      is_reassessment: false,
+      parent_assessment_id: null,
       skill_ids: skillIds,
       assessment_questions: assessmentQuestions,
       status: 'pending',
