@@ -1,15 +1,46 @@
 import { useState, useRef, useEffect } from 'react';
-import { useReviewStore } from '@/stores/reviewStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+interface AppNotification {
+  id: string;
+  tenant_id: string;
+  target_role: string;
+  target_user_id: string | null;
+  message: string;
+  type: string;
+  reference_id: string;
+  action_link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export default function NotificationDropdown() {
-  const { notifications, markNotificationRead } = useReviewStore();
   const { currentRole, user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Fetch notifications from DB on mount and when user changes
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error && data) {
+        setNotifications(data as AppNotification[]);
+      }
+      setLoaded(true);
+    };
+    load();
+  }, [user]);
 
   // Close on outside click
   useEffect(() => {
@@ -28,11 +59,13 @@ export default function NotificationDropdown() {
 
   const unread = myNotifications.filter((n) => !n.read).length;
 
-  const handleClick = (notif: typeof myNotifications[0]) => {
-    markNotificationRead(notif.id);
-    const link = (notif as any).action_link;
-    if (link) {
-      navigate(link);
+  const handleClick = async (notif: AppNotification) => {
+    if (!notif.read) {
+      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+      setNotifications((prev) => prev.map((n) => n.id === notif.id ? { ...n, read: true } : n));
+    }
+    if (notif.action_link) {
+      navigate(notif.action_link);
       setOpen(false);
     }
   };
