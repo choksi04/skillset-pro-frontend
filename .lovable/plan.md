@@ -1,81 +1,69 @@
+## Plan: Enhance My Skill Registry Listing with Full Score Details & Past Registry Drill-Down
 
+### Problem
 
-## Plan: Split Skill Registry into Two Separate Pages
+The current page shows past registries as a minimal table (cycle, skills rated, avg self-score, status) with no assessment/final scores, no manager info, and no drill-down detail view. The active cycle card also lacks score summaries.
 
-Split the current `SkillRegistryPage.tsx` (which uses tabs for My/Team) into two dedicated pages with separate routes and sidebar entries, matching the pattern used by Assessments and Manager Reviews.
+### Changes
 
----
+#### 1. `src/pages/SkillRegistryPage.tsx` — Rewrite listing & detail views
 
-### Architecture
+**Registry Listing (always shown, active on top):**
 
-```text
-/skill-registry        → My Skill Registry (employee's own view)
-/team-registry          → Team's Registry (manager/admin supervisory view)
-```
+Every registry card (active + past) shows:
 
-Both pages are standalone — no tabs. The sidebar shows both links (role-filtered).
+- Cycle Name
+- Self-Score (avg) — from `submission.ratings`
+- Assessment Score (avg) — from `attempt_skill_scores` via `attemptStore`
+- Final Score (avg) — from `official_skill_entries` via `reviewStore.officialEntries` (only when manager approved)
+- Manager — avatar/initials with hover card showing name, email (from `manager_reviews.reviewer_id` → `users` table)
+- Status badge
 
----
+The **active cycle card** keeps its existing prominent design (cycle dates, domain, duration, CTA button) but also shows the score columns inline.
 
-### File Changes
+Past registries render as clean cards (not just a table) with the same columns.
 
-#### 1. `src/pages/SkillRegistryPage.tsx` — Rewrite as "My Skill Registry"
+**Detail View (click any past registry card):**
 
-Remove `TeamRegistryView`, `TeamMemberDetail`, and the `Tabs` wrapper. This page becomes the employee-focused page with:
+Opens a dedicated detail page showing:
 
-- **Section 1: Current Active Cycle Card** — highlighted card with cycle name, dates, status badge, days remaining. Derives employee status (Not Started / In Progress / Self Review Submitted / Assessment Pending / Assessment Completed / Manager Review Pending / Approved) by cross-referencing submissions, assessments, attempts, and reviews. Shows dynamic CTA button based on status.
-- **Section 2: Self Review Form** — skills grouped by category with accordion, `RatingSlider` per skill, previous cycle rating shown inline ("Last cycle: L3"), optional collapsible comment textarea per skill, progress bar ("8 of 12 skills rated"), category-level progress, search, auto-save (2s debounce with "Saving..."/"Saved" indicator), validation before submit.
-- **Section 3: Past Registries Table** — past submissions for this employee, showing Cycle Name, Date, Avg Score, Status, with expandable detail (Skill / Self Score / Assessment Score / Final Score / Gap).
-- Edge cases: no active cycle, no domain, no skills, cycle closed.
+- Header: Cycle name, Status
+- Rating cards: Self-Score avg, Assessment Score avg, Final Score avg, 
+- Manager Details and comments/notes
+- Skills grouped by category, each skill row showing:
+  - Skill name
+  - Self Rating (L1-L5)
+  - Assessment Score (calculated level from `attempt_skill_scores`)
+  - Final Score (from `official_skill_entries`)
+  - Gap indicator (final - self)
 
-All roles can access this page (everyone has their own registry).
+**Edge case: No active cycle** — page still renders past registries list. No "empty page" when cycle is inactive.
 
-#### 2. `src/pages/TeamRegistryPage.tsx` — New Page
+#### 2. Data Fetching
 
-Extract `TeamRegistryView` and `TeamMemberDetail` into this new page. Admin + Manager only. Shows team submissions list with drill-down into member detail. Same logic as current `TeamRegistryView`.
+Currently `pastSubmissions` only filters by employee + cycle name. Need to:
 
-#### 3. `src/components/layout/AppSidebar.tsx`
+- Cross-reference `assessments` → `attempts` → `attempt_skill_scores` for assessment scores
+- Cross-reference `reviewStore.officialEntries` for final scores
+- Cross-reference `manager_reviews` for reviewer info
+- Fetch reviewer user names/emails from `users` table (similar pattern to `TeamRegistryPage`)
 
-Replace the single "Skill Registry" entry with two entries:
-- `{ title: 'My Registry', href: '/skill-registry', roles: ['admin', 'manager', 'employee'] }`
-- `{ title: 'Team Registry', href: '/team-registry', roles: ['admin', 'manager'] }`
+Build helper maps:
 
-#### 4. `src/App.tsx` — Routing
+- `submissionAssessmentScores: Record<submissionId, avgAssessmentScore>`
+- `submissionFinalScores: Record<submissionId, avgFinalScore>`
+- `submissionReviewer: Record<submissionId, { name, email, avatar_url }>`
+- `submissionStatus: Record<submissionId, derivedStatus>`
 
-- Add route: `/team-registry` → `<RoleGuard allowed={["admin", "manager"]}><TeamRegistryPage /></RoleGuard>`
-- Keep `/skill-registry` → `<SkillRegistryPage />` (all roles)
+#### 3. No new database changes needed
 
-#### 5. `src/components/layout/PageHeader.tsx`
-
-Add breadcrumb entries:
-- `/skill-registry` → `{ group: 'Operations', title: 'My Registry' }`
-- `/team-registry` → `{ group: 'Operations', title: 'Team Registry' }`
-
-#### 6. `src/stores/registryStore.ts`
-
-- Add `comment?: string` to `SkillSelfRating` interface
-- Update `createOrUpdateDraft` to persist comments in `skill_self_ratings.comment`
-
-#### 7. `src/components/registry/RatingSlider.tsx`
-
-- Add optional `previousRating?: RatingLevel` prop
-- Display "Last cycle: L{n}" label when provided
-
-#### 8. Database Migration
-
-- Add `comment text` nullable column to `skill_self_ratings` table
-
-#### 9. `src/pages/UserGuidePage.tsx`
-
-- Update Employee Guide with Skill Registry instructions (self review, scores, post-submission, auto-save)
+All data already exists in `attempt_skill_scores`, `official_skill_entries`, `manager_reviews`, and `users` tables.
 
 ---
 
-### Key Technical Details
+### File Summary
 
-- **Auto-save**: `useEffect` with 2s debounce on `ratings` state. Calls `createOrUpdateDraft`. Shows "Saving..." / "All changes saved" indicator. No manual Save Draft button.
-- **Status derivation**: Cross-reference `registryStore.submissions`, `assessmentStore.assessments`, `attemptStore.attempts`, `reviewStore.reviews` for the current cycle to compute status. No new DB columns.
-- **Previous cycle scores**: Query past submissions for same employee, build `Record<string, RatingLevel>` map, pass as `previousRating` to each `RatingSlider`.
-- **Past registries**: Filter submissions by employee_id excluding active cycle. Lazy-load assessment/final scores on expand by querying `attempt_skill_scores` and `official_skill_entries`.
-- **Comments**: Collapsible textarea per skill, only in draft mode. Stored in new `skill_self_ratings.comment` column.
 
+| File                              | Change                                                                                                                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/pages/SkillRegistryPage.tsx` | Rewrite `PastRegistriesTable` → detailed page with all score columns + manager. Add detail view for past registries. Update "no active cycle" to still show past registries. Fetch reviewer data from users table. |
