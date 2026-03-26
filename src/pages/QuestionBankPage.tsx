@@ -696,6 +696,9 @@ export default function QuestionBankPage() {
                       >
                         {display}
                       </button>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {new Date(q.updated_at || q.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
                     </TableCell>
                     <TableCell>
                       {q.ai_generated ? (
