@@ -515,6 +515,7 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_link: string | null
           created_at: string
           id: string
           message: string
@@ -526,6 +527,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          action_link?: string | null
           created_at?: string
           id: string
           message: string
@@ -537,6 +539,7 @@ export type Database = {
           type: string
         }
         Update: {
+          action_link?: string | null
           created_at?: string
           id?: string
           message?: string
@@ -720,6 +723,51 @@ export type Database = {
         }
         Relationships: []
       }
+      review_cycles: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string
+          grace_period_days: number
+          id: string
+          modified_at: string | null
+          modified_by: string | null
+          name: string
+          start_date: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          grace_period_days?: number
+          id: string
+          modified_at?: string | null
+          modified_by?: string | null
+          name: string
+          start_date: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          grace_period_days?: number
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          name?: string
+          start_date?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       review_skill_entries: {
         Row: {
           ai_calculated_level: number
@@ -811,6 +859,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           cycle: string
+          cycle_id: string | null
           deleted_by: string | null
           deleted_on: string | null
           domain_id: string
@@ -827,6 +876,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           cycle: string
+          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id: string
@@ -843,6 +893,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           cycle?: string
+          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id?: string

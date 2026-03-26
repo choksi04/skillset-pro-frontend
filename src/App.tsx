@@ -16,6 +16,7 @@ import QuestionBankPage from "@/pages/QuestionBankPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import AssessmentExecPage from "@/pages/AssessmentExecPage";
 import ReviewsPage from "@/pages/ReviewsPage";
+import ReviewCyclesPage from "@/pages/ReviewCyclesPage";
 import SkillRegistryPage from "@/pages/SkillRegistryPage";
 import HRDashboardPage from "@/pages/HRDashboardPage";
 import UserGuidePage from "@/pages/UserGuidePage";
@@ -86,13 +87,14 @@ const App = () => (
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />
-              <Route path="/review-cycles" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
+              <Route path="/review-cycles" element={<RoleGuard allowed={["admin", "manager"]}><ReviewCyclesPage /></RoleGuard>} />
+              <Route path="/manager-reviews" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
 
               {/* Legacy redirects */}
               <Route path="/ai-generate" element={<Navigate to="/questions" replace />} />
               <Route path="/skills" element={<Navigate to="/skill-library" replace />} />
               <Route path="/registry" element={<Navigate to="/skill-registry" replace />} />
-              <Route path="/reviews" element={<Navigate to="/review-cycles" replace />} />
+              <Route path="/reviews" element={<Navigate to="/manager-reviews" replace />} />
               <Route path="/guide" element={<Navigate to="/help" replace />} />
               <Route path="/skill-analytics" element={<Navigate to="/all-registries" replace />} />
               <Route path="/organization" element={<Navigate to="/" replace />} />

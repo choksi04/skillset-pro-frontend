@@ -5,6 +5,7 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useRegistryStore, ratingLabels, RatingLevel } from '@/stores/registryStore';
+import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -139,7 +140,8 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
   const { completeReview } = useReviewStore();
-  const { currentCycle } = useRegistryStore();
+  const { activeCycle } = useCycleStore();
+  const currentCycle = activeCycle?.name || useRegistryStore.getState().currentCycle;
   const { getAttemptForAssessment } = useAttemptStore();
   const { assessments } = useAssessmentStore();
 
@@ -350,9 +352,8 @@ export default function ReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <p className="text-sm text-muted-foreground">Review AI-evaluated assessment results, adjust skill levels, and generate official registry entries.</p>
-        <NotificationPanel />
       </div>
 
       {!isManager && (

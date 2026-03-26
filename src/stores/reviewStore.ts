@@ -39,8 +39,9 @@ export interface Notification {
   target_role: 'manager' | 'admin' | 'employee';
   target_user_id?: string;
   message: string;
-  type: 'assessment_completed' | 'review_completed' | 'reassessment_requested';
+  type: 'assessment_completed' | 'review_completed' | 'reassessment_requested' | 'cycle_activated' | 'submission_reminder' | 'assessment_reminder';
   reference_id: string;
+  action_link?: string;
   read: boolean;
   created_at: string;
 }
@@ -135,7 +136,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       const notifications: Notification[] = (notifsRes.data || []).map((n: any) => ({
         id: n.id, tenant_id: n.tenant_id, target_role: n.target_role as any,
         target_user_id: n.target_user_id, message: n.message, type: n.type as any,
-        reference_id: n.reference_id, read: n.read, created_at: n.created_at,
+        reference_id: n.reference_id, action_link: n.action_link, read: n.read, created_at: n.created_at,
       }));
 
       const officialEntries: OfficialSkillEntry[] = (entriesRes.data || []).map((e: any) => ({

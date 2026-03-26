@@ -4,6 +4,7 @@ import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useQuestionStore } from '@/stores/questionStore';
+import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import RatingSlider from '@/components/registry/RatingSlider';
@@ -229,14 +230,24 @@ function SkillDetailView({
 // ── Employee / "My Registry" view ──
 function MyRegistryView() {
   const { user } = useAuth();
-  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry } = useRegistryStore();
+  const { submissions, assignments, currentCycle, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry, setCurrentCycle } = useRegistryStore();
   const { addAssessment } = useAssessmentStore();
   const { domains, mappings } = useDomainStore();
   const { skills, categories } = useSkillStore();
   const { questions } = useQuestionStore();
+  const { activeCycle, isSubmissionAllowed, getDaysRemaining, fetchCycles } = useCycleStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
+
+  // Sync current cycle from cycle store
+  useEffect(() => {
+    fetchCycles();
+  }, [fetchCycles]);
+
+  useEffect(() => {
+    if (activeCycle) setCurrentCycle(activeCycle.name);
+  }, [activeCycle, setCurrentCycle]);
 
   const assignedDomain = useMemo(() => {
     if (user?.domain_id) return domains.find((d) => d.id === user.domain_id) ?? null;
@@ -339,6 +350,18 @@ function MyRegistryView() {
     setSuccessOpen(true);
   };
 
+  if (!activeCycle) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Clock size={32} className="text-muted-foreground mb-3" />
+        <h2 className="text-lg font-semibold text-foreground mb-1">No Active Review Cycle</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-md">
+          There is no active review cycle at the moment. Please wait for your admin to start a cycle.
+        </p>
+      </div>
+    );
+  }
+
   if (!assignedDomain) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -350,6 +373,9 @@ function MyRegistryView() {
       </div>
     );
   }
+
+  const submissionAllowed = isSubmissionAllowed();
+  const daysRemaining = getDaysRemaining();
 
   const ratedCount = domainSkills.filter((s) => ratings[s.id] != null).length;
 
@@ -373,9 +399,16 @@ function MyRegistryView() {
         <p className="text-xs text-muted-foreground">
           {isLocked
             ? 'Your skill registry has been submitted and locked for this cycle. An assessment has been generated.'
+            : !submissionAllowed
+            ? 'The submission window for this cycle has ended.'
             : `Rate your proficiency for each skill below (${domainSkills.length} skills). You can save as draft and return later.`
           }
         </p>
+        {daysRemaining !== null && !isLocked && submissionAllowed && (
+          <p className={`text-xs font-medium mt-1 ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-muted-foreground'}`}>
+            {daysRemaining > 0 ? `${daysRemaining} days remaining` : daysRemaining === 0 ? 'Ends today' : 'Grace period active'}
+          </p>
+        )}
       </div>
 
       {/* Detailed view with collapsed sections when submitted */}
@@ -391,7 +424,7 @@ function MyRegistryView() {
       />
 
       {/* Actions */}
-      {!isLocked && domainSkills.length > 0 && (
+      {!isLocked && submissionAllowed && domainSkills.length > 0 && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</p>
           <div className="flex gap-2">
@@ -664,10 +697,11 @@ export default function SkillRegistryPage() {
   const { fetchDomains } = useDomainStore();
   const { fetchSkills } = useSkillStore();
   const { fetchQuestions } = useQuestionStore();
+  const { fetchCycles } = useCycleStore();
 
   useEffect(() => {
-    fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry();
-  }, [fetchAssessments, fetchDomains, fetchSkills, fetchQuestions, fetchRegistry]);
+    fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry(); fetchCycles();
+  }, [fetchAssessments, fetchDomains, fetchSkills, fetchQuestions, fetchRegistry, fetchCycles]);
 
   const isEmployee = currentRole === 'employee';
 

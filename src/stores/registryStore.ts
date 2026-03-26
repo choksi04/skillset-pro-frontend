@@ -47,6 +47,7 @@ interface RegistryStore {
   loading: boolean;
   initialized: boolean;
   fetchRegistry: () => Promise<void>;
+  setCurrentCycle: (cycle: string) => void;
   getSubmission: (employeeId: string, cycle: string) => SkillRegistrySubmission | undefined;
   createOrUpdateDraft: (employeeId: string, tenantId: string, domainId: string, ratings: SkillSelfRating[]) => Promise<void>;
   submitRegistry: (submissionId: string) => Promise<void>;
@@ -57,7 +58,7 @@ interface RegistryStore {
 export const useRegistryStore = create<RegistryStore>((set, get) => ({
   submissions: [],
   assignments: [],
-  currentCycle: '2026-Q1',
+  currentCycle: '',
   loading: false,
   initialized: false,
 
@@ -99,6 +100,8 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
       set({ loading: false, initialized: true });
     }
   },
+
+  setCurrentCycle: (cycle) => set({ currentCycle: cycle }),
 
   getSubmission: (employeeId, cycle) =>
     get().submissions.find((s) => s.employee_id === employeeId && s.cycle === cycle),
