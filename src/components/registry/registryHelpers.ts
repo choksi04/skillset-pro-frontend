@@ -9,7 +9,8 @@ export type EmployeeStatus =
   | 'assessment_pending'
   | 'assessment_completed'
   | 'review_pending'
-  | 'approved';
+  | 'approved'
+  | 'incomplete';
 
 export interface EnrichedSubmission {
   submission: SkillRegistrySubmission;
