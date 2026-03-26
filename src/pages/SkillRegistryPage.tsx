@@ -49,7 +49,14 @@ export default function SkillRegistryPage() {
   const [reviewerMap, setReviewerMap] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
 
   useEffect(() => {
-    const reviewerIds = [...new Set(reviews.filter((r) => r.employee_id === employeeId).map((r) => r.reviewer_id))];
+    // Collect all reviewer IDs from reviews related to this employee's submissions
+    const mySubmissionIds = new Set(submissions.filter((s) => s.employee_id === employeeId).map((s) => s.id));
+    const relatedAssessments = assessments.filter((a) => mySubmissionIds.has(a.submission_id));
+    const relatedAttemptIds = new Set(
+      relatedAssessments.map((a) => attempts.find((att) => att.assessment_id === a.id)?.id).filter(Boolean) as string[]
+    );
+    const relatedReviews = reviews.filter((r) => relatedAttemptIds.has(r.attempt_id));
+    const reviewerIds = [...new Set(relatedReviews.map((r) => r.reviewer_id))];
     if (reviewerIds.length === 0) return;
     supabase.from('users').select('id, full_name, email, avatar_url').in('id', reviewerIds).then(({ data }) => {
       if (!data) return;
@@ -57,7 +64,7 @@ export default function SkillRegistryPage() {
       data.forEach((u: any) => { map[u.id] = { name: u.full_name, email: u.email, avatar_url: u.avatar_url || '' }; });
       setReviewerMap(map);
     });
-  }, [reviews, employeeId]);
+  }, [reviews, employeeId, submissions, assessments, attempts]);
 
   const assignedDomain = useMemo(() => {
     if (user?.domain_id) return domains.find((d) => d.id === user.domain_id) ?? null;
