@@ -8,7 +8,14 @@ import { Brain, LogIn, AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
 
 function MicrosoftIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 21 21"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <rect x="1" y="1" width="9" height="9" fill="#F25022" />
       <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
       <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
@@ -117,9 +124,15 @@ export default function LoginPage() {
 
               <div className="space-y-1.5 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground text-[11px] uppercase tracking-wider">Demo accounts</p>
-                <p><span className="font-medium text-foreground">Admin:</span> jagdish@1rivet.com</p>
-                <p><span className="font-medium text-foreground">Manager:</span> ashish@1rivet.com, purvesh@1rivet.com, gaurav@1rivet.com</p>
-                <p><span className="font-medium text-foreground">Employee:</span> mitul@1rivet.com, akash@1rivet.com</p>
+                <p>
+                  <span className="font-medium text-foreground">Admin:</span> temp_admin@1rivet.com
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Manager:</span> temp_manager@1rivet.com
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Employee:</span> test_emp@1rivet.com
+                </p>
               </div>
             </div>
           )}
