@@ -35,7 +35,7 @@ function exportToCSV(entries: OfficialSkillEntry[], skillMap: Map<string, string
       String(e.ai_level),
       String(e.final_level),
       e.cycle,
-      new Date(e.created_at).toLocaleDateString(),
+      new Date(e.timestamp).toLocaleDateString(),
     ]),
   ];
   const csv = rows.map((r) => r.join(',')).join('\n');
@@ -155,7 +155,7 @@ export default function AllRegistriesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{entry.cycle}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{new Date(entry.timestamp).toLocaleDateString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
