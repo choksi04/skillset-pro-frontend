@@ -13,7 +13,6 @@ import CategoryDetailPage from "@/pages/CategoryDetailPage";
 import DomainsPage from "@/pages/DomainsPage";
 import DomainDetailPage from "@/pages/DomainDetailPage";
 import QuestionBankPage from "@/pages/QuestionBankPage";
-import AIGenerationPage from "@/pages/AIGenerationPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import AssessmentExecPage from "@/pages/AssessmentExecPage";
 import ReviewsPage from "@/pages/ReviewsPage";
@@ -87,10 +86,10 @@ const App = () => (
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />
-              <Route path="/ai-generate" element={<RoleGuard allowed={["admin", "manager"]}><AIGenerationPage /></RoleGuard>} />
               <Route path="/review-cycles" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
 
               {/* Legacy redirects */}
+              <Route path="/ai-generate" element={<Navigate to="/questions" replace />} />
               <Route path="/skills" element={<Navigate to="/skill-library" replace />} />
               <Route path="/registry" element={<Navigate to="/skill-registry" replace />} />
               <Route path="/reviews" element={<Navigate to="/review-cycles" replace />} />
