@@ -8,9 +8,7 @@ import SkillDetailDrawer from '@/components/skills/SkillDetailDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -22,7 +20,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Plus, Search, Pencil, ToggleLeft, ToggleRight, Tag, MoreHorizontal, Trash2, Brain, BookOpen } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -76,11 +73,30 @@ export default function CategoryDetailPage() {
   const handleCreateSkill = () => { setEditingSkill(null); setSkillDialogOpen(true); };
   const handleEditSkill = (skill: Skill) => { setEditingSkill(skill); setSkillDialogOpen(true); };
 
+  const handleSkillCreated = (skillId: string) => {
+    // Find newly created skill and auto-open its detail drawer
+    setTimeout(() => {
+      const newSkill = useSkillStore.getState().skills.find((s) => s.id === skillId);
+      if (newSkill) setSelectedSkill(newSkill);
+    }, 50);
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     await deleteSkill(deleteTarget.id);
     setDeleteTarget(null);
   };
+
+  const tagOptions = [
+    { value: 'all', label: 'All Tags' },
+    ...allTags.map((t) => ({ value: t, label: t })),
+  ];
+
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'active', label: 'Active' },
+    { value: 'disabled', label: 'Disabled' },
+  ];
 
   if (!loading && initialized && !category) {
     return (
@@ -130,28 +146,21 @@ export default function CategoryDetailPage() {
           />
         </div>
         {allTags.length > 0 && (
-          <Select value={tagFilter} onValueChange={setTagFilter}>
-            <SelectTrigger className="w-[140px] h-9 text-sm">
-              <SelectValue placeholder="Tag" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tags</SelectItem>
-              {allTags.map((tag) => (
-                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            options={tagOptions}
+            value={tagFilter}
+            onValueChange={setTagFilter}
+            placeholder="Tag"
+            className="w-[140px] h-9 text-sm"
+          />
         )}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          options={statusOptions}
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status"
+          className="w-[130px] h-9 text-sm"
+        />
       </div>
 
       {/* Skills Table */}
@@ -272,6 +281,7 @@ export default function CategoryDetailPage() {
         onOpenChange={setSkillDialogOpen}
         editSkill={editingSkill}
         categoryName={category?.name}
+        onCreated={handleSkillCreated}
       />
 
       <SkillDetailDrawer

@@ -8,11 +8,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Plus, Tag, BookOpen, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,6 +29,7 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin }: SkillDeta
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState<SkillTopic | null>(null);
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [deleteTopicTarget, setDeleteTopicTarget] = useState<SkillTopic | null>(null);
 
   useEffect(() => {
     if (skill) {
@@ -40,6 +42,12 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin }: SkillDeta
 
   const handleAddTopic = () => { setEditingTopic(null); setTopicDialogOpen(true); };
   const handleEditTopic = (topic: SkillTopic) => { setEditingTopic(topic); setTopicDialogOpen(true); };
+
+  const confirmDeleteTopic = async () => {
+    if (!deleteTopicTarget || !skill) return;
+    await deleteTopic(deleteTopicTarget.id, skill.id);
+    setDeleteTopicTarget(null);
+  };
 
   return (
     <>
@@ -99,12 +107,9 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin }: SkillDeta
                 </p>
 
                 {loadingTopics ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {[1, 2].map((i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-4 w-48" />
-                      </div>
+                      <Skeleton key={i} className="h-20 w-full rounded-lg" />
                     ))}
                   </div>
                 ) : skillTopics.length === 0 ? (
@@ -113,48 +118,46 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin }: SkillDeta
                     <p className="text-xs text-muted-foreground">No topics added yet.</p>
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Topic Name</TableHead>
-                          <TableHead className="text-xs hidden sm:table-cell">Description</TableHead>
-                          {isAdmin && <TableHead className="w-[50px]" />}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {skillTopics.map((topic) => (
-                          <TableRow key={topic.id}>
-                            <TableCell className="text-sm font-medium">{topic.name}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground hidden sm:table-cell line-clamp-1">
-                              {topic.description || '—'}
-                            </TableCell>
-                            {isAdmin && (
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-                                      <MoreHorizontal size={12} />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleEditTopic(topic)}>
-                                      <Pencil size={12} className="mr-2" /> Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => deleteTopic(topic.id, skill.id)}
-                                      className="text-destructive focus:text-destructive"
-                                    >
-                                      <Trash2 size={12} className="mr-2" /> Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
+                  <div className="grid grid-cols-1 gap-3">
+                    {skillTopics.map((topic) => (
+                      <div key={topic.id} className="relative rounded-lg border border-border p-3 bg-card hover:bg-muted/30 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground">{topic.name}</p>
+                            {topic.description ? (
+                              <p
+                                className="text-xs text-muted-foreground mt-1 line-clamp-2"
+                                title={topic.description}
+                              >
+                                {topic.description}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mt-1 italic">No description</p>
                             )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                          </div>
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0">
+                                  <MoreHorizontal size={12} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditTopic(topic)}>
+                                  <Pencil size={12} className="mr-2" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteTopicTarget(topic)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 size={12} className="mr-2" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -173,6 +176,24 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin }: SkillDeta
           existingTopics={skillTopics}
         />
       )}
+
+      {/* Delete Topic Confirmation */}
+      <AlertDialog open={!!deleteTopicTarget} onOpenChange={(open) => { if (!open) setDeleteTopicTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Topic</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTopicTarget?.name}"</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTopic} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

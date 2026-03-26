@@ -7,9 +7,7 @@ import CategoryFormDialog from '@/components/skills/CategoryFormDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -21,7 +19,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Search, Pencil, ToggleLeft, ToggleRight, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function SkillFrameworkPage() {
   const { skills, categories, fetchSkills, deleteCategory, toggleCategoryStatus, loading, initialized } = useSkillStore();
@@ -65,6 +62,16 @@ export default function SkillFrameworkPage() {
     setDeleteTarget(null);
   };
 
+  const handleCategoryCreated = (categoryId: string) => {
+    navigate(`/skill-library/${categoryId}`);
+  };
+
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'active', label: 'Active' },
+    { value: 'disabled', label: 'Disabled' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -93,16 +100,13 @@ export default function SkillFrameworkPage() {
             maxLength={100}
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          options={statusOptions}
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status"
+          className="w-[130px] h-9 text-sm"
+        />
       </div>
 
       {/* Category Table */}
@@ -206,7 +210,12 @@ export default function SkillFrameworkPage() {
         </div>
       )}
 
-      <CategoryFormDialog open={catDialogOpen} onOpenChange={setCatDialogOpen} editCategory={editingCat} />
+      <CategoryFormDialog
+        open={catDialogOpen}
+        onOpenChange={setCatDialogOpen}
+        editCategory={editingCat}
+        onCreated={handleCategoryCreated}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>

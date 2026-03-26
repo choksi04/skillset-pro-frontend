@@ -1,18 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useSkillStore, Skill } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { X } from 'lucide-react';
 
 const skillSchema = z.object({
@@ -25,17 +23,12 @@ interface SkillFormDialogProps {
   onOpenChange: (open: boolean) => void;
   editSkill?: Skill | null;
   categoryName?: string;
+  onCreated?: (skillId: string) => void;
 }
 
-export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryName }: SkillFormDialogProps) {
-  const { skills, addSkill, updateSkill } = useSkillStore();
+export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryName, onCreated }: SkillFormDialogProps) {
+  const { addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
-
-  const existingTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    skills.forEach((s) => (s.tags || []).forEach((t) => tagSet.add(t)));
-    return Array.from(tagSet).sort();
-  }, [skills]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -70,7 +63,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const result = skillSchema.safeParse({ skill_name: name, skill_description: description });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -87,25 +80,31 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
         skill_category: resolvedCategory, tags, status,
       });
     } else {
-      addSkill({
+      const newId = await addSkill({
         tenant_id: user?.tenant_id ?? 'tenant-001',
         skill_name: result.data.skill_name, skill_description: result.data.skill_description,
         skill_category: resolvedCategory, tags, status,
       });
+      if (newId && onCreated) onCreated(newId);
     }
     onOpenChange(false);
   };
 
-  const unusedSuggestions = existingTags.filter((t) => !tags.includes(t));
+  const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'disabled', label: 'Disabled' },
+  ];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editSkill ? 'Edit Skill' : 'Create New Skill'}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          {/* Category indicator */}
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{editSkill ? 'Edit Skill' : 'Create New Skill'}</SheetTitle>
+          <SheetDescription>
+            {editSkill ? 'Update skill details.' : 'Add a new skill to this category.'}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 pt-4">
           {categoryName && (
             <div className="space-y-1.5">
               <Label>Category</Label>
@@ -113,14 +112,12 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
             </div>
           )}
 
-          {/* Name */}
           <div className="space-y-1.5">
             <Label htmlFor="skill-name">Skill Name</Label>
             <Input id="skill-name" placeholder="e.g. React, System Design" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
             {errors.skill_name && <p className="text-xs text-destructive">{errors.skill_name}</p>}
           </div>
 
-          {/* Description */}
           <div className="space-y-1.5">
             <Label htmlFor="skill-desc">Description</Label>
             <Textarea id="skill-desc" placeholder="Describe what this skill covers..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} />
@@ -130,7 +127,6 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
             </div>
           </div>
 
-          {/* Tags */}
           <div className="space-y-1.5">
             <Label>Tags</Label>
             <div className="flex flex-wrap gap-1.5 mb-2">
@@ -148,27 +144,17 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
               onKeyDown={handleTagKeyDown}
               onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
             />
-            {unusedSuggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {unusedSuggestions.map((s) => (
-                  <button key={s} onClick={() => addTag(s)} className="text-[11px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors">
-                    + {s}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Status */}
           <div className="space-y-1.5">
             <Label>Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as 'active' | 'disabled')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="disabled">Disabled</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={statusOptions}
+              value={status}
+              onValueChange={(v) => setStatus(v as 'active' | 'disabled')}
+              placeholder="Select status"
+              className="w-full h-9 text-sm"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -176,7 +162,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
             <Button onClick={handleSubmit}>{editSkill ? 'Save Changes' : 'Create Skill'}</Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

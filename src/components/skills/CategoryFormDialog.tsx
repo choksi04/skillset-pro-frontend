@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { useSkillStore, SkillCategory } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editCategory?: SkillCategory | null;
+  onCreated?: (categoryId: string) => void;
 }
 
-export default function CategoryFormDialog({ open, onOpenChange, editCategory }: Props) {
+export default function CategoryFormDialog({ open, onOpenChange, editCategory, onCreated }: Props) {
   const { addCategory, updateCategory } = useSkillStore();
   const { user } = useAuth();
   const [name, setName] = useState('');
@@ -36,7 +37,7 @@ export default function CategoryFormDialog({ open, onOpenChange, editCategory }:
     }
   }, [open, editCategory]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const result = schema.safeParse({ name, description });
     if (!result.success) {
       const fe: Record<string, string> = {};
@@ -47,18 +48,22 @@ export default function CategoryFormDialog({ open, onOpenChange, editCategory }:
     if (editCategory) {
       updateCategory(editCategory.id, { name: result.data.name, description: result.data.description || '' });
     } else {
-      addCategory({ tenant_id: user?.tenant_id ?? 'tenant-001', name: result.data.name, description: result.data.description || '', status: 'active' });
+      const newId = await addCategory({ tenant_id: user?.tenant_id ?? 'tenant-001', name: result.data.name, description: result.data.description || '', status: 'active' });
+      if (newId && onCreated) onCreated(newId);
     }
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{editCategory ? 'Edit Category' : 'Create Category'}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{editCategory ? 'Edit Category' : 'Create Category'}</SheetTitle>
+          <SheetDescription>
+            {editCategory ? 'Update category details.' : 'Add a new skill category to organize your skills.'}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <Label>Category Name</Label>
             <Input placeholder="e.g. Programming Languages" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
@@ -66,14 +71,15 @@ export default function CategoryFormDialog({ open, onOpenChange, editCategory }:
           </div>
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Textarea placeholder="Optional description..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} rows={2} />
+            <Textarea placeholder="Optional description..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} rows={3} />
+            <p className="text-xs text-muted-foreground text-right">{description.length}/300</p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>{editCategory ? 'Save' : 'Create'}</Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
