@@ -182,16 +182,16 @@ export default function AssessmentDetailPage() {
             </Button>
           </div>
         )}
-        {!isOwner && (status === 'evaluated' || status === 'review_pending') && (
-          <Button variant="outline" onClick={() => navigate('/manager-reviews')} className="gap-1.5">
-            <ArrowRight size={14} /> Go to Review
-          </Button>
-        )}
       </div>
 
       {/* Evaluation Results */}
       {isEvaluated && attempt && (
         <EvalResults attempt={attempt} assessment={assessment} />
+      )}
+
+      {/* Manager Review Panel (inline for team assessments) */}
+      {!isOwner && review && attempt && (
+        <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
       )}
     </div>
   );
