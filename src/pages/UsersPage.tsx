@@ -148,7 +148,18 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">Manage users, roles, and domain assignments.</p>
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">Users</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage users, roles, and domain assignments.
+          </p>
+        </div>
+        <Button size="sm" onClick={openCreate} className="gap-1.5">
+          <Plus size={14} /> Add User
+        </Button>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -166,14 +177,11 @@ export default function UsersPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+          <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
         </div>
-        <Button size="sm" onClick={openCreate} className="gap-1.5">
-          <Plus size={14} /> Add User
-        </Button>
       </div>
 
       {/* Table */}
