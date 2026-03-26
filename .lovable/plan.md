@@ -1,80 +1,66 @@
 
 
-## Plan: Redesign Domain Management Module
+## Plan: Question Bank UX Improvements
 
-Redesign the Domain detail page with tab-based Users/Skills sections, inline user assignment/removal, and domain form as a Sheet. Add user count to the list page and enforce deletion safety.
+Three changes: add AI/Manual source filter, improve AI preview to show only question titles (click to expand), and redesign the detail sheet with proper formatting per question type.
+
+---
+
+### 1. Add "Source" Filter (AI vs Manual)
+
+**File:** `src/pages/QuestionBankPage.tsx`
+
+- Add a new filter dropdown next to existing filters with options: All Sources, AI Generated, Manual
+- Add state `sourceFilter` (`'all' | 'ai' | 'manual'`)
+- Update the `filtered` memo to include `sourceFilter` check against `q.ai_generated`
+
+---
+
+### 2. Simplify AI Generation Preview
+
+**File:** `src/pages/QuestionBankPage.tsx`
+
+Currently the AI preview section (lines 358-378) shows raw question text including MCQ options as plain text. Changes:
+
+- Show only the question title (extracted via `parseQuestionText`) as a one-line preview
+- Add an expandable detail view (click to expand) that renders the full question with proper formatting:
+  - **MCQ**: Show options as styled list items with correct answer indicator (green highlight + checkmark)
+  - **Scenario**: Show question text + evaluation guidelines in labeled sections
+  - **Coding**: Show problem statement + example I/O in code blocks
+- Keep the accept/reject checkbox on the collapsed row
+
+---
+
+### 3. Redesign Question Detail Sheet
+
+**File:** `src/pages/QuestionBankPage.tsx` (the `QuestionDetailSheet` component, lines 604-698)
+
+Enhance the detail view with proper visual formatting:
+
+**Scenario type:**
+- Render question text in a styled card/section with proper paragraph spacing
+- Render evaluation guidelines in a separate bordered section with a distinct background
+- Parse markdown-like formatting (bullet points, numbered lists) if present
+
+**MCQ type:**
+- Already has decent option rendering — keep it but ensure it works for AI-generated questions where `parsed` might be null (fallback: try to parse the raw text)
+
+**Coding type:**
+- Problem statement in a readable card section
+- Example Input/Output in `pre`/`code` blocks styled like a terminal/code editor with monospace font, dark background
+- Show both even when only one exists (not nested inside `exampleInput` check)
+
+**General improvements:**
+- Add a "Source" badge (AI Generated / Manual) — already present
+- Add created date display
+- Add skill category breadcrumb context
 
 ---
 
 ### Technical Details
 
-#### 1. DomainFormDialog → Sheet + loading + onCreated
-
-**File: `src/components/domains/DomainFormDialog.tsx`**
-
-- Replace `Dialog` with `Sheet` (right drawer), matching Skill Library pattern.
-- Add `submitting` loading state with `Loader2` on submit button.
-- Add `onCreated?: (domainId: string) => void` callback.
-- Store's `addDomain` returns the new ID (`Promise<string | undefined>`).
-
-#### 2. DomainsPage — add User Count column + navigate on create
-
-**File: `src/pages/DomainsPage.tsx`**
-
-- Fetch user counts per domain lazily (single query: `SELECT domain_id, COUNT(*) FROM users WHERE deleted_on IS NULL GROUP BY domain_id`).
-- Add "Users" column between "Domain" and "Mapped Skills".
-- On domain creation, navigate to `/domains/${newId}` via `onCreated` callback.
-
-#### 3. DomainDetailPage — Tab-based redesign with inline user management
-
-**File: `src/pages/DomainDetailPage.tsx`** — Major rewrite.
-
-Header stays (domain name, description, status, edit button).
-
-Replace the flat sections with **Tabs**: `Users (count)` | `Skills (count)`
-
-**Users Tab:**
-- Search bar for filtering users in this domain.
-- Table: Name | Email | Role | Status | Actions (Remove button).
-- "Add User" button opens a multi-select popover (searchable) showing unassigned users from same tenant. Only users with `domain_id = null` or already in this domain shown for adding.
-- Remove user: sets `domain_id = null` on that user (with confirmation AlertDialog).
-- Domain Lead selector stays in header area (above tabs).
-
-**Skills Tab:**
-- Current skills display (grouped by category) stays.
-- "Manage Skills" opens existing `DomainSkillManager`.
-- Add inline remove button per skill row.
-
-#### 4. Domain deletion safety
-
-**File: `src/stores/domainStore.ts`**
-
-- Add `checkDomainDeletable(id: string): Promise<{deletable: boolean; reason?: string}>` — checks if users exist or skills are mapped.
-- Update `addDomain` return type to `Promise<string | undefined>`.
-
-#### 5. DomainSkillManager → Sheet
-
-**File: `src/components/domains/DomainSkillManager.tsx`**
-
-- Replace `Dialog` with `Sheet` (right drawer) for consistency.
-
-#### 6. User form domain validation
-
-**File: `src/pages/UsersPage.tsx`**
-
-- When role is `employee` or `manager`, show domain as required (warning if empty).
-- Admin role: domain remains optional.
-
----
-
-### Files Summary
-
-| Action | File |
-|--------|------|
-| Rewrite | `src/components/domains/DomainFormDialog.tsx` (Dialog → Sheet + loading + onCreated) |
-| Rewrite | `src/pages/DomainDetailPage.tsx` (tab layout, inline user add/remove) |
-| Modify | `src/pages/DomainsPage.tsx` (user count column, navigate on create) |
-| Modify | `src/stores/domainStore.ts` (addDomain returns ID, checkDomainDeletable) |
-| Modify | `src/components/domains/DomainSkillManager.tsx` (Dialog → Sheet) |
-| Modify | `src/pages/UsersPage.tsx` (domain required for employee/manager) |
+- All changes in a single file: `src/pages/QuestionBankPage.tsx`
+- No database changes needed
+- No store changes needed
+- Reuses existing `parseQuestionText` helper and UI components (Badge, Sheet, etc.)
 
