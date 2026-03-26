@@ -210,7 +210,7 @@ export default function UsersPage() {
                       {domain ? (
                         <span className="text-muted-foreground">{domain.name}</span>
                       ) : needsDomain ? (
-                        <span className="flex items-center gap-1 text-xs text-amber-600">
+                        <span className="flex items-center gap-1 text-xs text-destructive">
                           <AlertTriangle size={12} /> No domain
                         </span>
                       ) : (
