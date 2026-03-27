@@ -154,6 +154,14 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     if (!cat) return;
     const newStatus = cat.status === 'active' ? 'disabled' : 'active';
     await get().updateCategory(id, { status: newStatus });
+
+    // When disabling a category, also disable all child skills
+    if (newStatus === 'disabled') {
+      const childSkills = get().skills.filter((s) => s.skill_category === cat.name && s.status === 'active');
+      for (const skill of childSkills) {
+        await get().updateSkill(skill.id, { status: 'disabled' });
+      }
+    }
   },
 
   addSkill: async (skill) => {
