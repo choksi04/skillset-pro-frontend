@@ -1,8 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { UserRole } from '@/types/models';
-import { useTheme } from '@/hooks/useTheme';
-import SetupProgress from './SetupProgress';
+import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types/models";
+import { useTheme } from "@/hooks/useTheme";
+import SetupProgress from "./SetupProgress";
 import {
   Brain,
   Network,
@@ -20,7 +20,7 @@ import {
   FileText,
   SlidersHorizontal,
   RefreshCw,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface SidebarItem {
   title: string;
@@ -36,44 +36,69 @@ interface SidebarGroup {
 
 const sidebarGroups: SidebarGroup[] = [
   {
-    label: 'Insights',
+    label: "Insights",
     items: [
-      { title: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} />, roles: ['admin', 'manager', 'employee'] },
-      { title: 'All Registries', href: '/all-registries', icon: <Database size={18} />, roles: ['admin'] },
+      { title: "Dashboard", href: "/", icon: <LayoutDashboard size={18} />, roles: ["admin", "manager", "employee"] },
+      { title: "All Registries", href: "/all-registries", icon: <Database size={18} />, roles: ["admin"] },
     ],
   },
   {
-    label: 'Operations',
+    label: "Operations",
     items: [
-      { title: 'My Registry', href: '/skill-registry', icon: <BarChart3 size={18} />, roles: ['admin', 'manager', 'employee'] },
-      { title: 'Team Registry', href: '/team-registry', icon: <Users size={18} />, roles: ['admin', 'manager'] },
-      { title: 'My Assessments', href: '/assessments', icon: <ClipboardCheck size={18} />, roles: ['admin', 'manager', 'employee'] },
-      { title: 'Team Assessments', href: '/team-assessments', icon: <FileText size={18} />, roles: ['admin', 'manager'] },
+      {
+        title: "My Registry",
+        href: "/skill-registry",
+        icon: <BarChart3 size={18} />,
+        roles: ["admin", "manager", "employee"],
+      },
+      { title: "Team Registry", href: "/team-registry", icon: <Users size={18} />, roles: ["admin", "manager"] },
+      {
+        title: "My Assessments",
+        href: "/assessments",
+        icon: <ClipboardCheck size={18} />,
+        roles: ["admin", "manager", "employee"],
+      },
+      {
+        title: "Team Assessments",
+        href: "/team-assessments",
+        icon: <FileText size={18} />,
+        roles: ["admin", "manager"],
+      },
     ],
   },
   {
-    label: 'Settings',
+    label: "Settings",
     items: [
-      { title: 'Skill Library', href: '/skill-library', icon: <Brain size={18} />, roles: ['admin', 'manager'] },
-      { title: 'Domains', href: '/domains', icon: <Network size={18} />, roles: ['admin', 'manager'] },
-      { title: 'Users', href: '/users', icon: <Users size={18} />, roles: ['admin'] },
-      { title: 'Question Bank', href: '/questions', icon: <HelpCircle size={18} />, roles: ['admin', 'manager'] },
-      { title: 'Question Settings', href: '/question-settings', icon: <SlidersHorizontal size={18} />, roles: ['admin'] },
-      { title: 'Review Cycles', href: '/review-cycles', icon: <RefreshCw size={18} />, roles: ['admin'] },
+      { title: "Skill Library", href: "/skill-library", icon: <Brain size={18} />, roles: ["admin", "manager"] },
+      { title: "Domains", href: "/domains", icon: <Network size={18} />, roles: ["admin", "manager"] },
+      { title: "Question Bank", href: "/questions", icon: <HelpCircle size={18} />, roles: ["admin", "manager"] },
+      {
+        title: "Question Settings",
+        href: "/question-settings",
+        icon: <SlidersHorizontal size={18} />,
+        roles: ["admin"],
+      },
+      { title: "Review Cycles", href: "/review-cycles", icon: <RefreshCw size={18} />, roles: ["admin"] },
+      { title: "Users", href: "/users", icon: <Users size={18} />, roles: ["admin"] },
     ],
   },
   {
-    label: 'Support',
+    label: "Support",
     items: [
-      { title: 'Help & Tutorial', href: '/help', icon: <BookOpen size={18} />, roles: ['admin', 'manager', 'employee'] },
+      {
+        title: "Help & Tutorial",
+        href: "/help",
+        icon: <BookOpen size={18} />,
+        roles: ["admin", "manager", "employee"],
+      },
     ],
   },
 ];
 
 const roleLabels: Record<UserRole, string> = {
-  admin: 'Administrator',
-  manager: 'Manager',
-  employee: 'Employee',
+  admin: "Administrator",
+  manager: "Manager",
+  employee: "Employee",
 };
 
 export default function AppSidebar() {
@@ -113,21 +138,19 @@ export default function AppSidebar() {
           <div key={group.label}>
             {gi > 0 && <div className="mx-4 my-2 border-t border-sidebar-border" />}
             <div className="px-5 pt-2 pb-1">
-              <span className="text-[10px] uppercase tracking-wider text-sidebar-muted font-medium">
-                {group.label}
-              </span>
+              <span className="text-[10px] uppercase tracking-wider text-sidebar-muted font-medium">{group.label}</span>
             </div>
             <div className="px-2 space-y-0.5">
               {group.items.map((item) => (
                 <NavLink
                   key={item.href}
                   to={item.href}
-                  end={item.href === '/'}
+                  end={item.href === "/"}
                   className={({ isActive }) =>
                     `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
                       isActive
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                     }`
                   }
                 >
@@ -138,7 +161,7 @@ export default function AppSidebar() {
             </div>
 
             {/* Setup progress under Settings group for admin */}
-            {group.label === 'Settings' && currentRole === 'admin' && <SetupProgress />}
+            {group.label === "Settings" && currentRole === "admin" && <SetupProgress />}
           </div>
         ))}
       </nav>
@@ -151,9 +174,9 @@ export default function AppSidebar() {
           <button
             onClick={toggleTheme}
             className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
 
@@ -162,9 +185,9 @@ export default function AppSidebar() {
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
               {user?.full_name
-                ?.split(' ')
+                ?.split(" ")
                 .map((n) => n[0])
-                .join('') || '?'}
+                .join("") || "?"}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-sidebar-accent-foreground">{user?.full_name}</p>
