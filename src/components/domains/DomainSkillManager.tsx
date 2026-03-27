@@ -127,10 +127,8 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
                 <div key={catName} className="border border-border rounded-lg overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
                     <Checkbox
-                      checked={catState === 'all'}
-                      data-state={catState === 'partial' ? 'indeterminate' : catState === 'all' ? 'checked' : 'unchecked'}
+                      checked={catState === 'all' ? true : catState === 'partial' ? 'indeterminate' : false}
                       onCheckedChange={() => handleToggleCategory(catName)}
-                      className={catState === 'partial' ? 'opacity-70' : ''}
                     />
                     <button
                       onClick={() => toggleExpand(catName)}
