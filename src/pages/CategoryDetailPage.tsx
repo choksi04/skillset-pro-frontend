@@ -1,40 +1,63 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useSkillStore, Skill } from '@/stores/skillStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { Skeleton } from '@/components/ui/skeleton';
-import SkillFormDialog from '@/components/skills/SkillFormDialog';
-import SkillDetailDrawer from '@/components/skills/SkillDetailDrawer';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import SearchableSelect from '@/components/ui/searchable-select';
+import { useState, useMemo, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useSkillStore, Skill } from "@/stores/skillStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { Skeleton } from "@/components/ui/skeleton";
+import SkillFormDialog from "@/components/skills/SkillFormDialog";
+import SkillDetailDrawer from "@/components/skills/SkillDetailDrawer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import SearchableSelect from "@/components/ui/searchable-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Pencil, ToggleLeft, ToggleRight, Tag, MoreHorizontal, Trash2, Brain, BookOpen } from 'lucide-react';
+  ArrowLeft,
+  Plus,
+  Search,
+  Pencil,
+  ToggleLeft,
+  ToggleRight,
+  Tag,
+  MoreHorizontal,
+  Trash2,
+  Brain,
+  BookOpen,
+} from "lucide-react";
 
 export default function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { skills, categories, topics, fetchSkills, toggleSkillStatus, deleteSkill, loading, initialized } = useSkillStore();
+  const { skills, categories, topics, fetchSkills, toggleSkillStatus, deleteSkill, loading, initialized } =
+    useSkillStore();
   const { currentRole } = useAuth();
-  const isAdmin = currentRole === 'admin';
+  const isAdmin = currentRole === "admin";
 
-  useEffect(() => { fetchSkills(); }, [fetchSkills]);
+  useEffect(() => {
+    fetchSkills();
+  }, [fetchSkills]);
 
   const category = categories.find((c) => c.id === categoryId);
 
-  const [search, setSearch] = useState('');
-  const [tagFilter, setTagFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState("");
+  const [tagFilter, setTagFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [skillDialogOpen, setSkillDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
@@ -56,8 +79,8 @@ export default function CategoryDetailPage() {
       const matchesSearch =
         s.skill_name.toLowerCase().includes(search.toLowerCase()) ||
         s.skill_description.toLowerCase().includes(search.toLowerCase());
-      const matchesTag = tagFilter === 'all' || (s.tags || []).includes(tagFilter);
-      const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+      const matchesTag = tagFilter === "all" || (s.tags || []).includes(tagFilter);
+      const matchesStatus = statusFilter === "all" || s.status === statusFilter;
       return matchesSearch && matchesTag && matchesStatus;
     });
   }, [categorySkills, search, tagFilter, statusFilter]);
@@ -70,8 +93,14 @@ export default function CategoryDetailPage() {
     return map;
   }, [topics]);
 
-  const handleCreateSkill = () => { setEditingSkill(null); setSkillDialogOpen(true); };
-  const handleEditSkill = (skill: Skill) => { setEditingSkill(skill); setSkillDialogOpen(true); };
+  const handleCreateSkill = () => {
+    setEditingSkill(null);
+    setSkillDialogOpen(true);
+  };
+  const handleEditSkill = (skill: Skill) => {
+    setEditingSkill(skill);
+    setSkillDialogOpen(true);
+  };
 
   const handleSkillCreated = (skillId: string) => {
     // Find newly created skill and auto-open its detail drawer
@@ -87,21 +116,18 @@ export default function CategoryDetailPage() {
     setDeleteTarget(null);
   };
 
-  const tagOptions = [
-    { value: 'all', label: 'All Tags' },
-    ...allTags.map((t) => ({ value: t, label: t })),
-  ];
+  const tagOptions = [{ value: "all", label: "All Tags" }, ...allTags.map((t) => ({ value: t, label: t }))];
 
   const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'active', label: 'Active' },
-    { value: 'disabled', label: 'Disabled' },
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "disabled", label: "Disabled" },
   ];
 
   if (!loading && initialized && !category) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/skill-library')} className="gap-1.5">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/skill-library")} className="gap-1.5">
           <ArrowLeft size={14} /> Back to Skill Library
         </Button>
         <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
@@ -115,15 +141,13 @@ export default function CategoryDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/skill-library')} className="gap-1.5 mb-3 -ml-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/skill-library")} className="gap-1.5 mb-3 -ml-2">
           <ArrowLeft size={14} /> Skill Library
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">{category?.name || 'Loading...'}</h2>
-            {category?.description && (
-              <p className="text-sm text-muted-foreground mt-1">{category.description}</p>
-            )}
+            <h2 className="text-2xl font-semibold text-foreground">{category?.name || "Loading..."}</h2>
+            {category?.description && <p className="text-sm text-muted-foreground mt-1">{category.description}</p>}
           </div>
           {isAdmin && (
             <Button size="sm" onClick={handleCreateSkill} className="gap-1.5">
@@ -179,8 +203,8 @@ export default function CategoryDetailPage() {
           <Brain size={32} className="mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">
             {categorySkills.length === 0
-              ? 'No skills in this category yet. Add your first skill to get started.'
-              : 'No skills match your filters.'}
+              ? "No skills in this category yet. Add your first skill to get started."
+              : "No skills match your filters."}
           </p>
         </div>
       ) : (
@@ -188,8 +212,7 @@ export default function CategoryDetailPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Skill Name</TableHead>
-                <TableHead className="hidden md:table-cell">Description</TableHead>
+                <TableHead>Skill</TableHead>
                 <TableHead className="hidden sm:table-cell">Tags</TableHead>
                 <TableHead className="w-[80px] text-center">Topics</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
@@ -198,33 +221,41 @@ export default function CategoryDetailPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((skill) => {
-                const topicCount = topicCountMap[skill.id] ?? '—';
+                const topicCount = topicCountMap[skill.id] ?? "—";
                 return (
                   <TableRow
                     key={skill.id}
-                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${skill.status === 'disabled' ? 'opacity-60' : ''}`}
+                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${skill.status === "disabled" ? "opacity-60" : ""}`}
                     onClick={() => setSelectedSkill(skill)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Brain size={14} className="text-primary shrink-0" />
-                        <span className="font-medium text-foreground">{skill.skill_name}</span>
+                        <div>
+                          <Brain size={14} className="text-primary shrink-0" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">{skill.skill_name}</span>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{skill.skill_description || "—"}</p>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1">{skill.skill_description || '—'}</p>
-                    </TableCell>
+                    <TableCell className="hidden md:table-cell"></TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {(skill.tags || []).slice(0, 3).map((tag) => (
                           <Badge key={tag} variant="outline" className="text-[11px] font-normal">
-                            <Tag size={10} className="mr-1" />{tag}
+                            <Tag size={10} className="mr-1" />
+                            {tag}
                           </Badge>
                         ))}
                         {(skill.tags || []).length > 3 && (
-                          <Badge variant="outline" className="text-[11px] font-normal">+{skill.tags.length - 3}</Badge>
+                          <Badge variant="outline" className="text-[11px] font-normal">
+                            +{skill.tags.length - 3}
+                          </Badge>
                         )}
-                        {(!skill.tags || skill.tags.length === 0) && <span className="text-xs text-muted-foreground">—</span>}
+                        {(!skill.tags || skill.tags.length === 0) && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -235,8 +266,8 @@ export default function CategoryDetailPage() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={skill.status === 'active' ? 'default' : 'outline'}
-                        className={`text-xs ${skill.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
+                        variant={skill.status === "active" ? "default" : "outline"}
+                        className={`text-xs ${skill.status === "active" ? "bg-success/15 text-success border-success/20 hover:bg-success/20" : ""}`}
                       >
                         {skill.status}
                       </Badge>
@@ -254,8 +285,12 @@ export default function CategoryDetailPage() {
                               <Pencil size={14} className="mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => toggleSkillStatus(skill.id)}>
-                              {skill.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
-                              {skill.status === 'active' ? 'Disable' : 'Enable'}
+                              {skill.status === "active" ? (
+                                <ToggleLeft size={14} className="mr-2" />
+                              ) : (
+                                <ToggleRight size={14} className="mr-2" />
+                              )}
+                              {skill.status === "active" ? "Disable" : "Enable"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -284,24 +319,29 @@ export default function CategoryDetailPage() {
         onCreated={handleSkillCreated}
       />
 
-      <SkillDetailDrawer
-        skill={selectedSkill}
-        onClose={() => setSelectedSkill(null)}
-        isAdmin={isAdmin}
-      />
+      <SkillDetailDrawer skill={selectedSkill} onClose={() => setSelectedSkill(null)} isAdmin={isAdmin} />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Skill</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>?
-              Skills mapped to domains or used in questions cannot be deleted.
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>? Skills mapped to domains or
+              used in questions cannot be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
