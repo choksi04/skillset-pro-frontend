@@ -290,6 +290,25 @@ function ActionItem({ text, priority }: { text: string; priority: 'high' | 'medi
 /* ──────────────── MAIN ──────────────── */
 export default function DashboardPage() {
   const { currentRole, user } = useAuth();
+  const { fetchSkills } = useSkillStore();
+  const { fetchDomains } = useDomainStore();
+  const { fetchQuestions } = useQuestionStore();
+  const { fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts } = useAttemptStore();
+  const { fetchRegistry } = useRegistryStore();
+  const { fetchReviews } = useReviewStore();
+  const { fetchCycles } = useCycleStore();
+
+  useEffect(() => {
+    fetchSkills();
+    fetchDomains();
+    fetchQuestions();
+    fetchAssessments();
+    fetchAttempts();
+    fetchRegistry();
+    fetchReviews();
+    fetchCycles();
+  }, [fetchSkills, fetchDomains, fetchQuestions, fetchAssessments, fetchAttempts, fetchRegistry, fetchReviews, fetchCycles]);
 
   return (
     <div className="space-y-6" data-tour="dashboard">
