@@ -304,7 +304,7 @@ export default function QuestionBankPage() {
     aiGenerated: questions.filter((q) => q.ai_generated).length,
   }), [questions]);
 
-  // --- Coverage indicator ---
+  // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
     const minRequired = settings.length > 0 ? Math.min(...settings.map((s) => s.min_questions)) : 3;
     const skillCoverage: Record<string, Record<string, number>> = {};
@@ -313,19 +313,21 @@ export default function QuestionBankPage() {
       if (!skillCoverage[q.skill_id]) skillCoverage[q.skill_id] = {};
       skillCoverage[q.skill_id][q.competency_level] = (skillCoverage[q.skill_id][q.competency_level] || 0) + 1;
     }
+    const filteredSkills = skillFilter === 'all' ? activeSkills : activeSkills.filter((s) => s.id === skillFilter);
+    const filteredLevels = levelFilter === 'all' ? competencyLevels : competencyLevels.filter((l) => l === levelFilter);
     const result: { skillId: string; skillName: string; levels: { level: CompetencyLevel; count: number; min: number }[]; hasGaps: boolean }[] = [];
-    for (const skill of activeSkills) {
+    for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
-      const levels = competencyLevels.map((l) => {
+      const levels = filteredLevels.map((l) => {
         const setting = settings.find((s) => s.name.toLowerCase() === l);
         const min = setting?.min_questions ?? minRequired;
         return { level: l, count: counts[l] || 0, min };
       });
       const hasGaps = levels.some((lv) => lv.count < lv.min);
-      result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
+      if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
-    return result.filter((r) => r.hasGaps);
-  }, [questions, activeSkills, settings]);
+    return result;
+  }, [questions, activeSkills, settings, skillFilter, levelFilter]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {
@@ -558,42 +560,6 @@ export default function QuestionBankPage() {
         </Collapsible>
       )}
 
-      {/* Coverage Indicator */}
-      {canEdit && coverageData.length > 0 && (
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="text-warning" />
-            <h3 className="text-sm font-semibold text-foreground">Question Coverage Gaps</h3>
-            <Badge variant="outline" className="text-xs border-warning/30 text-warning">{coverageData.length} skill(s)</Badge>
-          </div>
-          <div className="space-y-2">
-            {coverageData.slice(0, 5).map((skill) => (
-              <div key={skill.skillId} className="flex items-center gap-3 text-xs">
-                <span className="font-medium text-foreground w-36 truncate">{skill.skillName}</span>
-                <div className="flex gap-1.5 flex-1">
-                  {skill.levels.map((lv) => (
-                    <div
-                      key={lv.level}
-                      className={`flex items-center gap-1 rounded px-2 py-0.5 border ${
-                        lv.count >= lv.min
-                          ? 'border-success/20 bg-success/5 text-success'
-                          : 'border-destructive/20 bg-destructive/5 text-destructive'
-                      }`}
-                    >
-                      <span className="font-medium">{competencyLabels[lv.level]}</span>
-                      <span>{lv.count}/{lv.min}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {coverageData.length > 5 && (
-              <p className="text-xs text-muted-foreground">...and {coverageData.length - 5} more skill(s) with gaps.</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
@@ -651,7 +617,40 @@ export default function QuestionBankPage() {
         </Select>
       </div>
 
-      {/* Question Table */}
+      {/* Coverage Gaps (below filters, respects active filters) */}
+      {canEdit && coverageData.length > 0 && (
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-warning" />
+            <h3 className="text-sm font-semibold text-foreground">Question Coverage Gaps</h3>
+            <Badge variant="outline" className="text-xs border-warning/30 text-warning">{coverageData.length} skill(s)</Badge>
+          </div>
+          <div className="space-y-2 max-h-[240px] overflow-y-auto">
+            {coverageData.map((skill) => (
+              <div key={skill.skillId} className="flex items-center gap-3 text-xs">
+                <span className="font-medium text-foreground w-36 truncate" title={skill.skillName}>{skill.skillName}</span>
+                <div className="flex gap-1.5 flex-1 flex-wrap">
+                  {skill.levels.map((lv) => (
+                    <div
+                      key={lv.level}
+                      className={`flex items-center gap-1 rounded px-2 py-0.5 border ${
+                        lv.count >= lv.min
+                          ? 'border-success/20 bg-success/5 text-success'
+                          : 'border-destructive/20 bg-destructive/5 text-destructive'
+                      }`}
+                    >
+                      <span className="font-medium">{competencyLabels[lv.level]}</span>
+                      <span>{lv.count}/{lv.min}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>

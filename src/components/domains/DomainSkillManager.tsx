@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '@/components/ui/sheet';
-import { Search, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, FolderOpen, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DomainSkillManagerProps {
   domainId: string;
@@ -25,10 +26,27 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
 
   const [search, setSearch] = useState('');
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [pendingSkillIds, setPendingSkillIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   const activeSkills = useMemo(() => skills.filter((s) => s.status === 'active'), [skills]);
   const currentMappings = useMemo(() => mappings.filter((m) => m.domain_id === domainId), [mappings, domainId]);
   const mappedSkillIds = useMemo(() => new Set(currentMappings.map((m) => m.skill_id)), [currentMappings]);
+
+  // Initialize pending state from current mappings when sheet opens
+  useEffect(() => {
+    if (open) {
+      setPendingSkillIds(new Set(currentMappings.map((m) => m.skill_id)));
+    }
+  }, [open, currentMappings]);
+
+  const isDirty = useMemo(() => {
+    if (pendingSkillIds.size !== mappedSkillIds.size) return true;
+    for (const id of pendingSkillIds) {
+      if (!mappedSkillIds.has(id)) return true;
+    }
+    return false;
+  }, [pendingSkillIds, mappedSkillIds]);
 
   const grouped = useMemo(() => {
     const q = search.toLowerCase();
@@ -56,7 +74,7 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
   const getCategoryState = (catName: string): 'none' | 'partial' | 'all' => {
     const catSkills = activeSkills.filter((s) => s.skill_category === catName);
     if (catSkills.length === 0) return 'none';
-    const mapped = catSkills.filter((s) => mappedSkillIds.has(s.id)).length;
+    const mapped = catSkills.filter((s) => pendingSkillIds.has(s.id)).length;
     if (mapped === 0) return 'none';
     if (mapped === catSkills.length) return 'all';
     return 'partial';
@@ -64,33 +82,65 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
 
   const handleToggleCategory = (catName: string) => {
     const catSkills = activeSkills.filter((s) => s.skill_category === catName);
-    const allMapped = catSkills.every((s) => mappedSkillIds.has(s.id));
+    const allMapped = catSkills.every((s) => pendingSkillIds.has(s.id));
 
-    if (allMapped) {
-      catSkills.forEach((s) => {
-        const m = currentMappings.find((mp) => mp.skill_id === s.id);
-        if (m) removeMapping(m.id);
-      });
-    } else {
-      catSkills.forEach((s) => {
-        if (!mappedSkillIds.has(s.id)) {
-          addMapping({ domain_id: domainId, skill_id: s.id, tenant_id: user?.tenant_id ?? 'tenant-001', skill_weight: 1 });
-        }
-      });
-    }
+    setPendingSkillIds((prev) => {
+      const next = new Set(prev);
+      if (allMapped) {
+        catSkills.forEach((s) => next.delete(s.id));
+      } else {
+        catSkills.forEach((s) => next.add(s.id));
+      }
+      return next;
+    });
   };
 
   const handleToggleSkill = (skillId: string) => {
-    if (mappedSkillIds.has(skillId)) {
-      const m = currentMappings.find((mp) => mp.skill_id === skillId);
-      if (m) removeMapping(m.id);
-    } else {
-      addMapping({ domain_id: domainId, skill_id: skillId, tenant_id: user?.tenant_id ?? 'tenant-001', skill_weight: 1 });
+    setPendingSkillIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(skillId)) next.delete(skillId);
+      else next.add(skillId);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Find removed: in mappedSkillIds but not in pendingSkillIds
+      for (const m of currentMappings) {
+        if (!pendingSkillIds.has(m.skill_id)) {
+          await removeMapping(m.id);
+        }
+      }
+      // Find added: in pendingSkillIds but not in mappedSkillIds
+      for (const skillId of pendingSkillIds) {
+        if (!mappedSkillIds.has(skillId)) {
+          await addMapping({ domain_id: domainId, skill_id: skillId, tenant_id: user?.tenant_id ?? 'tenant-001', skill_weight: 1 });
+        }
+      }
+      toast.success('Skill mappings saved successfully.');
+      onOpenChange(false);
+    } catch (err) {
+      toast.error('Failed to save skill mappings.');
+    } finally {
+      setSaving(false);
     }
   };
 
+  const changeCount = useMemo(() => {
+    let added = 0, removed = 0;
+    for (const id of pendingSkillIds) {
+      if (!mappedSkillIds.has(id)) added++;
+    }
+    for (const id of mappedSkillIds) {
+      if (!pendingSkillIds.has(id)) removed++;
+    }
+    return { added, removed };
+  }, [pendingSkillIds, mappedSkillIds]);
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(v) => { if (!v && !saving) onOpenChange(false); }}>
       <SheetContent side="right" className="sm:max-w-2xl flex flex-col">
         <SheetHeader>
           <SheetTitle>Manage Skills</SheetTitle>
@@ -109,9 +159,20 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
         </div>
 
         <div className="flex items-center gap-3 px-1 text-xs text-muted-foreground">
-          <span>{currentMappings.length} skill{currentMappings.length !== 1 ? 's' : ''} mapped</span>
+          <span>{pendingSkillIds.size} skill{pendingSkillIds.size !== 1 ? 's' : ''} selected</span>
           <Separator orientation="vertical" className="h-3" />
           <span>{grouped.size} {grouped.size === 1 ? 'category' : 'categories'} shown</span>
+          {isDirty && (
+            <>
+              <Separator orientation="vertical" className="h-3" />
+              <span className="text-primary font-medium">
+                {changeCount.added > 0 && `+${changeCount.added}`}
+                {changeCount.added > 0 && changeCount.removed > 0 && ', '}
+                {changeCount.removed > 0 && `-${changeCount.removed}`}
+                {' '}change{(changeCount.added + changeCount.removed) !== 1 ? 's' : ''}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
@@ -121,7 +182,7 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
             Array.from(grouped.entries()).map(([catName, catSkills]) => {
               const catState = getCategoryState(catName);
               const isExpanded = expandedCats.has(catName);
-              const mappedCount = catSkills.filter((s) => mappedSkillIds.has(s.id)).length;
+              const mappedCount = catSkills.filter((s) => pendingSkillIds.has(s.id)).length;
 
               return (
                 <div key={catName} className="border border-border rounded-lg overflow-hidden">
@@ -151,7 +212,7 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
                             <tr key={skill.id} className="hover:bg-muted/20 transition-colors">
                               <td className="pl-12 pr-2 py-2.5 w-8">
                                 <Checkbox
-                                  checked={mappedSkillIds.has(skill.id)}
+                                  checked={pendingSkillIds.has(skill.id)}
                                   onCheckedChange={() => handleToggleSkill(skill.id)}
                                 />
                               </td>
@@ -172,8 +233,12 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
         </div>
 
         <Separator />
-        <div className="flex justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={!isDirty || saving}>
+            {saving && <Loader2 size={14} className="mr-1.5 animate-spin" />}
+            Save Changes
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
