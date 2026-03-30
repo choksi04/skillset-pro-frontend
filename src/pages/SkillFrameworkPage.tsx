@@ -168,9 +168,9 @@ export default function SkillFrameworkPage() {
                     onClick={() => navigate(`/skill-library/${cat.id}`)}
                   >
                     <TableCell>
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center flex-column gap-2.5">
                         <FolderOpen size={16} className="text-primary shrink-0" />
-                        <div className="font-medium text-foreground">{cat.name}</div>
+                        <span className="font-medium text-foreground">{cat.name}</span>
                         <p className="text-sm text-muted-foreground line-clamp-1">{cat.description || "—"}</p>
                       </div>
                     </TableCell>
