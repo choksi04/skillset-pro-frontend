@@ -170,7 +170,7 @@ export default function SkillFrameworkPage() {
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <FolderOpen size={16} className="text-primary shrink-0" />
-                        <span className="d-block font-medium text-foreground">{cat.name}</span>
+                        <div className="font-medium text-foreground">{cat.name}</div>
                         <p className="text-sm text-muted-foreground line-clamp-1">{cat.description || "—"}</p>
                       </div>
                     </TableCell>
