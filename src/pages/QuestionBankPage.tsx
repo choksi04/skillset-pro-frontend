@@ -560,42 +560,6 @@ export default function QuestionBankPage() {
         </Collapsible>
       )}
 
-      {/* Coverage Indicator */}
-      {canEdit && coverageData.length > 0 && (
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="text-warning" />
-            <h3 className="text-sm font-semibold text-foreground">Question Coverage Gaps</h3>
-            <Badge variant="outline" className="text-xs border-warning/30 text-warning">{coverageData.length} skill(s)</Badge>
-          </div>
-          <div className="space-y-2">
-            {coverageData.slice(0, 5).map((skill) => (
-              <div key={skill.skillId} className="flex items-center gap-3 text-xs">
-                <span className="font-medium text-foreground w-36 truncate">{skill.skillName}</span>
-                <div className="flex gap-1.5 flex-1">
-                  {skill.levels.map((lv) => (
-                    <div
-                      key={lv.level}
-                      className={`flex items-center gap-1 rounded px-2 py-0.5 border ${
-                        lv.count >= lv.min
-                          ? 'border-success/20 bg-success/5 text-success'
-                          : 'border-destructive/20 bg-destructive/5 text-destructive'
-                      }`}
-                    >
-                      <span className="font-medium">{competencyLabels[lv.level]}</span>
-                      <span>{lv.count}/{lv.min}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {coverageData.length > 5 && (
-              <p className="text-xs text-muted-foreground">...and {coverageData.length - 5} more skill(s) with gaps.</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px] max-w-xs">

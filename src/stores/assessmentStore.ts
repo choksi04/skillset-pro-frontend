@@ -29,6 +29,7 @@ const competencyToLevel: Record<CompetencyLevel, number> = {
   intermediate: 2,
   advanced: 3,
   expert: 4,
+  master: 5,
 };
 
 /**
