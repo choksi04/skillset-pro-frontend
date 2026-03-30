@@ -43,10 +43,8 @@ function AdminDashboard() {
   const { assessments } = useAssessmentStore();
   const { attempts } = useAttemptStore();
   const { reviews, officialEntries } = useReviewStore();
-  const { activeCycle, getDaysRemaining, fetchCycles } = useCycleStore();
+  const { activeCycle, getDaysRemaining } = useCycleStore();
   const navigate = useNavigate();
-
-  useEffect(() => { fetchCycles(); }, [fetchCycles]);
 
   const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
   const completedAssessments = attempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length;
@@ -290,6 +288,25 @@ function ActionItem({ text, priority }: { text: string; priority: 'high' | 'medi
 /* ──────────────── MAIN ──────────────── */
 export default function DashboardPage() {
   const { currentRole, user } = useAuth();
+  const { fetchSkills } = useSkillStore();
+  const { fetchDomains } = useDomainStore();
+  const { fetchQuestions } = useQuestionStore();
+  const { fetchAssessments } = useAssessmentStore();
+  const { fetchAttempts } = useAttemptStore();
+  const { fetchRegistry } = useRegistryStore();
+  const { fetchReviews } = useReviewStore();
+  const { fetchCycles } = useCycleStore();
+
+  useEffect(() => {
+    fetchSkills();
+    fetchDomains();
+    fetchQuestions();
+    fetchAssessments();
+    fetchAttempts();
+    fetchRegistry();
+    fetchReviews();
+    fetchCycles();
+  }, [fetchSkills, fetchDomains, fetchQuestions, fetchAssessments, fetchAttempts, fetchRegistry, fetchReviews, fetchCycles]);
 
   return (
     <div className="space-y-6" data-tour="dashboard">
