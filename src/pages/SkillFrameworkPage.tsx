@@ -1,35 +1,46 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSkillStore, SkillCategory } from '@/stores/skillStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { Skeleton } from '@/components/ui/skeleton';
-import CategoryFormDialog from '@/components/skills/CategoryFormDialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import SearchableSelect from '@/components/ui/searchable-select';
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSkillStore, SkillCategory } from "@/stores/skillStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { Skeleton } from "@/components/ui/skeleton";
+import CategoryFormDialog from "@/components/skills/CategoryFormDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import SearchableSelect from "@/components/ui/searchable-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, ToggleLeft, ToggleRight, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Search, Pencil, ToggleLeft, ToggleRight, FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
 
 export default function SkillFrameworkPage() {
-  const { skills, categories, fetchSkills, deleteCategory, toggleCategoryStatus, loading, initialized } = useSkillStore();
+  const { skills, categories, fetchSkills, deleteCategory, toggleCategoryStatus, loading, initialized } =
+    useSkillStore();
   const { currentRole } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = currentRole === 'admin';
+  const isAdmin = currentRole === "admin";
 
-  useEffect(() => { fetchSkills(); }, [fetchSkills]);
+  useEffect(() => {
+    fetchSkills();
+  }, [fetchSkills]);
 
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [catDialogOpen, setCatDialogOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<SkillCategory | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -38,8 +49,8 @@ export default function SkillFrameworkPage() {
     return categories.filter((c) => {
       const matchesSearch =
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        (c.description || '').toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+        (c.description || "").toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [categories, search, statusFilter]);
@@ -47,14 +58,20 @@ export default function SkillFrameworkPage() {
   const skillCountMap = useMemo(() => {
     const map: Record<string, number> = {};
     skills.forEach((s) => {
-      const cat = s.skill_category || '';
+      const cat = s.skill_category || "";
       map[cat] = (map[cat] || 0) + 1;
     });
     return map;
   }, [skills]);
 
-  const handleCreateCat = () => { setEditingCat(null); setCatDialogOpen(true); };
-  const handleEditCat = (cat: SkillCategory) => { setEditingCat(cat); setCatDialogOpen(true); };
+  const handleCreateCat = () => {
+    setEditingCat(null);
+    setCatDialogOpen(true);
+  };
+  const handleEditCat = (cat: SkillCategory) => {
+    setEditingCat(cat);
+    setCatDialogOpen(true);
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -67,9 +84,9 @@ export default function SkillFrameworkPage() {
   };
 
   const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'active', label: 'Active' },
-    { value: 'disabled', label: 'Disabled' },
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "disabled", label: "Disabled" },
   ];
 
   return (
@@ -126,8 +143,8 @@ export default function SkillFrameworkPage() {
           <FolderOpen size={32} className="mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">
             {categories.length === 0
-              ? 'No categories yet. Create your first category to get started.'
-              : 'No categories match your filters.'}
+              ? "No categories yet. Create your first category to get started."
+              : "No categories match your filters."}
           </p>
         </div>
       ) : (
@@ -135,8 +152,7 @@ export default function SkillFrameworkPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Category Name</TableHead>
-                <TableHead className="hidden sm:table-cell">Description</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead className="w-[100px] text-center">Skills</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
                 {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
@@ -148,19 +164,15 @@ export default function SkillFrameworkPage() {
                 return (
                   <TableRow
                     key={cat.id}
-                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${cat.status === 'disabled' ? 'opacity-60' : ''}`}
+                    className={`cursor-pointer transition-colors hover:bg-muted/50 ${cat.status === "disabled" ? "opacity-60" : ""}`}
                     onClick={() => navigate(`/skill-library/${cat.id}`)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <FolderOpen size={16} className="text-primary shrink-0" />
                         <span className="font-medium text-foreground">{cat.name}</span>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{cat.description || "—"}</p>
                       </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {cat.description || '—'}
-                      </p>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className="text-xs font-normal">
@@ -169,8 +181,8 @@ export default function SkillFrameworkPage() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={cat.status === 'active' ? 'default' : 'outline'}
-                        className={`text-xs ${cat.status === 'active' ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}`}
+                        variant={cat.status === "active" ? "default" : "outline"}
+                        className={`text-xs ${cat.status === "active" ? "bg-success/15 text-success border-success/20 hover:bg-success/20" : ""}`}
                       >
                         {cat.status}
                       </Badge>
@@ -188,8 +200,12 @@ export default function SkillFrameworkPage() {
                               <Pencil size={14} className="mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => toggleCategoryStatus(cat.id)}>
-                              {cat.status === 'active' ? <ToggleLeft size={14} className="mr-2" /> : <ToggleRight size={14} className="mr-2" />}
-                              {cat.status === 'active' ? 'Disable' : 'Enable'}
+                              {cat.status === "active" ? (
+                                <ToggleLeft size={14} className="mr-2" />
+                              ) : (
+                                <ToggleRight size={14} className="mr-2" />
+                              )}
+                              {cat.status === "active" ? "Disable" : "Enable"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -217,18 +233,27 @@ export default function SkillFrameworkPage() {
         onCreated={handleCategoryCreated}
       />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>?
-              Categories with skills cannot be deleted.
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>? Categories with skills cannot
+              be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
