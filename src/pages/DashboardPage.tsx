@@ -43,10 +43,8 @@ function AdminDashboard() {
   const { assessments } = useAssessmentStore();
   const { attempts } = useAttemptStore();
   const { reviews, officialEntries } = useReviewStore();
-  const { activeCycle, getDaysRemaining, fetchCycles } = useCycleStore();
+  const { activeCycle, getDaysRemaining } = useCycleStore();
   const navigate = useNavigate();
-
-  useEffect(() => { fetchCycles(); }, [fetchCycles]);
 
   const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
   const completedAssessments = attempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length;
