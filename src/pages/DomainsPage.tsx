@@ -166,7 +166,6 @@ export default function DomainsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Domain</TableHead>
-                <TableHead className="hidden sm:table-cell">Description</TableHead>
                 <TableHead className="w-[80px] text-center">Users</TableHead>
                 <TableHead className="w-[100px] text-center">Skills</TableHead>
                 <TableHead className="w-[90px]">Status</TableHead>
@@ -185,13 +184,16 @@ export default function DomainsPage() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-2.5">
-                        <Network size={16} className="text-primary shrink-0" />
-                        <span className="font-medium text-foreground">{domain.name}</span>
+                        <div>
+                          <Network size={16} className="text-primary shrink-0" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">{domain.name}</span>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{domain.description || "—"}</p>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1">{domain.description || "—"}</p>
-                    </TableCell>
+
                     <TableCell className="text-center">
                       <Badge variant="outline" className="text-xs font-normal">
                         {uCount}
