@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
 
-export type CompetencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+export type CompetencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master';
 export type QuestionType = 'scenario' | 'coding' | 'mcq';
 export type QuestionStatus = 'draft' | 'published' | 'disabled';
 
@@ -206,11 +206,11 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 }));
 
-export const competencyLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
+export const competencyLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert', 'master'];
 export const questionTypes: QuestionType[] = ['scenario', 'coding', 'mcq'];
 
 export const competencyLabels: Record<CompetencyLevel, string> = {
-  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', expert: 'Expert',
+  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', expert: 'Expert', master: 'Master',
 };
 
 export const questionTypeLabels: Record<QuestionType, string> = {

@@ -304,7 +304,7 @@ export default function QuestionBankPage() {
     aiGenerated: questions.filter((q) => q.ai_generated).length,
   }), [questions]);
 
-  // --- Coverage indicator ---
+  // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
     const minRequired = settings.length > 0 ? Math.min(...settings.map((s) => s.min_questions)) : 3;
     const skillCoverage: Record<string, Record<string, number>> = {};
@@ -313,19 +313,21 @@ export default function QuestionBankPage() {
       if (!skillCoverage[q.skill_id]) skillCoverage[q.skill_id] = {};
       skillCoverage[q.skill_id][q.competency_level] = (skillCoverage[q.skill_id][q.competency_level] || 0) + 1;
     }
+    const filteredSkills = skillFilter === 'all' ? activeSkills : activeSkills.filter((s) => s.id === skillFilter);
+    const filteredLevels = levelFilter === 'all' ? competencyLevels : competencyLevels.filter((l) => l === levelFilter);
     const result: { skillId: string; skillName: string; levels: { level: CompetencyLevel; count: number; min: number }[]; hasGaps: boolean }[] = [];
-    for (const skill of activeSkills) {
+    for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
-      const levels = competencyLevels.map((l) => {
+      const levels = filteredLevels.map((l) => {
         const setting = settings.find((s) => s.name.toLowerCase() === l);
         const min = setting?.min_questions ?? minRequired;
         return { level: l, count: counts[l] || 0, min };
       });
       const hasGaps = levels.some((lv) => lv.count < lv.min);
-      result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
+      if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
-    return result.filter((r) => r.hasGaps);
-  }, [questions, activeSkills, settings]);
+    return result;
+  }, [questions, activeSkills, settings, skillFilter, levelFilter]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {

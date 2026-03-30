@@ -96,26 +96,39 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
   useEffect(() => {
     if (!open) return;
     const q = editQuestion;
-    setSkillId(q?.skill_id ?? '');
-    setTopicId(q?.topic_id ?? '');
-    setLevel(q?.competency_level ?? '');
-    setQType(q?.question_type ?? '');
-    setGuidelines(q?.evaluation_guidelines ?? '');
     setErrors({});
 
-    if (q?.question_type === 'mcq') {
-      const mcq = parseMcqFromText(q.question_text);
-      setText(mcq.questionText);
-      setMcqOptions(mcq.options);
-      setMcqCorrect(mcq.correctIndex);
-    } else if (q?.question_type === 'coding') {
-      const cd = parseCodingFromText(q?.question_text ?? '');
-      setProblemStatement(cd.problemStatement);
-      setExampleInput(cd.exampleInput);
-      setExampleOutput(cd.exampleOutput);
-      setText('');
+    if (q) {
+      // Editing existing question — populate all fields
+      setSkillId(q.skill_id ?? '');
+      setTopicId(q.topic_id ?? '');
+      setLevel(q.competency_level ?? '');
+      setQType(q.question_type ?? '');
+      setGuidelines(q.evaluation_guidelines ?? '');
+
+      if (q.question_type === 'mcq') {
+        const mcq = parseMcqFromText(q.question_text);
+        setText(mcq.questionText);
+        setMcqOptions(mcq.options);
+        setMcqCorrect(mcq.correctIndex);
+      } else if (q.question_type === 'coding') {
+        const cd = parseCodingFromText(q.question_text ?? '');
+        setProblemStatement(cd.problemStatement);
+        setExampleInput(cd.exampleInput);
+        setExampleOutput(cd.exampleOutput);
+        setText('');
+      } else {
+        setText(q.question_text ?? '');
+        setMcqOptions(['', '', '', '']);
+        setMcqCorrect(null);
+        setProblemStatement('');
+        setExampleInput('');
+        setExampleOutput('');
+      }
     } else {
-      setText(q?.question_text ?? '');
+      // New question — preserve skillId, topicId, level, qType; reset only content
+      setGuidelines('');
+      setText('');
       setMcqOptions(['', '', '', '']);
       setMcqCorrect(null);
       setProblemStatement('');
