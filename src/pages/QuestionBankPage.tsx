@@ -617,7 +617,40 @@ export default function QuestionBankPage() {
         </Select>
       </div>
 
-      {/* Question Table */}
+      {/* Coverage Gaps (below filters, respects active filters) */}
+      {canEdit && coverageData.length > 0 && (
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-warning" />
+            <h3 className="text-sm font-semibold text-foreground">Question Coverage Gaps</h3>
+            <Badge variant="outline" className="text-xs border-warning/30 text-warning">{coverageData.length} skill(s)</Badge>
+          </div>
+          <div className="space-y-2 max-h-[240px] overflow-y-auto">
+            {coverageData.map((skill) => (
+              <div key={skill.skillId} className="flex items-center gap-3 text-xs">
+                <span className="font-medium text-foreground w-36 truncate" title={skill.skillName}>{skill.skillName}</span>
+                <div className="flex gap-1.5 flex-1 flex-wrap">
+                  {skill.levels.map((lv) => (
+                    <div
+                      key={lv.level}
+                      className={`flex items-center gap-1 rounded px-2 py-0.5 border ${
+                        lv.count >= lv.min
+                          ? 'border-success/20 bg-success/5 text-success'
+                          : 'border-destructive/20 bg-destructive/5 text-destructive'
+                      }`}
+                    >
+                      <span className="font-medium">{competencyLabels[lv.level]}</span>
+                      <span>{lv.count}/{lv.min}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
