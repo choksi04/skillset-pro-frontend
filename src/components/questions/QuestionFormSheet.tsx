@@ -71,10 +71,15 @@ interface QuestionFormSheetProps {
 }
 
 export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: QuestionFormSheetProps) {
-  const { addQuestion, updateQuestion } = useQuestionStore();
+  const { addQuestion, updateQuestion, settings, fetchSettings } = useQuestionStore();
   const { skills, topics, fetchTopicsForSkill } = useSkillStore();
   const { user } = useAuth();
   const activeSkills = skills.filter((s) => s.status === 'active');
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const dynamicLevels = useMemo(() => getCompetencyLevels(settings), [settings]);
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
 
   const [skillId, setSkillId] = useState('');
   const [topicId, setTopicId] = useState('');
