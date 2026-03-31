@@ -31,10 +31,13 @@ function parseMCQForDisplay(questionText: string) {
 }
 
 export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
-  const { questions } = useQuestionStore();
+  const { questions, settings, fetchSettings } = useQuestionStore();
   const { skills } = useSkillStore();
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
