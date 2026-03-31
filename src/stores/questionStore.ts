@@ -206,13 +206,37 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 }));
 
+/** @deprecated Use getCompetencyLevels(settings) instead */
 export const competencyLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert', 'master'];
 export const questionTypes: QuestionType[] = ['scenario', 'coding', 'mcq'];
 
-export const competencyLabels: Record<CompetencyLevel, string> = {
+/** @deprecated Use getCompetencyLabelsMap(settings) instead */
+export const competencyLabels: Record<string, string> = {
   beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', expert: 'Expert', master: 'Master',
 };
 
 export const questionTypeLabels: Record<QuestionType, string> = {
   scenario: 'Scenario', coding: 'Coding', mcq: 'MCQ',
 };
+
+// ─── Dynamic helpers derived from question_settings ───
+
+export function getCompetencyLevels(settings: QuestionSetting[]): string[] {
+  return settings
+    .filter(s => s.status === 'active')
+    .sort((a, b) => a.level - b.level)
+    .map(s => s.name);
+}
+
+export function getCompetencyLabel(settings: QuestionSetting[], name: string): string {
+  return settings.find(s => s.name === name)?.label || name;
+}
+
+export function getCompetencyLabelsMap(settings: QuestionSetting[]): Record<string, string> {
+  return Object.fromEntries(
+    settings
+      .filter(s => s.status === 'active')
+      .sort((a, b) => a.level - b.level)
+      .map(s => [s.name, s.label])
+  );
+}
