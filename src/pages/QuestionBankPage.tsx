@@ -684,7 +684,7 @@ export default function QuestionBankPage() {
                     <TableCell className="text-sm font-medium">{skill?.skill_name ?? 'Unknown'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{q.topic_id ? (topicMap.get(q.topic_id) || '—') : '—'}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs font-normal">{competencyLabels[q.competency_level]}</Badge>
+                      <Badge variant="outline" className="text-xs font-normal">{dynamicLabels[q.competency_level] || q.competency_level}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs font-normal">
