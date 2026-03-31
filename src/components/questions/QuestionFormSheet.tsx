@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { useQuestionStore, Question, questionTypes, questionTypeLabels, getCompetencyLevels, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
