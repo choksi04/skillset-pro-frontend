@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
-import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
+import { useQuestionStore, questionTypeLabels, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
 import { Badge } from '@/components/ui/badge';
@@ -31,10 +31,13 @@ function parseMCQForDisplay(questionText: string) {
 }
 
 export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
-  const { questions } = useQuestionStore();
+  const { questions, settings, fetchSettings } = useQuestionStore();
   const { skills } = useSkillStore();
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -179,7 +182,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-foreground line-clamp-2">{question?.question_text ?? 'Question unavailable'}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            {aq && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{competencyLabels[aq.target_level]}</Badge>}
+                            {aq && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{dynamicLabels[aq.target_level] || aq.target_level}</Badge>}
                             {question && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{questionTypeLabels[question.question_type]}</Badge>}
                           </div>
                         </div>

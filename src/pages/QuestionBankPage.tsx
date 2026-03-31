@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import {
-  useQuestionStore, Question, QuestionStatus, competencyLevels, questionTypes,
-  competencyLabels, questionTypeLabels, CompetencyLevel, QuestionType,
+  useQuestionStore, Question, QuestionStatus, questionTypes,
+  questionTypeLabels, CompetencyLevel, QuestionType,
+  getCompetencyLevels, getCompetencyLabelsMap,
 } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -272,6 +273,8 @@ export default function QuestionBankPage() {
 
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
+  const dynamicLevels = useMemo(() => getCompetencyLevels(settings), [settings]);
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
   const topicMap = useMemo(() => {
     const m = new Map<string, string>();
     Object.values(topics).flat().forEach((t) => m.set(t.id, t.name));
@@ -314,8 +317,8 @@ export default function QuestionBankPage() {
       skillCoverage[q.skill_id][q.competency_level] = (skillCoverage[q.skill_id][q.competency_level] || 0) + 1;
     }
     const filteredSkills = skillFilter === 'all' ? activeSkills : activeSkills.filter((s) => s.id === skillFilter);
-    const filteredLevels = levelFilter === 'all' ? competencyLevels : competencyLevels.filter((l) => l === levelFilter);
-    const result: { skillId: string; skillName: string; levels: { level: CompetencyLevel; count: number; min: number }[]; hasGaps: boolean }[] = [];
+    const filteredLevels = levelFilter === 'all' ? dynamicLevels : dynamicLevels.filter((l) => l === levelFilter);
+    const result: { skillId: string; skillName: string; levels: { level: string; count: number; min: number }[]; hasGaps: boolean }[] = [];
     for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
       const levels = filteredLevels.map((l) => {
@@ -327,7 +330,7 @@ export default function QuestionBankPage() {
       if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
     return result;
-  }, [questions, activeSkills, settings, skillFilter, levelFilter]);
+  }, [questions, activeSkills, settings, skillFilter, levelFilter, dynamicLevels]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {
@@ -478,7 +481,7 @@ export default function QuestionBankPage() {
                     <Select value={aiLevel} onValueChange={setAiLevel}>
                       <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
                       <SelectContent>
-                        {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+                        {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {aiErrors.competency_level && <p className="text-xs text-destructive">{aiErrors.competency_level}</p>}
@@ -577,7 +580,7 @@ export default function QuestionBankPage() {
           <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Level" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
-            {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+            {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -639,7 +642,7 @@ export default function QuestionBankPage() {
                           : 'border-destructive/20 bg-destructive/5 text-destructive'
                       }`}
                     >
-                      <span className="font-medium">{competencyLabels[lv.level]}</span>
+                      <span className="font-medium">{dynamicLabels[lv.level] || lv.level}</span>
                       <span>{lv.count}/{lv.min}</span>
                     </div>
                   ))}
@@ -681,7 +684,7 @@ export default function QuestionBankPage() {
                     <TableCell className="text-sm font-medium">{skill?.skill_name ?? 'Unknown'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{q.topic_id ? (topicMap.get(q.topic_id) || '—') : '—'}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs font-normal">{competencyLabels[q.competency_level]}</Badge>
+                      <Badge variant="outline" className="text-xs font-normal">{dynamicLabels[q.competency_level] || q.competency_level}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs font-normal">
@@ -755,6 +758,7 @@ export default function QuestionBankPage() {
           skillName={skillMap.get(detailQuestion.skill_id)?.skill_name ?? 'Unknown'}
           topicName={detailQuestion.topic_id ? (topicMap.get(detailQuestion.topic_id) || null) : null}
           onClose={() => setDetailQuestion(null)}
+          levelLabels={dynamicLabels}
         />
       )}
 
@@ -768,14 +772,14 @@ export default function QuestionBankPage() {
             <SheetHeader>
               <SheetTitle>AI Generated Question</SheetTitle>
               <SheetDescription>
-                {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {competencyLabels[aiLevel as CompetencyLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
+                {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {dynamicLabels[aiLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
               </SheetDescription>
             </SheetHeader>
             <div className="space-y-4 mt-4 flex-1">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
                 <Badge variant="secondary" className="text-xs">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
-                <Badge variant="outline" className="text-xs">{competencyLabels[aiLevel as CompetencyLevel] || aiLevel}</Badge>
+                <Badge variant="outline" className="text-xs">{dynamicLabels[aiLevel] || aiLevel}</Badge>
                 {pItem.accepted ? (
                   <Badge className="text-xs border border-success/20 bg-success/15 text-success">Accepted</Badge>
                 ) : (
@@ -906,15 +910,15 @@ export default function QuestionBankPage() {
 
 // ─── Question Detail Sheet ───
 function QuestionDetailSheet({
-  question, skillName, topicName, onClose,
-}: { question: Question; skillName: string; topicName: string | null; onClose: () => void }) {
+  question, skillName, topicName, onClose, levelLabels,
+}: { question: Question; skillName: string; topicName: string | null; onClose: () => void; levelLabels: Record<string, string> }) {
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Question Details</SheetTitle>
           <SheetDescription>
-            {skillName}{topicName ? ` → ${topicName}` : ''} · {competencyLabels[question.competency_level]} · {questionTypeLabels[question.question_type]}
+            {skillName}{topicName ? ` → ${topicName}` : ''} · {levelLabels[question.competency_level] || question.competency_level} · {questionTypeLabels[question.question_type]}
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 mt-4">

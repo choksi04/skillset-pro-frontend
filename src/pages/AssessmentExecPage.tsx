@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useQuestionStore, competencyLabels, questionTypeLabels, Question } from '@/stores/questionStore';
+import { useQuestionStore, questionTypeLabels, Question, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -106,14 +106,16 @@ export default function AssessmentExecPage() {
   const navigate = useNavigate();
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts, pauseAttempt, resumeAttempt, retryEvaluation } = useAttemptStore();
-  const { questions, fetchQuestions } = useQuestionStore();
+  const { questions, settings, fetchQuestions, fetchSettings } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains();
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchSettings();
   }, []);
+
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
@@ -456,7 +458,7 @@ export default function AssessmentExecPage() {
                 {/* Question metadata */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs">{skillMap.get(currentAQ.skill_id)?.skill_name ?? 'Unknown'}</Badge>
-                  <Badge variant="outline" className="text-xs">{competencyLabels[currentAQ.target_level]}</Badge>
+                  <Badge variant="outline" className="text-xs">{dynamicLabels[currentAQ.target_level] || currentAQ.target_level}</Badge>
                   <Badge variant="outline" className="text-xs">{questionTypeLabels[currentQuestion.question_type]}</Badge>
                   <span className="text-xs text-muted-foreground ml-auto">Q{currentIdx + 1}/{currentQuestions.length}</span>
                 </div>

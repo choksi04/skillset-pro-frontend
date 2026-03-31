@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
-import { useQuestionStore, Question, competencyLevels, questionTypes, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
+import { useQuestionStore, Question, questionTypes, questionTypeLabels, getCompetencyLevels, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -71,10 +71,15 @@ interface QuestionFormSheetProps {
 }
 
 export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: QuestionFormSheetProps) {
-  const { addQuestion, updateQuestion } = useQuestionStore();
+  const { addQuestion, updateQuestion, settings, fetchSettings } = useQuestionStore();
   const { skills, topics, fetchTopicsForSkill } = useSkillStore();
   const { user } = useAuth();
   const activeSkills = skills.filter((s) => s.status === 'active');
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const dynamicLevels = useMemo(() => getCompetencyLevels(settings), [settings]);
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
 
   const [skillId, setSkillId] = useState('');
   const [topicId, setTopicId] = useState('');
@@ -255,7 +260,7 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
               <Select value={level} onValueChange={setLevel}>
                 <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
                 <SelectContent>
-                  {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+                  {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
                 </SelectContent>
               </Select>
               {errors.competency_level && <p className="text-xs text-destructive">{errors.competency_level}</p>}
