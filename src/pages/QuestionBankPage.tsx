@@ -642,7 +642,7 @@ export default function QuestionBankPage() {
                           : 'border-destructive/20 bg-destructive/5 text-destructive'
                       }`}
                     >
-                      <span className="font-medium">{competencyLabels[lv.level]}</span>
+                      <span className="font-medium">{dynamicLabels[lv.level] || lv.level}</span>
                       <span>{lv.count}/{lv.min}</span>
                     </div>
                   ))}
