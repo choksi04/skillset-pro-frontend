@@ -1,67 +1,79 @@
-# Plan: All Registries — Dual View Mode (By Skills / By Employee)
-
-## Overview
-
-Replace the current flat table on `/all-registries` with a **Switch toggle** offering two views:
-
-1. **Registry by Skills** — Aggregated skill-level view showing employee distribution across competency levels
-2. **Registry by Employee** — Employee-centric view with avg scores and click-through to detail
-
----
-
-## View 1: Registry by Skills
-
-**Table columns:**
 
 
-| Skill Name | Category | Employees | L1  | L2  | L3  | L4  | L5  | Avg Level |
-| ---------- | -------- | --------- | --- | --- | --- | --- | --- | --------- |
+# Plan: Replace Hardcoded Competency Levels with Dynamic Settings
 
+## Problem
 
-- **Employees**: Total distinct employees with a final level for that skill
-- **L1–L5**: Number of employees at each level (colored badges) — this is more actionable than just showing averages, as HR can instantly spot gaps (e.g., "0 employees at L4 for React")
-- **Avg Level**: Weighted average final level across all employees (e.g., 2.8)
-- Searchable by skill name, filterable by domain
-- Clicking a skill row could expand inline to show the employee breakdown (optional, phase 2)
-- CSV export adapts to this view
+Competency levels are hardcoded in `questionStore.ts` as a static type/array/map (`'beginner' | 'intermediate' | ...`). The `question_settings` table already stores the actual configurable levels (name, label, etc.), but forms, filters, and display components import the hardcoded constants instead.
 
-**Data source**: `officialEntries` grouped by `skill_id`, counting distinct `employee_id` per `final_level`.
+## Approach
 
----
+Make all competency level dropdowns, filters, and labels derive from `question_settings` data fetched from the database. Remove the hardcoded `competencyLevels` array and `competencyLabels` map as the source of truth.
 
-## View 2: Registry by Employee
+## Changes
 
-**Table columns:**
+### 1. `src/stores/questionStore.ts`
+- Keep `CompetencyLevel` as a broad `string` type (since settings are dynamic)
+- Replace the hardcoded `competencyLevels` array and `competencyLabels` map with **derived getters** from `settings`:
+  - `getCompetencyLevels()` → returns `settings.map(s => s.name)` (sorted by `level`)
+  - `getCompetencyLabels()` → returns `Record<string, string>` from `settings` (`name → label`)
+- Keep the old exports as deprecated fallbacks or remove them entirely
 
+### 2. `src/components/questions/QuestionFormSheet.tsx`
+- Import `settings` and `fetchSettings` from `useQuestionStore`
+- Call `fetchSettings()` on mount
+- Build level options from `settings` instead of `competencyLevels`/`competencyLabels`
 
-| Employee Name | Domain | Self Avg | Assessment Avg | Final Avg | Status |
-| ------------- | ------ | -------- | -------------- | --------- | ------ |
+### 3. `src/pages/QuestionBankPage.tsx`
+- Use `settings` for:
+  - AI generation level dropdown
+  - Filter level dropdown
+  - Coverage gap level iteration
+  - Badge labels (question detail, table rows, AI preview)
+- Call `fetchSettings()` alongside `fetchQuestions()`
 
+### 4. `src/pages/AssessmentExecPage.tsx`
+- Replace `competencyLabels[currentAQ.target_level]` with settings-derived label lookup
 
-- Employee names fetched from `users` table (same pattern as TeamRegistryPage)
-- Domain name resolved from submissions + domainStore
-- Scores: averaged from `officialEntries` grouped by `employee_id`
-- **Clickable rows** → navigate to `/team-registry/:submissionId` (reuse existing detail page)
-- Searchable by employee name, filterable by domain
+### 5. `src/components/assessment/EvalResults.tsx`
+- Replace `competencyLabels` usage with settings-derived lookup
 
-**Data source**: `officialEntries` grouped by `employee_id`, plus `submissions` for linking to detail page and resolving domain.
+### 6. `src/stores/assessmentStore.ts`
+- Replace hardcoded `levelToCompetency` map and `getTargetCompetencyLevels` function to use settings-based level names
+- Update `competencyToLevel` to be derived from settings
 
----
+## Technical Detail
 
-## UI Design
+A helper will be added to `questionStore.ts`:
 
-- **Switch component** at the top-right (next to Export button): `"By Skills"` / `"By Employee"` using the existing `Switch` or a `Tabs` component styled as pills
-- Search + domain filter remain shared across both views
-- Export CSV adjusts output based on active view
+```typescript
+// Derived from settings (fetched from question_settings table)
+export function getCompetencyLevels(settings: QuestionSetting[]): string[] {
+  return settings
+    .filter(s => s.status === 'active')
+    .sort((a, b) => a.level - b.level)
+    .map(s => s.name);
+}
 
----
+export function getCompetencyLabel(settings: QuestionSetting[], name: string): string {
+  return settings.find(s => s.name === name)?.label || name;
+}
 
-## Technical Changes
+export function getCompetencyLabelsMap(settings: QuestionSetting[]): Record<string, string> {
+  return Object.fromEntries(settings.map(s => [s.name, s.label]));
+}
+```
 
+All consuming components will call `fetchSettings()` on mount (idempotent — already guarded by `settingsLoaded` flag) and use these helpers.
 
-| File                              | Change                          |
-| --------------------------------- | ------------------------------- |
-| `src/pages/AllRegistriesPage.tsx` | Add `viewMode` state (`'skills' |
+## Files to Edit
 
+| File | Change |
+|------|--------|
+| `src/stores/questionStore.ts` | Add helper functions, deprecate hardcoded arrays |
+| `src/stores/assessmentStore.ts` | Use settings-derived level mappings |
+| `src/components/questions/QuestionFormSheet.tsx` | Use settings for level dropdown |
+| `src/pages/QuestionBankPage.tsx` | Use settings for filters, dropdowns, badges, coverage |
+| `src/pages/AssessmentExecPage.tsx` | Use settings for level badge |
+| `src/components/assessment/EvalResults.tsx` | Use settings for level badge |
 
-**No new files or routes needed** — this is a single-page enhancement. User name fetching follows the same Supabase query pattern already used in `TeamRegistryPage`.
