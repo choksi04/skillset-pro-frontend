@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
-import { Question, CompetencyLevel } from './questionStore';
+import { Question, CompetencyLevel, QuestionSetting } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
 import { getCurrentUserId } from '@/lib/audit';
 
