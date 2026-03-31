@@ -112,8 +112,10 @@ export default function AssessmentExecPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains();
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchSettings();
   }, []);
+
+  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
