@@ -778,7 +778,7 @@ export default function QuestionBankPage() {
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
                 <Badge variant="secondary" className="text-xs">{questionTypeLabels[aiQType as QuestionType] || aiQType}</Badge>
-                <Badge variant="outline" className="text-xs">{competencyLabels[aiLevel as CompetencyLevel] || aiLevel}</Badge>
+                <Badge variant="outline" className="text-xs">{dynamicLabels[aiLevel] || aiLevel}</Badge>
                 {pItem.accepted ? (
                   <Badge className="text-xs border border-success/20 bg-success/15 text-success">Accepted</Badge>
                 ) : (
