@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
-import { useQuestionStore, competencyLabels, questionTypeLabels } from '@/stores/questionStore';
+import { useQuestionStore, questionTypeLabels, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
 import { Badge } from '@/components/ui/badge';
