@@ -771,7 +771,7 @@ export default function QuestionBankPage() {
             <SheetHeader>
               <SheetTitle>AI Generated Question</SheetTitle>
               <SheetDescription>
-                {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {competencyLabels[aiLevel as CompetencyLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
+                {skillMap.get(aiSkillId)?.skill_name ?? 'Unknown'}{aiTopicId && topicMap.get(aiTopicId) ? ` → ${topicMap.get(aiTopicId)}` : ''} · {dynamicLabels[aiLevel] || aiLevel} · {questionTypeLabels[aiQType as QuestionType] || aiQType}
               </SheetDescription>
             </SheetHeader>
             <div className="space-y-4 mt-4 flex-1">
