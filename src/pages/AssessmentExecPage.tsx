@@ -106,7 +106,7 @@ export default function AssessmentExecPage() {
   const navigate = useNavigate();
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts, pauseAttempt, resumeAttempt, retryEvaluation } = useAttemptStore();
-  const { questions, fetchQuestions } = useQuestionStore();
+  const { questions, settings, fetchQuestions, fetchSettings } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
