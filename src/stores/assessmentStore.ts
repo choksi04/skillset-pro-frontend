@@ -156,12 +156,13 @@ export function generateAssessmentQuestions(
   publishedQuestions: Question[],
   maxPerSkill: number = 3,
   excludeIds: string[] = [],
+  settings: QuestionSetting[] = [],
 ): AssessmentQuestion[] {
   const selected: AssessmentQuestion[] = [];
   const usedIds = new Set(excludeIds);
 
   for (const { skill_id, rating } of ratings) {
-    const targetLevels = getTargetCompetencyLevels(rating);
+    const targetLevels = getTargetCompetencyLevels(rating, settings);
     const candidates = publishedQuestions.filter(
       (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level) && !usedIds.has(q.id)
     );
