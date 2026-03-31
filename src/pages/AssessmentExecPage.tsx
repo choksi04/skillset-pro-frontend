@@ -458,7 +458,7 @@ export default function AssessmentExecPage() {
                 {/* Question metadata */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs">{skillMap.get(currentAQ.skill_id)?.skill_name ?? 'Unknown'}</Badge>
-                  <Badge variant="outline" className="text-xs">{competencyLabels[currentAQ.target_level]}</Badge>
+                  <Badge variant="outline" className="text-xs">{dynamicLabels[currentAQ.target_level] || currentAQ.target_level}</Badge>
                   <Badge variant="outline" className="text-xs">{questionTypeLabels[currentQuestion.question_type]}</Badge>
                   <span className="text-xs text-muted-foreground ml-auto">Q{currentIdx + 1}/{currentQuestions.length}</span>
                 </div>

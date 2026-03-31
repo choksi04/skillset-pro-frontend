@@ -182,7 +182,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-foreground line-clamp-2">{question?.question_text ?? 'Question unavailable'}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            {aq && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{competencyLabels[aq.target_level]}</Badge>}
+                            {aq && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{dynamicLabels[aq.target_level] || aq.target_level}</Badge>}
                             {question && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{questionTypeLabels[question.question_type]}</Badge>}
                           </div>
                         </div>
