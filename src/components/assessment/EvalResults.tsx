@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
 import { useQuestionStore, questionTypeLabels, getCompetencyLabelsMap } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
