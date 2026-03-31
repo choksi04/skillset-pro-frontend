@@ -317,8 +317,8 @@ export default function QuestionBankPage() {
       skillCoverage[q.skill_id][q.competency_level] = (skillCoverage[q.skill_id][q.competency_level] || 0) + 1;
     }
     const filteredSkills = skillFilter === 'all' ? activeSkills : activeSkills.filter((s) => s.id === skillFilter);
-    const filteredLevels = levelFilter === 'all' ? competencyLevels : competencyLevels.filter((l) => l === levelFilter);
-    const result: { skillId: string; skillName: string; levels: { level: CompetencyLevel; count: number; min: number }[]; hasGaps: boolean }[] = [];
+    const filteredLevels = levelFilter === 'all' ? dynamicLevels : dynamicLevels.filter((l) => l === levelFilter);
+    const result: { skillId: string; skillName: string; levels: { level: string; count: number; min: number }[]; hasGaps: boolean }[] = [];
     for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
       const levels = filteredLevels.map((l) => {
