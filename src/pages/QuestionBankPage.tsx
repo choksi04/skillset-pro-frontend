@@ -481,7 +481,7 @@ export default function QuestionBankPage() {
                     <Select value={aiLevel} onValueChange={setAiLevel}>
                       <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
                       <SelectContent>
-                        {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+                        {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {aiErrors.competency_level && <p className="text-xs text-destructive">{aiErrors.competency_level}</p>}
