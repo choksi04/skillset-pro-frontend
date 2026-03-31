@@ -255,7 +255,14 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
   addAssessment: async (params) => {
     const { tenant_id, employee_id, submission_id, domain_id, cycle_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
-    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds);
+    // Fetch settings for dynamic competency level mapping
+    const { data: settingsData } = await supabase.from('question_settings').select('*').order('level');
+    const qSettings: QuestionSetting[] = (settingsData || []).map((s: any) => ({
+      id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
+      description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
+      min_questions: s.min_questions, status: s.status,
+    }));
+    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds, qSettings);
     const skillIds = [...new Set(ratings.map((r) => r.skill_id))];
     const durationMinutes = Math.max(30, assessmentQuestions.length * 10);
     const userId = getCurrentUserId();
