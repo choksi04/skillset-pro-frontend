@@ -580,7 +580,7 @@ export default function QuestionBankPage() {
           <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Level" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
-            {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+            {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
