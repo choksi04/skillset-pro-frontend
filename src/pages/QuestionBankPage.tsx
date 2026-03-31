@@ -909,8 +909,8 @@ export default function QuestionBankPage() {
 
 // ─── Question Detail Sheet ───
 function QuestionDetailSheet({
-  question, skillName, topicName, onClose,
-}: { question: Question; skillName: string; topicName: string | null; onClose: () => void }) {
+  question, skillName, topicName, onClose, levelLabels,
+}: { question: Question; skillName: string; topicName: string | null; onClose: () => void; levelLabels: Record<string, string> }) {
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
