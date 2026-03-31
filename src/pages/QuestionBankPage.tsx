@@ -758,6 +758,7 @@ export default function QuestionBankPage() {
           skillName={skillMap.get(detailQuestion.skill_id)?.skill_name ?? 'Unknown'}
           topicName={detailQuestion.topic_id ? (topicMap.get(detailQuestion.topic_id) || null) : null}
           onClose={() => setDetailQuestion(null)}
+          levelLabels={dynamicLabels}
         />
       )}
 
