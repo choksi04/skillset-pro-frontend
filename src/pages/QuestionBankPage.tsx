@@ -917,7 +917,7 @@ function QuestionDetailSheet({
         <SheetHeader>
           <SheetTitle>Question Details</SheetTitle>
           <SheetDescription>
-            {skillName}{topicName ? ` → ${topicName}` : ''}
+            {skillName}{topicName ? ` → ${topicName}` : ''} · {levelLabels[question.competency_level] || question.competency_level} · {questionTypeLabels[question.question_type]}
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 mt-4">
