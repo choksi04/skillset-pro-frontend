@@ -260,7 +260,7 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
               <Select value={level} onValueChange={setLevel}>
                 <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
                 <SelectContent>
-                  {competencyLevels.map((l) => <SelectItem key={l} value={l}>{competencyLabels[l]}</SelectItem>)}
+                  {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
                 </SelectContent>
               </Select>
               {errors.competency_level && <p className="text-xs text-destructive">{errors.competency_level}</p>}
