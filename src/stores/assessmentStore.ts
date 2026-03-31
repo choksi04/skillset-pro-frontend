@@ -15,30 +15,47 @@ export const assessmentStatusConfig: Record<string, { label: string; color: stri
   approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' },
 };
 
-// Rating level (1-5) to competency level name mapping
-const levelToCompetency: Record<number, CompetencyLevel> = {
-  1: 'beginner',
-  2: 'beginner',
-  3: 'intermediate',
-  4: 'advanced',
-  5: 'expert',
-};
+// Rating level (1-5) to competency level name mapping — now settings-aware
+function getLevelToCompetencyMap(settings: QuestionSetting[]): Record<number, CompetencyLevel> {
+  const active = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level);
+  if (active.length === 0) {
+    // Fallback if settings not loaded
+    return { 1: 'beginner', 2: 'beginner', 3: 'intermediate', 4: 'advanced', 5: 'expert' };
+  }
+  const map: Record<number, CompetencyLevel> = {};
+  for (const s of active) {
+    map[s.level] = s.name;
+  }
+  return map;
+}
 
-const competencyToLevel: Record<CompetencyLevel, number> = {
-  beginner: 1,
-  intermediate: 2,
-  advanced: 3,
-  expert: 4,
-  master: 5,
-};
+function getCompetencyToLevelMap(settings: QuestionSetting[]): Record<string, number> {
+  const active = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level);
+  if (active.length === 0) {
+    return { beginner: 1, intermediate: 2, advanced: 3, expert: 4, master: 5 };
+  }
+  return Object.fromEntries(active.map(s => [s.name, s.level]));
+}
 
 /**
  * For a self-rating of n, get target competency levels: n, n-1, n-2
  * Maps rating levels to competency level names.
  */
-function getTargetCompetencyLevels(rating: RatingLevel): CompetencyLevel[] {
-  const allLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
-  const primary = levelToCompetency[rating];
+function getTargetCompetencyLevels(rating: RatingLevel, settings: QuestionSetting[]): CompetencyLevel[] {
+  const levelMap = getLevelToCompetencyMap(settings);
+  const allLevels = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level).map(s => s.name);
+  if (allLevels.length === 0) {
+    // Fallback
+    const fallbackLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
+    const primary = { 1: 'beginner', 2: 'beginner', 3: 'intermediate', 4: 'advanced', 5: 'expert' }[rating] || 'beginner';
+    const primaryIdx = fallbackLevels.indexOf(primary);
+    const targets = new Set<CompetencyLevel>();
+    targets.add(primary);
+    if (primaryIdx - 1 >= 0) targets.add(fallbackLevels[primaryIdx - 1]);
+    if (primaryIdx - 2 >= 0) targets.add(fallbackLevels[primaryIdx - 2]);
+    return Array.from(targets);
+  }
+  const primary = levelMap[rating] || allLevels[0];
   const primaryIdx = allLevels.indexOf(primary);
   const targets = new Set<CompetencyLevel>();
   targets.add(primary);
