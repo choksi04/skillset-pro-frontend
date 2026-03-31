@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import {
-  useQuestionStore, Question, QuestionStatus, competencyLevels, questionTypes,
-  competencyLabels, questionTypeLabels, CompetencyLevel, QuestionType,
+  useQuestionStore, Question, QuestionStatus, questionTypes,
+  questionTypeLabels, CompetencyLevel, QuestionType,
+  getCompetencyLevels, getCompetencyLabelsMap,
 } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
