@@ -121,11 +121,12 @@ export async function validateQuestionAvailability(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
   minQuestionsPerSkill: number = 3,
+  settings: QuestionSetting[] = [],
 ): Promise<ValidationResult> {
   const issues: { skill_id: string; available: number; required: number }[] = [];
 
   for (const { skill_id, rating } of ratings) {
-    const targetLevels = getTargetCompetencyLevels(rating);
+    const targetLevels = getTargetCompetencyLevels(rating, settings);
     const candidates = publishedQuestions.filter(
       (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level)
     );
