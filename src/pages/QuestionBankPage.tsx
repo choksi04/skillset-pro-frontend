@@ -330,7 +330,7 @@ export default function QuestionBankPage() {
       if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
     return result;
-  }, [questions, activeSkills, settings, skillFilter, levelFilter]);
+  }, [questions, activeSkills, settings, skillFilter, levelFilter, dynamicLevels]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {
