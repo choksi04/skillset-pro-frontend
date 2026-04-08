@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
-import { Question, CompetencyLevel, QuestionSetting } from './questionStore';
+import { Question, CompetencyLevel } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
+import { CompetencyLevel as CompetencyLevelConfig, getLevelToCompetencyMap } from './competencyLevelStore';
 import { getCurrentUserId } from '@/lib/audit';
 
 export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'evaluated' | 'review_pending' | 'approved';
@@ -15,53 +16,13 @@ export const assessmentStatusConfig: Record<string, { label: string; color: stri
   approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' },
 };
 
-// Rating level (1-5) to competency level name mapping — now settings-aware
-function getLevelToCompetencyMap(settings: QuestionSetting[]): Record<number, CompetencyLevel> {
-  const active = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level);
-  if (active.length === 0) {
-    // Fallback if settings not loaded
-    return { 1: 'beginner', 2: 'beginner', 3: 'intermediate', 4: 'advanced', 5: 'expert' };
-  }
-  const map: Record<number, CompetencyLevel> = {};
-  for (const s of active) {
-    map[s.level] = s.name;
-  }
-  return map;
-}
-
-function getCompetencyToLevelMap(settings: QuestionSetting[]): Record<string, number> {
-  const active = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level);
-  if (active.length === 0) {
-    return { beginner: 1, intermediate: 2, advanced: 3, expert: 4, master: 5 };
-  }
-  return Object.fromEntries(active.map(s => [s.name, s.level]));
-}
-
 /**
- * For a self-rating of n, get target competency levels: n, n-1, n-2
- * Maps rating levels to competency level names.
+ * For a self-rating of n, get the target competency level name.
+ * Questions are picked ONLY from the exact level matching the rating.
  */
-function getTargetCompetencyLevels(rating: RatingLevel, settings: QuestionSetting[]): CompetencyLevel[] {
+function getTargetCompetencyLevel(rating: RatingLevel, settings: CompetencyLevelConfig[]): CompetencyLevel | null {
   const levelMap = getLevelToCompetencyMap(settings);
-  const allLevels = settings.filter(s => s.status === 'active').sort((a, b) => a.level - b.level).map(s => s.name);
-  if (allLevels.length === 0) {
-    // Fallback
-    const fallbackLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert'];
-    const primary = { 1: 'beginner', 2: 'beginner', 3: 'intermediate', 4: 'advanced', 5: 'expert' }[rating] || 'beginner';
-    const primaryIdx = fallbackLevels.indexOf(primary);
-    const targets = new Set<CompetencyLevel>();
-    targets.add(primary);
-    if (primaryIdx - 1 >= 0) targets.add(fallbackLevels[primaryIdx - 1]);
-    if (primaryIdx - 2 >= 0) targets.add(fallbackLevels[primaryIdx - 2]);
-    return Array.from(targets);
-  }
-  const primary = levelMap[rating] || allLevels[0];
-  const primaryIdx = allLevels.indexOf(primary);
-  const targets = new Set<CompetencyLevel>();
-  targets.add(primary);
-  if (primaryIdx - 1 >= 0) targets.add(allLevels[primaryIdx - 1]);
-  if (primaryIdx - 2 >= 0) targets.add(allLevels[primaryIdx - 2]);
-  return Array.from(targets);
+  return levelMap[rating] || null;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -115,20 +76,21 @@ export interface ValidationResult {
 }
 
 /**
- * Validate that enough published questions exist for each skill/level combo.
+ * Validate that enough published questions exist for each skill at the exact rated level.
  */
 export async function validateQuestionAvailability(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
   minQuestionsPerSkill: number = 3,
-  settings: QuestionSetting[] = [],
+  settings: CompetencyLevelConfig[] = [],
 ): Promise<ValidationResult> {
   const issues: { skill_id: string; available: number; required: number }[] = [];
 
   for (const { skill_id, rating } of ratings) {
-    const targetLevels = getTargetCompetencyLevels(rating, settings);
+    const targetLevel = getTargetCompetencyLevel(rating, settings);
+    if (!targetLevel) continue;
     const candidates = publishedQuestions.filter(
-      (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level)
+      (q) => q.skill_id === skill_id && q.competency_level === targetLevel
     );
     if (candidates.length < minQuestionsPerSkill) {
       issues.push({ skill_id, available: candidates.length, required: minQuestionsPerSkill });
@@ -146,25 +108,25 @@ export async function validateQuestionAvailability(
 }
 
 /**
- * Generate assessment questions using level-based selection:
- * For each skill rated at level n, pick questions at n, n-1, n-2.
- * Respects topic_id when available (prefers matching topics).
- * Deduplicates questions.
+ * Generate assessment questions: for each skill rated at level n,
+ * pick questions ONLY from level n (exact match).
  */
 export function generateAssessmentQuestions(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
   maxPerSkill: number = 3,
   excludeIds: string[] = [],
-  settings: QuestionSetting[] = [],
+  settings: CompetencyLevelConfig[] = [],
 ): AssessmentQuestion[] {
   const selected: AssessmentQuestion[] = [];
   const usedIds = new Set(excludeIds);
 
   for (const { skill_id, rating } of ratings) {
-    const targetLevels = getTargetCompetencyLevels(rating, settings);
+    const targetLevel = getTargetCompetencyLevel(rating, settings);
+    if (!targetLevel) continue;
+
     const candidates = publishedQuestions.filter(
-      (q) => q.skill_id === skill_id && targetLevels.includes(q.competency_level) && !usedIds.has(q.id)
+      (q) => q.skill_id === skill_id && q.competency_level === targetLevel && !usedIds.has(q.id)
     );
 
     // Prefer questions with matching topics first, then others
@@ -175,7 +137,7 @@ export function generateAssessmentQuestions(
     const picked = ordered.slice(0, maxPerSkill);
     for (const q of picked) {
       usedIds.add(q.id);
-      selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: q.competency_level });
+      selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: targetLevel });
     }
   }
   return selected;
@@ -228,20 +190,13 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
           }));
         const skillIds = [...new Set(aqs.map((q) => q.skill_id))];
         return {
-          id: a.id,
-          tenant_id: a.tenant_id,
-          employee_id: a.employee_id,
-          submission_id: a.submission_id,
-          domain_id: a.domain_id,
-          cycle_id: a.cycle_id ?? null,
-          is_reassessment: a.is_reassessment ?? false,
+          id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
+          submission_id: a.submission_id, domain_id: a.domain_id,
+          cycle_id: a.cycle_id ?? null, is_reassessment: a.is_reassessment ?? false,
           parent_assessment_id: a.parent_assessment_id ?? null,
-          skill_ids: skillIds,
-          assessment_questions: aqs,
-          status: a.status,
-          duration_minutes: a.duration_minutes,
-          created_at: a.created_at,
-          updated_at: a.updated_at,
+          skill_ids: skillIds, assessment_questions: aqs,
+          status: a.status, duration_minutes: a.duration_minutes,
+          created_at: a.created_at, updated_at: a.updated_at,
         };
       });
 
@@ -254,14 +209,14 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
   addAssessment: async (params) => {
     const { tenant_id, employee_id, submission_id, domain_id, cycle_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
-    // Fetch settings for dynamic competency level mapping
-    const { data: settingsData } = await supabase.from('question_settings').select('*').order('level');
-    const qSettings: QuestionSetting[] = (settingsData || []).map((s: any) => ({
+    // Fetch competency levels for dynamic mapping
+    const { data: levelsData } = await supabase.from('competency_levels').select('*').order('level');
+    const clSettings: CompetencyLevelConfig[] = (levelsData || []).map((s: any) => ({
       id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
       description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
       min_questions: s.min_questions, status: s.status,
     }));
-    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds, qSettings);
+    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds, clSettings);
     const skillIds = [...new Set(ratings.map((r) => r.skill_id))];
     const durationMinutes = Math.max(30, assessmentQuestions.length * 10);
     const userId = getCurrentUserId();
@@ -269,14 +224,9 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     const { data: row, error } = await supabase
       .from('assessments')
       .insert({
-        tenant_id,
-        employee_id,
-        submission_id,
-        domain_id,
-        cycle_id: cycle_id ?? null,
-        status: 'pending',
-        duration_minutes: durationMinutes,
-        created_by: userId,
+        tenant_id, employee_id, submission_id, domain_id,
+        cycle_id: cycle_id ?? null, status: 'pending',
+        duration_minutes: durationMinutes, created_by: userId,
       })
       .select()
       .single();
@@ -304,20 +254,11 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     }
 
     const newAssessment: Assessment = {
-      id: assessmentId,
-      tenant_id,
-      employee_id,
-      submission_id,
-      domain_id,
-      cycle_id: cycle_id ?? null,
-      is_reassessment: false,
-      parent_assessment_id: null,
-      skill_ids: skillIds,
-      assessment_questions: assessmentQuestions,
-      status: 'pending',
-      duration_minutes: durationMinutes,
-      created_at: (row as any).created_at,
-      updated_at: (row as any).updated_at,
+      id: assessmentId, tenant_id, employee_id, submission_id, domain_id,
+      cycle_id: cycle_id ?? null, is_reassessment: false, parent_assessment_id: null,
+      skill_ids: skillIds, assessment_questions: assessmentQuestions,
+      status: 'pending', duration_minutes: durationMinutes,
+      created_at: (row as any).created_at, updated_at: (row as any).updated_at,
     };
 
     set((state) => ({ assessments: [newAssessment, ...state.assessments] }));

@@ -3,8 +3,8 @@ import { z } from 'zod';
 import {
   useQuestionStore, Question, QuestionStatus, questionTypes,
   questionTypeLabels, CompetencyLevel, QuestionType,
-  getCompetencyLevels, getCompetencyLabelsMap,
 } from '@/stores/questionStore';
+import { useCompetencyLevelStore, getActiveLevelNames, getLevelLabelsMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -231,14 +231,15 @@ function FormattedQuestionContent({ text, guidelines, type }: {
 
 export default function QuestionBankPage() {
   const {
-    questions, settings, fetchQuestions, fetchSettings,
+    questions, fetchQuestions,
     toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
   } = useQuestionStore();
+  const { levels: clSettings, fetchLevels } = useCompetencyLevelStore();
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
   const { currentRole, user } = useAuth();
   const canEdit = currentRole === 'admin' || currentRole === 'manager';
 
-  useEffect(() => { fetchQuestions(); fetchSkills(); fetchSettings(); }, [fetchQuestions, fetchSkills, fetchSettings]);
+  useEffect(() => { fetchQuestions(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchSkills, fetchLevels]);
 
   // --- List state ---
   const [search, setSearch] = useState('');
@@ -275,8 +276,8 @@ export default function QuestionBankPage() {
 
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const dynamicLevels = useMemo(() => getCompetencyLevels(settings), [settings]);
-  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
+  const dynamicLevels = useMemo(() => getActiveLevelNames(clSettings), [clSettings]);
+  const dynamicLabels = useMemo(() => getLevelLabelsMap(clSettings), [clSettings]);
   const topicMap = useMemo(() => {
     const m = new Map<string, string>();
     Object.values(topics).flat().forEach((t) => m.set(t.id, t.name));
@@ -311,7 +312,7 @@ export default function QuestionBankPage() {
 
   // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
-    const minRequired = settings.length > 0 ? Math.min(...settings.map((s) => s.min_questions)) : 3;
+    const minRequired = clSettings.length > 0 ? Math.min(...clSettings.map((s) => s.min_questions)) : 3;
     const skillCoverage: Record<string, Record<string, number>> = {};
     for (const q of questions) {
       if (q.status === 'disabled') continue;
@@ -324,7 +325,7 @@ export default function QuestionBankPage() {
     for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
       const levels = filteredLevels.map((l) => {
-        const setting = settings.find((s) => s.name.toLowerCase() === l);
+        const setting = clSettings.find((s) => s.name.toLowerCase() === l);
         const min = setting?.min_questions ?? minRequired;
         return { level: l, count: counts[l] || 0, min };
       });
@@ -332,7 +333,7 @@ export default function QuestionBankPage() {
       if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
     return result;
-  }, [questions, activeSkills, settings, skillFilter, levelFilter, dynamicLevels]);
+  }, [questions, activeSkills, clSettings, skillFilter, levelFilter, dynamicLevels]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {

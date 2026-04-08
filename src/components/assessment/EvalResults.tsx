@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
-import { useQuestionStore, questionTypeLabels, getCompetencyLabelsMap } from '@/stores/questionStore';
+import { useQuestionStore, questionTypeLabels } from '@/stores/questionStore';
+import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
 import { Badge } from '@/components/ui/badge';
@@ -31,13 +32,14 @@ function parseMCQForDisplay(questionText: string) {
 }
 
 export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
-  const { questions, settings, fetchSettings } = useQuestionStore();
+  const { questions } = useQuestionStore();
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { skills } = useSkillStore();
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
+  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => { fetchLevels(); }, [fetchLevels]);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

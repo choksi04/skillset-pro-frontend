@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from './questionStore';
+import { CompetencyLevel as CompetencyLevelConfig, scoreToLevelDynamic } from './competencyLevelStore';
 import { getCurrentUserId } from '@/lib/audit';
 
 export interface AnswerEntry {
@@ -30,6 +31,31 @@ export interface SkillScore {
   question_count: number;
 }
 
+/**
+ * Dynamic scoreToLevel: fetches competency levels from DB and uses score ranges.
+ * Falls back to hardcoded thresholds if fetch fails.
+ */
+async function fetchAndScoreToLevel(score: number): Promise<number> {
+  try {
+    const { data } = await supabase.from('competency_levels').select('*').eq('status', 'active').order('level');
+    if (data && data.length > 0) {
+      const levels: CompetencyLevelConfig[] = data.map((s: any) => ({
+        id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
+        description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
+        min_questions: s.min_questions, status: s.status,
+      }));
+      return scoreToLevelDynamic(levels, score);
+    }
+  } catch { /* fallback */ }
+  // Absolute fallback
+  if (score >= 90) return 5;
+  if (score >= 75) return 4;
+  if (score >= 60) return 3;
+  if (score >= 40) return 2;
+  return 1;
+}
+
+/** @deprecated Use scoreToLevelDynamic from competencyLevelStore instead */
 export function scoreToLevel(score: number): number {
   if (score >= 90) return 5;
   if (score >= 75) return 4;
@@ -100,10 +126,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       }
 
       const attempts: AssessmentAttempt[] = (attemptRows || []).map((a: any) => ({
-        id: a.id,
-        assessment_id: a.assessment_id,
-        tenant_id: a.tenant_id,
-        employee_id: a.employee_id,
+        id: a.id, assessment_id: a.assessment_id, tenant_id: a.tenant_id, employee_id: a.employee_id,
         answers: answerRows
           .filter((ans: any) => ans.attempt_id === a.id)
           .map((ans: any) => ({ question_id: ans.question_id, answer_text: ans.answer_text, time_spent_seconds: ans.time_spent_seconds })),
@@ -119,13 +142,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
             skill_id: ss.skill_id, avg_score: ss.avg_score,
             calculated_level: ss.calculated_level, question_count: ss.question_count,
           })),
-        total_ai_score: a.total_ai_score,
-        status: a.status,
-        started_at: a.started_at,
-        submitted_at: a.submitted_at,
-        evaluated_at: a.evaluated_at,
-        paused_at: a.paused_at ?? null,
-        remaining_seconds: a.remaining_seconds ?? null,
+        total_ai_score: a.total_ai_score, status: a.status,
+        started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
+        paused_at: a.paused_at ?? null, remaining_seconds: a.remaining_seconds ?? null,
       }));
 
       set({ attempts, loading: false, initialized: true });
@@ -164,7 +183,6 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
 
   saveAnswer: async (attemptId, answer) => {
     const userId = getCurrentUserId();
-    // Upsert: delete old then insert new
     await supabase.from('attempt_answers').delete()
       .eq('attempt_id', attemptId).eq('question_id', answer.question_id);
 
@@ -216,7 +234,6 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     const now = new Date().toISOString();
     const userId = getCurrentUserId();
 
-    // First set status to submitted
     await supabase.from('assessment_attempts').update({
       status: 'submitted', submitted_at: now, paused_at: null,
       modified_by: userId, modified_at: now,
@@ -228,15 +245,12 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       ),
     }));
 
-    // Call edge function for AI evaluation
     try {
       const answersPayload = attempt.answers.map((ans) => {
         const q = questionMap.get(ans.question_id);
         return {
-          question_id: ans.question_id,
-          answer_text: ans.answer_text,
-          question_text: q?.question_text ?? '',
-          question_type: q?.question_type ?? 'scenario',
+          question_id: ans.question_id, answer_text: ans.answer_text,
+          question_text: q?.question_text ?? '', question_type: q?.question_type ?? 'scenario',
           evaluation_guidelines: q?.evaluation_guidelines ?? '',
           skill_id: assessmentQuestions.find((aq) => aq.question_id === ans.question_id)?.skill_id ?? '',
         };
@@ -254,7 +268,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         ? Math.round(evaluations.reduce((sum: number, e: AIEvaluation) => sum + e.score, 0) / evaluations.length)
         : 0;
 
-      // Calculate skill scores
+      // Calculate skill scores using dynamic level mapping
       const skillScoreMap: Record<string, { total: number; count: number }> = {};
       for (const ev of evaluations) {
         const aq = assessmentQuestions.find((q) => q.question_id === ev.question_id);
@@ -263,10 +277,15 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         skillScoreMap[skillId].total += ev.score;
         skillScoreMap[skillId].count += 1;
       }
-      const skillScores: SkillScore[] = Object.entries(skillScoreMap).map(([skill_id, { total, count }]) => {
+
+      // Use dynamic scoreToLevel
+      const skillScoreEntries = Object.entries(skillScoreMap);
+      const skillScores: SkillScore[] = [];
+      for (const [skill_id, { total, count }] of skillScoreEntries) {
         const avg_score = Math.round(total / count);
-        return { skill_id, avg_score, calculated_level: scoreToLevel(avg_score), question_count: count };
-      });
+        const calculated_level = await fetchAndScoreToLevel(avg_score);
+        skillScores.push({ skill_id, avg_score, calculated_level, question_count: count });
+      }
 
       // Clean previous data and write new
       await Promise.all([
@@ -314,7 +333,6 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       }));
     } catch (err) {
       console.error('AI evaluation failed:', err);
-      // Status stays as 'submitted' — user can retry
     }
   },
 
@@ -322,7 +340,6 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     const attempt = get().attempts.find((a) => a.id === attemptId);
     if (!attempt || attempt.status !== 'submitted') return;
 
-    // Re-use submitAttempt logic but reset status first
     const userId = getCurrentUserId();
     await supabase.from('assessment_attempts').update({
       status: 'in_progress', modified_by: userId, modified_at: new Date().toISOString(),
