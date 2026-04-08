@@ -193,9 +193,15 @@ export default function ReviewCyclesPage() {
       details: gaps.length > 0 ? gaps : ['All skill/level/type combinations covered'],
     });
 
-    // 3. Assigned employees
-    const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
-    const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
+    // 3. Assigned employees — check both assignment table AND legacy domain_id on users
+    const [assignmentRes, directUsersRes] = await Promise.all([
+      supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId),
+      supabase.from('users').select('domain_id').eq('tenant_id', tenantId).eq('status', 'active').not('domain_id', 'is', null),
+    ]);
+    const assignedDomainIds = new Set([
+      ...(assignmentRes.data || []).map((a: any) => a.domain_id),
+      ...(directUsersRes.data || []).map((u: any) => u.domain_id),
+    ]);
     const domainsWithoutEmployees = selectedDomainObjs.filter(d => !assignedDomainIds.has(d.id));
     checks.push({
       label: 'All selected domains have assigned employees',
