@@ -612,6 +612,49 @@ export default function ReviewCyclesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Readiness Check Dialog */}
+      <AlertDialog open={readinessOpen} onOpenChange={(open) => { if (!open) { setReadinessOpen(false); setReadinessTarget(null); } }}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ClipboardCheck size={18} /> Pre-Activation Readiness Check
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Review the checklist below before activating this cycle.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {readinessLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Running checks…</div>
+          ) : (
+            <div className="space-y-2 my-2 max-h-64 overflow-y-auto">
+              {readinessChecks.map((check, i) => (
+                <div key={i} className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                  {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
+                  <div>
+                    <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                    {check.detail && <p className="text-xs text-muted-foreground mt-0.5">{check.detail}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {!readinessLoading && (
+              <AlertDialogAction
+                onClick={() => {
+                  setReadinessOpen(false);
+                  setConfirmActivate(readinessTarget);
+                }}
+                disabled={readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')}
+              >
+                Proceed to Activate
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
