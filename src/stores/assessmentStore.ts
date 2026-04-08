@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Question, CompetencyLevel } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
 import { CompetencyLevel as CompetencyLevelConfig, getLevelToCompetencyMap } from './competencyLevelStore';
+import { AssessmentConfig, getQuestionLimits } from './assessmentConfigStore';
 import { getCurrentUserId } from '@/lib/audit';
 
 export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'evaluated' | 'review_pending' | 'approved';
@@ -23,15 +24,6 @@ export const assessmentStatusConfig: Record<string, { label: string; color: stri
 function getTargetCompetencyLevel(rating: RatingLevel, settings: CompetencyLevelConfig[]): CompetencyLevel | null {
   const levelMap = getLevelToCompetencyMap(settings);
   return levelMap[rating] || null;
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 export interface AssessmentQuestion {
@@ -72,28 +64,35 @@ export interface GenerateAssessmentParams {
 export interface ValidationResult {
   valid: boolean;
   message?: string;
-  details?: { skill_id: string; skill_name?: string; available: number; required: number }[];
+  details?: { skill_id: string; skill_name?: string; available: number; required: number; question_type?: string }[];
 }
 
 /**
- * Validate that enough published questions exist for each skill at the exact rated level.
+ * Validate that enough published questions exist for each skill at the exact rated level,
+ * broken down by question type using assessment config limits.
  */
 export async function validateQuestionAvailability(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
-  minQuestionsPerSkill: number = 3,
   settings: CompetencyLevelConfig[] = [],
+  configs: AssessmentConfig[] = [],
 ): Promise<ValidationResult> {
-  const issues: { skill_id: string; available: number; required: number }[] = [];
+  const issues: { skill_id: string; available: number; required: number; question_type?: string }[] = [];
+  const questionTypes = ['mcq', 'scenario', 'coding'];
 
   for (const { skill_id, rating } of ratings) {
     const targetLevel = getTargetCompetencyLevel(rating, settings);
     if (!targetLevel) continue;
-    const candidates = publishedQuestions.filter(
-      (q) => q.skill_id === skill_id && q.competency_level === targetLevel
-    );
-    if (candidates.length < minQuestionsPerSkill) {
-      issues.push({ skill_id, available: candidates.length, required: minQuestionsPerSkill });
+
+    for (const qType of questionTypes) {
+      const { min } = getQuestionLimits(configs, qType);
+      if (min <= 0) continue;
+      const candidates = publishedQuestions.filter(
+        (q) => q.skill_id === skill_id && q.competency_level === targetLevel && q.question_type === qType
+      );
+      if (candidates.length < min) {
+        issues.push({ skill_id, available: candidates.length, required: min, question_type: qType });
+      }
     }
   }
 
@@ -108,36 +107,42 @@ export async function validateQuestionAvailability(
 }
 
 /**
- * Generate assessment questions: for each skill rated at level n,
- * pick questions ONLY from level n (exact match).
+ * Generate assessment questions using assessment config limits per question type.
+ * For each skill rated at level n, pick questions ONLY from level n (exact match).
+ * For each question type, pick between min and max questions as per config.
+ * Questions are picked deterministically by created_at order.
  */
 export function generateAssessmentQuestions(
   ratings: SkillSelfRating[],
   publishedQuestions: Question[],
-  maxPerSkill: number = 3,
+  _maxPerSkill: number = 3, // kept for backward compat but now uses config
   excludeIds: string[] = [],
   settings: CompetencyLevelConfig[] = [],
+  configs: AssessmentConfig[] = [],
 ): AssessmentQuestion[] {
   const selected: AssessmentQuestion[] = [];
   const usedIds = new Set(excludeIds);
+  const questionTypes = ['mcq', 'scenario', 'coding'];
 
   for (const { skill_id, rating } of ratings) {
     const targetLevel = getTargetCompetencyLevel(rating, settings);
     if (!targetLevel) continue;
 
-    const candidates = publishedQuestions.filter(
-      (q) => q.skill_id === skill_id && q.competency_level === targetLevel && !usedIds.has(q.id)
-    );
+    for (const qType of questionTypes) {
+      const { min, max } = getQuestionLimits(configs, qType);
+      const targetCount = Math.max(min, Math.min(max, min)); // use min as target, up to max
 
-    // Prefer questions with matching topics first, then others
-    const withTopic = candidates.filter((q) => q.topic_id);
-    const withoutTopic = candidates.filter((q) => !q.topic_id);
-    const ordered = [...shuffle(withTopic), ...shuffle(withoutTopic)];
+      const candidates = publishedQuestions
+        .filter(
+          (q) => q.skill_id === skill_id && q.competency_level === targetLevel && q.question_type === qType && !usedIds.has(q.id)
+        )
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-    const picked = ordered.slice(0, maxPerSkill);
-    for (const q of picked) {
-      usedIds.add(q.id);
-      selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: targetLevel });
+      const picked = candidates.slice(0, targetCount);
+      for (const q of picked) {
+        usedIds.add(q.id);
+        selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: targetLevel });
+      }
     }
   }
   return selected;
