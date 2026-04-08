@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useQuestionStore } from '@/stores/questionStore';
-import { useAssessmentStore } from '@/stores/assessmentStore';
+import { useCycleStore } from '@/stores/cycleStore';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Circle } from 'lucide-react';
 
@@ -15,22 +15,32 @@ const setupSteps = [
 ] as const;
 
 export default function SetupProgress() {
-  const { skills } = useSkillStore();
-  const { domains, mappings } = useDomainStore();
-  const { questions } = useQuestionStore();
-  const { assessments } = useAssessmentStore();
+  const { skills, initialized: skillsInit, fetchSkills } = useSkillStore();
+  const { domains, mappings, initialized: domainsInit, fetchDomains } = useDomainStore();
+  const { questions, initialized: questionsInit, fetchQuestions } = useQuestionStore();
+  const { cycles, initialized: cyclesInit, fetchCycles } = useCycleStore();
+
+  useEffect(() => {
+    if (!skillsInit) fetchSkills();
+    if (!domainsInit) fetchDomains();
+    if (!questionsInit) fetchQuestions();
+    if (!cyclesInit) fetchCycles();
+  }, [skillsInit, domainsInit, questionsInit, cyclesInit, fetchSkills, fetchDomains, fetchQuestions, fetchCycles]);
+
+  const allLoaded = skillsInit && domainsInit && questionsInit && cyclesInit;
 
   const completion = useMemo(() => ({
     skills: skills.length > 0,
     domains: domains.length > 0,
     mappings: mappings.length > 0,
     questions: questions.length > 0,
-    cycle: assessments.length > 0,
-  }), [skills, domains, mappings, questions, assessments]);
+    cycle: cycles.some(c => c.status === 'active' || c.status === 'closed'),
+  }), [skills, domains, mappings, questions, cycles]);
 
   const done = Object.values(completion).filter(Boolean).length;
   const total = setupSteps.length;
 
+  if (!allLoaded) return null;
   if (done === total) return null;
 
   return (
