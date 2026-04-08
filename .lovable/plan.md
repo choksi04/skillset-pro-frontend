@@ -1,79 +1,60 @@
 
 
-# Plan: Replace Hardcoded Competency Levels with Dynamic Settings
+# Comprehensive System Fix & Enhancement Plan
 
-## Problem
+## ✅ Phase 1: Critical Bugs & Data Freshness — COMPLETED
 
-Competency levels are hardcoded in `questionStore.ts` as a static type/array/map (`'beginner' | 'intermediate' | ...`). The `question_settings` table already stores the actual configurable levels (name, label, etc.), but forms, filters, and display components import the hardcoded constants instead.
+### 1A. ✅ Remove Hard-Caching from all stores
+All 8 Zustand stores now always re-fetch from DB (removed `initialized` early-return guards).
 
-## Approach
+### 1B. ✅ Fix MCQ Scoring Bug
+Rewrote `evaluateMCQ` to parse `correctIndex` from `question_text` JSON. Falls back to `evaluation_guidelines` regex. Converts user letter (A-D) to index for comparison.
 
-Make all competency level dropdowns, filters, and labels derive from `question_settings` data fetched from the database. Remove the hardcoded `competencyLevels` array and `competencyLabels` map as the source of truth.
+### 1C. ✅ Hide Expected Output in Coding Questions
+Removed "Expected Output" section from `AssessmentExecPage.tsx` coding question display.
 
-## Changes
+### 1D. ✅ Fix Domain Skill Re-mapping Bug
+Resolved by Phase 1A — store now always refreshes from DB including soft-deleted mappings.
 
-### 1. `src/stores/questionStore.ts`
-- Keep `CompetencyLevel` as a broad `string` type (since settings are dynamic)
-- Replace the hardcoded `competencyLevels` array and `competencyLabels` map with **derived getters** from `settings`:
-  - `getCompetencyLevels()` → returns `settings.map(s => s.name)` (sorted by `level`)
-  - `getCompetencyLabels()` → returns `Record<string, string>` from `settings` (`name → label`)
-- Keep the old exports as deprecated fallbacks or remove them entirely
+### 1E. ✅ Multi-Select Publish for Questions
+Added `bulkPublish` to `questionStore.ts`, checkbox selection column + bulk "Publish Selected" action bar to `QuestionBankPage.tsx`.
 
-### 2. `src/components/questions/QuestionFormSheet.tsx`
-- Import `settings` and `fetchSettings` from `useQuestionStore`
-- Call `fetchSettings()` on mount
-- Build level options from `settings` instead of `competencyLevels`/`competencyLabels`
+### 1F. ✅ Improved AI Scoring Accuracy
+Updated evaluate-assessment edge function with more detailed scoring rubric, step-by-step reasoning requirements, and stricter scoring guide.
 
-### 3. `src/pages/QuestionBankPage.tsx`
-- Use `settings` for:
-  - AI generation level dropdown
-  - Filter level dropdown
-  - Coverage gap level iteration
-  - Badge labels (question detail, table rows, AI preview)
-- Call `fetchSettings()` alongside `fetchQuestions()`
+---
 
-### 4. `src/pages/AssessmentExecPage.tsx`
-- Replace `competencyLabels[currentAQ.target_level]` with settings-derived label lookup
+## Phase 2: Rename `question_settings` → `competency_levels` Table
 
-### 5. `src/components/assessment/EvalResults.tsx`
-- Replace `competencyLabels` usage with settings-derived lookup
+### 2A. Database Migration
+- Rename table `question_settings` to `competency_levels`
 
-### 6. `src/stores/assessmentStore.ts`
-- Replace hardcoded `levelToCompetency` map and `getTargetCompetencyLevels` function to use settings-based level names
-- Update `competencyToLevel` to be derived from settings
+### 2B. Code Updates
+- Rename `QuestionSetting` type to `CompetencyLevel` across all stores
+- Update all Supabase queries from `.from('question_settings')` to `.from('competency_levels')`
+- Update all imports across files that reference `QuestionSetting` or `fetchSettings`
 
-## Technical Detail
+### 2C. Scan and Remove Hardcoded Values
+- Fallback competency maps in `assessmentStore.ts`
+- `ratingLabels` and `ratingDescriptions` in `registryStore.ts`
+- `scoreToLevel` thresholds in `attemptStore.ts`
+- Deprecated `competencyLevels` and `competencyLabels` exports in `questionStore.ts`
 
-A helper will be added to `questionStore.ts`:
+---
 
-```typescript
-// Derived from settings (fetched from question_settings table)
-export function getCompetencyLevels(settings: QuestionSetting[]): string[] {
-  return settings
-    .filter(s => s.status === 'active')
-    .sort((a, b) => a.level - b.level)
-    .map(s => s.name);
-}
+## Phase 3: Assessment Config & Predictable Question Selection
 
-export function getCompetencyLabel(settings: QuestionSetting[], name: string): string {
-  return settings.find(s => s.name === name)?.label || name;
-}
+### 3A. New `assessment_config` Table
+### 3B. Assessment Config Admin UI
+### 3C. Rewrite Question Selection Logic (exact level match, per-type min/max)
+### 3D. Pre-Validation Before Cycle Activation
+### 3E. Improve AI Scoring Accuracy
 
-export function getCompetencyLabelsMap(settings: QuestionSetting[]): Record<string, string> {
-  return Object.fromEntries(settings.map(s => [s.name, s.label]));
-}
-```
+---
 
-All consuming components will call `fetchSettings()` on mount (idempotent — already guarded by `settingsLoaded` flag) and use these helpers.
+## Phase 4: Review Cycle Prerequisites, Flexibility & Manual Overrides
 
-## Files to Edit
-
-| File | Change |
-|------|--------|
-| `src/stores/questionStore.ts` | Add helper functions, deprecate hardcoded arrays |
-| `src/stores/assessmentStore.ts` | Use settings-derived level mappings |
-| `src/components/questions/QuestionFormSheet.tsx` | Use settings for level dropdown |
-| `src/pages/QuestionBankPage.tsx` | Use settings for filters, dropdowns, badges, coverage |
-| `src/pages/AssessmentExecPage.tsx` | Use settings for level badge |
-| `src/components/assessment/EvalResults.tsx` | Use settings for level badge |
-
+### 4A. Review Cycle Activation Prerequisites Checklist
+### 4B. Domain Selection for Cycle Activation
+### 4C. Dynamic Employee Eligibility
+### 4D. Manual Override Capabilities
