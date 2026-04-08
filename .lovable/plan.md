@@ -1,79 +1,28 @@
+# Plan: Truncate All Database Tables
 
+## What This Does
 
-# Plan: Replace Hardcoded Competency Levels with Dynamic Settings
+Clears all data from every table in the database so you can start fresh. This is irreversible.
 
-## Problem
+## Execution Order
 
-Competency levels are hardcoded in `questionStore.ts` as a static type/array/map (`'beginner' | 'intermediate' | ...`). The `question_settings` table already stores the actual configurable levels (name, label, etc.), but forms, filters, and display components import the hardcoded constants instead.
+Tables must be truncated in dependency order (child tables first) to avoid constraint issues:
 
-## Approach
-
-Make all competency level dropdowns, filters, and labels derive from `question_settings` data fetched from the database. Remove the hardcoded `competencyLevels` array and `competencyLabels` map as the source of truth.
-
-## Changes
-
-### 1. `src/stores/questionStore.ts`
-- Keep `CompetencyLevel` as a broad `string` type (since settings are dynamic)
-- Replace the hardcoded `competencyLevels` array and `competencyLabels` map with **derived getters** from `settings`:
-  - `getCompetencyLevels()` → returns `settings.map(s => s.name)` (sorted by `level`)
-  - `getCompetencyLabels()` → returns `Record<string, string>` from `settings` (`name → label`)
-- Keep the old exports as deprecated fallbacks or remove them entirely
-
-### 2. `src/components/questions/QuestionFormSheet.tsx`
-- Import `settings` and `fetchSettings` from `useQuestionStore`
-- Call `fetchSettings()` on mount
-- Build level options from `settings` instead of `competencyLevels`/`competencyLabels`
-
-### 3. `src/pages/QuestionBankPage.tsx`
-- Use `settings` for:
-  - AI generation level dropdown
-  - Filter level dropdown
-  - Coverage gap level iteration
-  - Badge labels (question detail, table rows, AI preview)
-- Call `fetchSettings()` alongside `fetchQuestions()`
-
-### 4. `src/pages/AssessmentExecPage.tsx`
-- Replace `competencyLabels[currentAQ.target_level]` with settings-derived label lookup
-
-### 5. `src/components/assessment/EvalResults.tsx`
-- Replace `competencyLabels` usage with settings-derived lookup
-
-### 6. `src/stores/assessmentStore.ts`
-- Replace hardcoded `levelToCompetency` map and `getTargetCompetencyLevels` function to use settings-based level names
-- Update `competencyToLevel` to be derived from settings
+1. **Leaf tables first**: `ai_evaluations`, `attempt_answers`, `attempt_skill_scores`, `review_skill_entries`, `skill_self_ratings`, `notifications`, `reassessment_requests`, `official_skill_entries`
+2. **Mid-level**: `assessment_questions`, `assessment_attempts`, `manager_reviews`
+3. **Parent-level**: `assessments`, `skill_registry_submissions`, `employee_domain_assignments`
+4. **Core config**: `questions`, `skill_topics`, `domain_skill_mappings`, `domains`, `skills`, `skill_categories`, `review_cycles`, `users`
+5. **Settings** (preserve or clear): `question_settings` — this contains your competency level configuration. I recommend **keeping** this data.
 
 ## Technical Detail
 
-A helper will be added to `questionStore.ts`:
+Since there are no foreign key constraints defined in the database, a single `DELETE FROM` per table will work. This will be executed using the data insert tool (which supports DELETE operations).
 
-```typescript
-// Derived from settings (fetched from question_settings table)
-export function getCompetencyLevels(settings: QuestionSetting[]): string[] {
-  return settings
-    .filter(s => s.status === 'active')
-    .sort((a, b) => a.level - b.level)
-    .map(s => s.name);
-}
+## What Will NOT Be Touched
 
-export function getCompetencyLabel(settings: QuestionSetting[], name: string): string {
-  return settings.find(s => s.name === name)?.label || name;
-}
-
-export function getCompetencyLabelsMap(settings: QuestionSetting[]): Record<string, string> {
-  return Object.fromEntries(settings.map(s => [s.name, s.label]));
-}
-```
-
-All consuming components will call `fetchSettings()` on mount (idempotent — already guarded by `settingsLoaded` flag) and use these helpers.
-
-## Files to Edit
-
-| File | Change |
-|------|--------|
-| `src/stores/questionStore.ts` | Add helper functions, deprecate hardcoded arrays |
-| `src/stores/assessmentStore.ts` | Use settings-derived level mappings |
-| `src/components/questions/QuestionFormSheet.tsx` | Use settings for level dropdown |
-| `src/pages/QuestionBankPage.tsx` | Use settings for filters, dropdowns, badges, coverage |
-| `src/pages/AssessmentExecPage.tsx` | Use settings for level badge |
-| `src/components/assessment/EvalResults.tsx` | Use settings for level badge |
-
+- `question_settings` — preserves your L1–L5 competency level configuration (unless you want this cleared too)
+- Database schema, functions, triggers — unchanged
+- Keep the demo accounts as well.
+  - Admin
+  - John Emp
+  - John Manager
