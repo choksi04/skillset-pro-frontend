@@ -813,13 +813,18 @@ export default function ReviewCyclesPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {statusBadgeSmall(emp.status)}
                       {emp.status === 'draft' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => handleForceSubmit(emp)}
-                        >
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => handleForceSubmit(emp)}>
                           <Upload size={12} /> Force Submit
+                        </Button>
+                      )}
+                      {emp.status === 'submitted' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => handleGenerateAssessment(emp)}>
+                          <Zap size={12} /> Generate Assessment
+                        </Button>
+                      )}
+                      {emp.status === 'assessment_generated' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-warning" onClick={() => handleResetSubmission(emp)}>
+                          <RotateCcw size={12} /> Reset to Submitted
                         </Button>
                       )}
                     </div>
