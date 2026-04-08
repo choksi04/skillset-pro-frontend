@@ -4,10 +4,12 @@ import { getCurrentUserId } from '@/lib/audit';
 
 export type RatingLevel = 1 | 2 | 3 | 4 | 5;
 
+/** @deprecated Use getRatingLabels from competencyLevelStore instead */
 export const ratingLabels: Record<RatingLevel, string> = {
   1: 'Basic Awareness', 2: 'Working Knowledge', 3: 'Independent Contributor', 4: 'Advanced', 5: 'Expert',
 };
 
+/** @deprecated Use getRatingDescriptions from competencyLevelStore instead */
 export const ratingDescriptions: Record<RatingLevel, string> = {
   1: 'Aware of concepts but needs guidance for most tasks',
   2: 'Can perform basic tasks with some supervision',

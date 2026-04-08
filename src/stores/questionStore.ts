@@ -21,28 +21,11 @@ export interface Question {
   updated_at: string;
 }
 
-export interface QuestionSetting {
-  id: string;
-  tenant_id: string;
-  level: number;
-  name: string;
-  label: string;
-  description: string;
-  score_range_min: number;
-  score_range_max: number;
-  min_questions: number;
-  status: string;
-}
-
 interface QuestionStore {
   questions: Question[];
-  settings: QuestionSetting[];
   loading: boolean;
   initialized: boolean;
-  settingsLoaded: boolean;
   fetchQuestions: () => Promise<void>;
-  fetchSettings: () => Promise<void>;
-  updateSetting: (id: string, updates: Partial<QuestionSetting>) => Promise<void>;
   addQuestion: (q: Omit<Question, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   addQuestions: (qs: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
@@ -55,10 +38,8 @@ interface QuestionStore {
 
 export const useQuestionStore = create<QuestionStore>((set, get) => ({
   questions: [],
-  settings: [],
   loading: false,
   initialized: false,
-  settingsLoaded: false,
 
   fetchQuestions: async () => {
     set({ loading: true });
@@ -84,36 +65,6 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       console.error('Failed to fetch questions:', err);
       set({ loading: false, initialized: true });
     }
-  },
-
-  fetchSettings: async () => {
-    try {
-      const { data, error } = await supabase
-        .from('question_settings')
-        .select('*')
-        .order('level');
-      if (error) throw error;
-      const settings: QuestionSetting[] = (data || []).map((s: any) => ({
-        id: s.id, tenant_id: s.tenant_id, level: s.level,
-        name: s.name, label: s.label, description: s.description || '',
-        score_range_min: s.score_range_min, score_range_max: s.score_range_max,
-        min_questions: s.min_questions, status: s.status,
-      }));
-      set({ settings, settingsLoaded: true });
-    } catch (err) {
-      console.error('Failed to fetch question settings:', err);
-    }
-  },
-
-  updateSetting: async (id, updates) => {
-    const userId = getCurrentUserId();
-    const { error } = await supabase.from('question_settings').update({
-      ...updates, modified_at: new Date().toISOString(), modified_by: userId,
-    }).eq('id', id);
-    if (error) { console.error('Failed to update setting:', error); return; }
-    set((state) => ({
-      settings: state.settings.map((s) => s.id === id ? { ...s, ...updates } : s),
-    }));
   },
 
   addQuestion: async (q) => {
@@ -221,37 +172,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 }));
 
-/** @deprecated Use getCompetencyLevels(settings) instead */
-export const competencyLevels: CompetencyLevel[] = ['beginner', 'intermediate', 'advanced', 'expert', 'master'];
 export const questionTypes: QuestionType[] = ['scenario', 'coding', 'mcq'];
-
-/** @deprecated Use getCompetencyLabelsMap(settings) instead */
-export const competencyLabels: Record<string, string> = {
-  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', expert: 'Expert', master: 'Master',
-};
 
 export const questionTypeLabels: Record<QuestionType, string> = {
   scenario: 'Scenario', coding: 'Coding', mcq: 'MCQ',
 };
-
-// ─── Dynamic helpers derived from question_settings ───
-
-export function getCompetencyLevels(settings: QuestionSetting[]): string[] {
-  return settings
-    .filter(s => s.status === 'active')
-    .sort((a, b) => a.level - b.level)
-    .map(s => s.name);
-}
-
-export function getCompetencyLabel(settings: QuestionSetting[], name: string): string {
-  return settings.find(s => s.name === name)?.label || name;
-}
-
-export function getCompetencyLabelsMap(settings: QuestionSetting[]): Record<string, string> {
-  return Object.fromEntries(
-    settings
-      .filter(s => s.status === 'active')
-      .sort((a, b) => a.level - b.level)
-      .map(s => [s.name, s.label])
-  );
-}
