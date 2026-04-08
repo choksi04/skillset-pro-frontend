@@ -111,7 +111,12 @@ export default function ReviewCyclesPage() {
 
   useEffect(() => {
     fetchCycles();
-  }, [fetchCycles]);
+    fetchDomains();
+    fetchSkills();
+    fetchQuestions();
+    fetchConfigs();
+    fetchLevels();
+  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels]);
 
   useEffect(() => {
     if (activeCycle) computeSummary(tenantId);
