@@ -196,7 +196,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                           {ev.score}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-foreground line-clamp-2">{question?.question_text ?? 'Question unavailable'}</p>
+                          <p className="text-xs text-foreground line-clamp-2">{question ? getDisplayQuestionText(question.question_text, question.question_type) : 'Question unavailable'}</p>
                           <div className="flex items-center gap-2 mt-1">
                             {aq && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{dynamicLabels[aq.target_level] || aq.target_level}</Badge>}
                             {question && <Badge variant="outline" className="text-[10px] h-4 px-1.5">{questionTypeLabels[question.question_type]}</Badge>}
@@ -237,8 +237,8 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                             <p className="text-xs text-foreground bg-primary/5 border border-primary/10 rounded-lg p-3">{ev.feedback}</p>
                           </div>
 
-                          {/* Dimension scores */}
-                          {ev.dimensions.length > 0 && (
+                          {/* Dimension scores — hide for MCQ (binary) */}
+                          {!isMCQ && ev.dimensions.length > 0 && (
                             <div>
                               <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">Dimension Scores</p>
                               <div className="grid grid-cols-2 gap-2">
@@ -259,7 +259,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                           )}
 
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-1">
-                            <span>Confidence: {Math.round(ev.confidence * 100)}%</span>
+                            {!isMCQ && <span>Confidence: {Math.round(ev.confidence * 100)}%</span>}
                             {answer && <span>Time spent: {answer.time_spent_seconds}s</span>}
                           </div>
                         </div>
