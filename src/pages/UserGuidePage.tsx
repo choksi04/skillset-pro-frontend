@@ -108,11 +108,11 @@ const adminGuide: GuideStep[] = [
     ],
   },
   {
-    title: 'Question Settings',
-    description: 'Configure competency levels, score ranges, and minimum question requirements.',
+    title: 'Assessment Configuration',
+    description: 'Configure competency levels, assessment generation limits, score ranges, and scoring rules.',
     icon: <SlidersHorizontal size={16} />,
     steps: [
-      'Navigate to Settings > Question Settings.',
+      'Navigate to Settings > Assessment Config.',
       'View and edit the 5 competency levels (L1–L5) — click the pencil icon on any level card.',
       'Configure score ranges (e.g. 0–39 for L1) and minimum questions per skill+level.',
       'Understand the 3 question types and how they are evaluated.',

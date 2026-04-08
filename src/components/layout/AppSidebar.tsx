@@ -73,8 +73,8 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Domains", href: "/domains", icon: <Network size={18} />, roles: ["admin", "manager"] },
       { title: "Question Bank", href: "/questions", icon: <HelpCircle size={18} />, roles: ["admin", "manager"] },
       {
-        title: "Question Settings",
-        href: "/question-settings",
+        title: "Assessment Config",
+        href: "/assessment-config",
         icon: <SlidersHorizontal size={18} />,
         roles: ["admin"],
       },
