@@ -10,14 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from '@/components/ui/sheet';
-import { Pencil, Loader2, Settings2 } from 'lucide-react';
+import { Pencil, Loader2, Settings2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
-const questionTypesMeta = [
-  { type: 'scenario', label: 'Scenario', description: 'Open-ended questions that test practical application of knowledge. Evaluated by AI across multiple dimensions.' },
-  { type: 'mcq', label: 'Multiple Choice', description: 'Single-answer questions with 4 options. Auto-scored based on correct answer selection.' },
-  { type: 'coding', label: 'Coding', description: 'Problem-solving questions requiring code implementation. AI evaluates correctness, approach, and code quality.' },
-];
+function formatQuestionType(type: string): string {
+  if (type === 'mcq') return 'MCQ';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
 export default function QuestionSettingsPage() {
   const { levels: settings, fetchLevels, updateLevel } = useCompetencyLevelStore();
@@ -33,7 +32,6 @@ export default function QuestionSettingsPage() {
   const [minQuestions, setMinQuestions] = useState(3);
   const [saving, setSaving] = useState(false);
 
-  // Assessment config edit state
   const [editConfig, setEditConfig] = useState<AssessmentConfig | null>(null);
   const [cfgMin, setCfgMin] = useState(2);
   const [cfgMax, setCfgMax] = useState(6);
@@ -78,21 +76,24 @@ export default function QuestionSettingsPage() {
     setEditConfig(null);
   };
 
+  const globalConfigs = configs.filter(c => c.config_type === 'global');
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-foreground">Question Settings</h2>
+        <h2 className="text-2xl font-semibold text-foreground">Assessment Configuration</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure competency levels, score ranges, and assessment question limits.
+          Configure competency levels, assessment generation limits, and scoring rules.
         </p>
       </div>
 
       {/* Competency Levels */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-foreground">Competency Levels</h3>
-        <p className="text-xs text-muted-foreground">
-          These levels determine question difficulty, scoring thresholds, and minimum question coverage.
-        </p>
+        <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>Min Questions defines the minimum number of published questions required per skill at this level before assessments can be generated. This is a readiness prerequisite, not a generation count.</span>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {settings.map((s) => (
             <Card key={s.id} className="relative group">
@@ -123,45 +124,41 @@ export default function QuestionSettingsPage() {
         </div>
       </div>
 
-      {/* Assessment Config per Question Type */}
+      {/* Assessment Config per Question Type — data-driven */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
           <Settings2 size={14} /> Assessment Question Limits
         </h3>
-        <p className="text-xs text-muted-foreground">
-          Configure how many questions of each type are included per skill in generated assessments.
-        </p>
+        <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>These limits control how many questions of each type the system selects per skill when generating an assessment.</span>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {questionTypesMeta.map((qt) => {
-            const cfg = configs.find(c => c.config_type === 'global' && c.question_type === qt.type);
-            return (
-              <Card key={qt.type} className="relative group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">{qt.label}</CardTitle>
-                    {cfg && (
-                      <Button
-                        size="icon" variant="ghost"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => openConfigEdit(cfg)}
-                      >
-                        <Pencil size={12} />
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{qt.description}</p>
-                  {cfg && (
-                    <div className="flex items-center gap-3 mt-2">
-                      <Badge variant="outline" className="text-[10px]">Min: {cfg.min_questions}</Badge>
-                      <Badge variant="outline" className="text-[10px]">Max: {cfg.max_questions}</Badge>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {globalConfigs.map((cfg) => (
+            <Card key={cfg.id} className="relative group">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">{formatQuestionType(cfg.question_type)}</CardTitle>
+                  <Button
+                    size="icon" variant="ghost"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => openConfigEdit(cfg)}
+                  >
+                    <Pencil size={12} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 mt-1">
+                  <Badge variant="outline" className="text-[10px]">Min: {cfg.min_questions}</Badge>
+                  <Badge variant="outline" className="text-[10px]">Max: {cfg.max_questions}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {globalConfigs.length === 0 && (
+            <p className="text-xs text-muted-foreground col-span-full">No assessment question limits configured yet.</p>
+          )}
         </div>
       </div>
 
@@ -217,7 +214,7 @@ export default function QuestionSettingsPage() {
             <div className="space-y-1.5">
               <Label>Min Questions per Skill+Level</Label>
               <Input type="number" value={minQuestions} onChange={(e) => setMinQuestions(Number(e.target.value))} min={1} max={20} />
-              <p className="text-xs text-muted-foreground">Minimum number of questions required per skill at this level for assessment generation.</p>
+              <p className="text-xs text-muted-foreground">Minimum published questions required per skill at this level before a cycle can be activated.</p>
             </div>
           </div>
           <SheetFooter className="mt-6">
@@ -234,7 +231,7 @@ export default function QuestionSettingsPage() {
       <Sheet open={!!editConfig} onOpenChange={(open) => { if (!open) setEditConfig(null); }}>
         <SheetContent className="sm:max-w-sm">
           <SheetHeader>
-            <SheetTitle>Edit {editConfig?.question_type?.toUpperCase()} Limits</SheetTitle>
+            <SheetTitle>Edit {editConfig ? formatQuestionType(editConfig.question_type) : ''} Limits</SheetTitle>
             <SheetDescription>Set min/max questions per skill for this question type in generated assessments.</SheetDescription>
           </SheetHeader>
           <div className="space-y-4 mt-4">

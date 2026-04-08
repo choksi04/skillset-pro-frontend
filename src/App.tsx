@@ -89,7 +89,7 @@ const App = () => (
 
               {/* Admin only */}
               <Route path="/users" element={<RoleGuard allowed={["admin"]}><UsersPage /></RoleGuard>} />
-              <Route path="/question-settings" element={<RoleGuard allowed={["admin"]}><QuestionSettingsPage /></RoleGuard>} />
+              <Route path="/assessment-config" element={<RoleGuard allowed={["admin"]}><QuestionSettingsPage /></RoleGuard>} />
               <Route path="/all-registries" element={<RoleGuard allowed={["admin"]}><AllRegistriesPage /></RoleGuard>} />
 
               {/* Admin + Manager */}
