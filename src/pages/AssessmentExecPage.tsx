@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useQuestionStore, questionTypeLabels, Question, getCompetencyLabelsMap } from '@/stores/questionStore';
+import { useQuestionStore, questionTypeLabels, Question } from '@/stores/questionStore';
+import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -106,16 +107,17 @@ export default function AssessmentExecPage() {
   const navigate = useNavigate();
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts, pauseAttempt, resumeAttempt, retryEvaluation } = useAttemptStore();
-  const { questions, settings, fetchQuestions, fetchSettings } = useQuestionStore();
+  const { questions, fetchQuestions } = useQuestionStore();
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchSettings();
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchLevels();
   }, []);
 
-  const dynamicLabels = useMemo(() => getCompetencyLabelsMap(settings), [settings]);
+  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';

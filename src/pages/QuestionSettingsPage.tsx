@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuestionStore, QuestionSetting } from '@/stores/questionStore';
+import { useCompetencyLevelStore, CompetencyLevel } from '@/stores/competencyLevelStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,10 @@ const questionTypes = [
 ];
 
 export default function QuestionSettingsPage() {
-  const { settings, fetchSettings, updateSetting } = useQuestionStore();
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  const { levels: settings, fetchLevels, updateLevel } = useCompetencyLevelStore();
+  useEffect(() => { fetchLevels(); }, [fetchLevels]);
 
-  const [editSetting, setEditSetting] = useState<QuestionSetting | null>(null);
+  const [editSetting, setEditSetting] = useState<CompetencyLevel | null>(null);
   const [name, setName] = useState('');
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
@@ -31,7 +31,7 @@ export default function QuestionSettingsPage() {
   const [minQuestions, setMinQuestions] = useState(3);
   const [saving, setSaving] = useState(false);
 
-  const openEdit = (s: QuestionSetting) => {
+  const openEdit = (s: CompetencyLevel) => {
     setEditSetting(s);
     setName(s.name);
     setLabel(s.label);
@@ -47,7 +47,7 @@ export default function QuestionSettingsPage() {
     if (scoreMin >= scoreMax) { toast.error('Min score must be less than max.'); return; }
     if (minQuestions < 1) { toast.error('Min questions must be at least 1.'); return; }
     setSaving(true);
-    await updateSetting(editSetting.id, { name: name.trim(), label: label.trim(), description: description.trim(), score_range_min: scoreMin, score_range_max: scoreMax, min_questions: minQuestions });
+    await updateLevel(editSetting.id, { name: name.trim(), label: label.trim(), description: description.trim(), score_range_min: scoreMin, score_range_max: scoreMax, min_questions: minQuestions });
     setSaving(false);
     toast.success('Setting updated.');
     setEditSetting(null);
