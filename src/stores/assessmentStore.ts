@@ -214,14 +214,22 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
   addAssessment: async (params) => {
     const { tenant_id, employee_id, submission_id, domain_id, cycle_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
-    // Fetch competency levels for dynamic mapping
-    const { data: levelsData } = await supabase.from('competency_levels').select('*').order('level');
+    // Fetch competency levels and assessment configs for dynamic mapping
+    const [{ data: levelsData }, { data: configsData }] = await Promise.all([
+      supabase.from('competency_levels').select('*').order('level'),
+      supabase.from('assessment_config').select('*'),
+    ]);
     const clSettings: CompetencyLevelConfig[] = (levelsData || []).map((s: any) => ({
       id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
       description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
       min_questions: s.min_questions, status: s.status,
     }));
-    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds, clSettings);
+    const acConfigs: AssessmentConfig[] = (configsData || []).map((c: any) => ({
+      id: c.id, tenant_id: c.tenant_id, config_type: c.config_type,
+      reference_id: c.reference_id, question_type: c.question_type,
+      min_questions: c.min_questions, max_questions: c.max_questions,
+    }));
+    const assessmentQuestions = generateAssessmentQuestions(ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds, clSettings, acConfigs);
     const skillIds = [...new Set(ratings.map((r) => r.skill_id))];
     const durationMinutes = Math.max(30, assessmentQuestions.length * 10);
     const userId = getCurrentUserId();
