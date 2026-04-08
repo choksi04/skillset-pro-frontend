@@ -1,69 +1,108 @@
+# Phase 4: Manual Override Capabilities
 
+## Overview
 
-# Fix Review Cycle Activation: Domain-First Flow & Formatted Errors
+Implement 4 missing admin/manager override actions for managing assessments mid-cycle. All actions appear on the **Team Assessment Detail page** (`AssessmentDetailPage.tsx`) when viewed by an admin/manager, with supporting store logic.
 
-## Problem
+---
 
-1. **Readiness checks run against ALL active domains** — The current `runReadinessCheck` checks every active domain (line 148-197), even if the admin only wants to activate the cycle for specific ones. This causes false failures for domains not participating.
+## Capability 1: Re-trigger Assessment Generation
 
-2. **Error details are paragraph-formatted** — Gaps like question coverage are shown as a single semicolon-separated string, making them hard to read.
+**What**: Admin can generate an assessment for an employee whose submission is "submitted" but has no assessment yet.
 
-3. **Flow is backwards** — Domain selection appears *below* the readiness results. The admin should pick domains *first*, then the checks run scoped to those domains.
+**Where**: New action on `ReviewCyclesPage.tsx` (pending employees panel) or a dedicated section.
 
-## Changes
+**How**:
 
-### 1. Restructure the readiness dialog into two steps
+- In the pending employees override panel (`ReviewCyclesPage.tsx`), add a "Generate Assessment" button next to employees whose submission status is `submitted` (no linked assessment exists)
+- On click: fetch the submission's ratings, call `addAssessment()` from `assessmentStore`, then call `markAssessmentGenerated()` on the submission
+- Show success/error toast
 
-**Step 1 — Domain Selection**: Show domain checkboxes with skill counts. A "Run Readiness Check" button triggers step 2.
+**Files**: `src/pages/ReviewCyclesPage.tsx`, no new store methods needed (reuses existing `addAssessment` + `markAssessmentGenerated`)
 
-**Step 2 — Scoped Readiness Results**: Run all checks only against the selected domains. Show results with proper formatting.
+---
 
-State: add `readinessStep: 1 | 2` to track which step is active.
+## Capability 2: Reset Submission Status
 
-### 2. Scope all checks to selected domains only
+**What**: Admin can revert a submission from `assessment_generated` back to `submitted`, useful if the generated assessment had issues.
 
-Refactor `runReadinessCheck` to accept a `domainIds: string[]` parameter. Every check filters against only those domains:
-- "Domains have skills mapped" — only checks selected domains
-- "Sufficient published questions" — only checks skills mapped to selected domains
-- "Domains have assigned employees" — only checks selected domains
-- "Domains have a domain lead" — only checks selected domains
+**How**:
 
-### 3. Format error details as bullet lists
+- Add `resetSubmissionStatus(submissionId: string)` to `registryStore.ts` — updates status to `submitted` in DB and local state
+- On the `ReviewCyclesPage.tsx` override panel, show a "Reset to Submitted" button for submissions with status `assessment_generated`
+- Optionally soft-delete the linked assessment (set `deleted_on`) so a fresh one can be generated
 
-Replace the single `detail` string with a `details: string[]` array. Render each item as a separate line in the UI:
+**Files**: `src/stores/registryStore.ts` (new method), `src/pages/ReviewCyclesPage.tsx` (UI button)
 
-```
-✗ Sufficient published questions for all skills
-  • React / L1 / scenario: 0/2
-  • React / L1 / coding: 0/2
-  • React / L2 / scenario: 0/2
-  ...and 20 more
-```
+---
 
-For the gaps list, show up to 10 items with a "show all" toggle, each on its own line. For missing domains/employees/leads, show each domain name as a separate bullet.
+## Capability 3: Regenerate Assessment
 
-### 4. UI layout for the two-step dialog
+**What**: Admin creates a new assessment for an employee, excluding previously used questions.
 
-**Step 1 UI:**
-- Title: "Select Participating Domains"
-- Domain checkboxes (existing UI)
-- Footer: Cancel | "Check Readiness →" button (disabled if no domains selected)
+**How**:
 
-**Step 2 UI:**
-- Title: "Pre-Activation Readiness Check"
-- Subtitle showing selected domain count
-- Readiness check items with formatted detail lists
-- "← Back" link to return to step 1 and change selection
-- Footer: Cancel | "Proceed to Activate" (disabled if blocking checks fail)
+- Add a "Regenerate Assessment" button on `AssessmentDetailPage.tsx` (team view, visible to admin/manager when assessment status is `pending`)
+- On click: soft-delete the current assessment (`deleted_on = now()`), collect all question IDs from the old assessment, call `addAssessment()` with `excludeQuestionIds` populated, reset submission status back to `assessment_generated`
+- Add `softDeleteAssessment(id: string)` to `assessmentStore.ts`
+- The existing `generateAssessmentQuestions` already supports `excludeIds`
+  &nbsp;
 
-## Files Modified
+**Files**: `src/stores/assessmentStore.ts` (new `softDeleteAssessment`), `src/pages/AssessmentDetailPage.tsx` (UI button + logic)
 
-- `src/pages/ReviewCyclesPage.tsx` — Restructure readiness dialog, scope checks, format details
+---
+
+## Capability 4: Add/Remove Questions in Generated Assessment
+
+**What**: Admin/manager can modify questions in a generated assessment before the employee starts it.
+
+**Where**: `AssessmentDetailPage.tsx` — team view, only when assessment status is `pending`.
+
+**How**:
+
+- Show the current question list in an editable table with a "Remove" button per row
+- Add an "Add Question" button that opens a dialog/sheet:
+  - Filter available published questions by the assessment's skills and competency levels
+  - Exclude already-included question IDs
+  - Allow selecting one or more questions to add
+- Store methods in `assessmentStore.ts`:
+  - `removeAssessmentQuestion(assessmentId: string, questionId: string)` — deletes from `assessment_questions` table, updates local state
+  - `addAssessmentQuestion(assessmentId: string, question: AssessmentQuestion)` — inserts into `assessment_questions` table, updates local state
+- UI renders only for non-owner users viewing a `pending` assessment
+
+**Files**: `src/stores/assessmentStore.ts` (2 new methods), `src/pages/AssessmentDetailPage.tsx` (question management UI), new component `src/components/assessment/AddQuestionDialog.tsx` (question picker)
+
+---
 
 ## Technical Details
 
-- `readinessChecks` type changes from `{ label; pass; detail?: string }[]` to `{ label; pass; details?: string[] }[]`
-- `runReadinessCheck` signature becomes `runReadinessCheck(cycleId: string, domainIds: string[])` 
-- Gap display: render `details` as a `<ul>` with `<li>` items, capped at 10 visible with a "Show all N" toggle
-- The "Proceed to Activate" button remains disabled if any blocking check fails (same rules as current, excluding "No other cycle active" and "Sufficient questions")
+### New store methods summary
 
+```text
+registryStore.ts:
+  + resetSubmissionStatus(submissionId: string): Promise<void>
+
+assessmentStore.ts:
+  + softDeleteAssessment(id: string): Promise<void>
+  + removeAssessmentQuestion(assessmentId: string, questionId: string): Promise<void>
+  + addAssessmentQuestion(assessmentId: string, question: AssessmentQuestion): Promise<void>
+```
+
+### UI visibility rules
+
+All override actions are gated by:
+
+- User is NOT the assessment owner (`!isOwner`)
+- User role is `admin` or `manager`
+- Assessment status is `pending` (not yet started by employee)
+
+### File changes summary
+
+
+| File                                              | Changes                                                                         |
+| ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/stores/assessmentStore.ts`                   | Add `softDeleteAssessment`, `removeAssessmentQuestion`, `addAssessmentQuestion` |
+| `src/stores/registryStore.ts`                     | Add `resetSubmissionStatus`                                                     |
+| `src/pages/AssessmentDetailPage.tsx`              | Add admin action buttons (regenerate, add/remove questions UI)                  |
+| `src/pages/ReviewCyclesPage.tsx`                  | Add "Generate Assessment" and "Reset Submission" buttons in override panel      |
+| `src/components/assessment/AddQuestionDialog.tsx` | New — question picker filtered by skill/level                                   |
