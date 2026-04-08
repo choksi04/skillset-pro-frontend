@@ -6,6 +6,7 @@ import { useQuestionStore } from "@/stores/questionStore";
 import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
 import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
 import { useRegistryStore } from "@/stores/registryStore";
+import { useAssessmentStore } from "@/stores/assessmentStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO } from "date-fns";
@@ -35,6 +36,7 @@ import { toast } from "sonner";
 import {
   CalendarIcon, Plus, Play, Square, Trash2, Bell, Users, CheckCircle,
   Clock, ClipboardCheck, BarChart3, Send, AlertTriangle, Timer, Shield, Upload,
+  RotateCcw, Zap,
 } from "lucide-react";
 
 const statusBadge = (status: string) => {
@@ -81,13 +83,14 @@ export default function ReviewCyclesPage() {
   const { questions, fetchQuestions } = useQuestionStore();
   const { configs, fetchConfigs } = useAssessmentConfigStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
-  const { submissions, fetchRegistry } = useRegistryStore();
+  const { submissions, fetchRegistry, resetSubmissionStatus } = useRegistryStore();
+  const { assessments, addAssessment, fetchAssessments } = useAssessmentStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
   useEffect(() => {
-    fetchCycles(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchConfigs(); fetchLevels(); fetchRegistry();
-  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels, fetchRegistry]);
+    fetchCycles(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchConfigs(); fetchLevels(); fetchRegistry(); fetchAssessments();
+  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels, fetchRegistry, fetchAssessments]);
 
   useEffect(() => {
     if (activeCycle) computeSummary(tenantId);
@@ -337,6 +340,54 @@ export default function ReviewCyclesPage() {
       await fetchRegistry();
     } catch (err: any) {
       toast.error(err.message || "Failed to force-submit");
+    }
+  };
+
+  const handleGenerateAssessment = async (emp: typeof pendingEmployees[0]) => {
+    if (!emp.submissionId || !activeCycle) return;
+    try {
+      const sub = submissions.find(s => s.id === emp.submissionId);
+      if (!sub) { toast.error("Submission not found"); return; }
+
+      const publishedQuestions = questions.filter(q => q.status === 'published');
+      const assessmentId = await addAssessment({
+        tenant_id: tenantId,
+        employee_id: emp.id,
+        submission_id: sub.id,
+        domain_id: sub.domain_id,
+        cycle_id: activeCycle.id,
+        ratings: sub.ratings,
+        publishedQuestions,
+      });
+      if (!assessmentId) { toast.error("Failed to generate assessment"); return; }
+
+      const { markAssessmentGenerated } = useRegistryStore.getState();
+      await markAssessmentGenerated(sub.id);
+      toast.success(`Assessment generated for ${emp.name}`);
+      setPendingEmployees(prev =>
+        prev.map(e => e.id === emp.id ? { ...e, status: 'assessment_generated' } : e)
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate assessment");
+    }
+  };
+
+  const handleResetSubmission = async (emp: typeof pendingEmployees[0]) => {
+    if (!emp.submissionId) return;
+    try {
+      // Soft-delete linked assessment if exists
+      const linkedAssessment = assessments.find(a => a.submission_id === emp.submissionId && a.status === 'pending');
+      if (linkedAssessment) {
+        const { softDeleteAssessment } = useAssessmentStore.getState();
+        await softDeleteAssessment(linkedAssessment.id);
+      }
+      await resetSubmissionStatus(emp.submissionId);
+      toast.success(`Submission reset to "submitted" for ${emp.name}`);
+      setPendingEmployees(prev =>
+        prev.map(e => e.id === emp.id ? { ...e, status: 'submitted' } : e)
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reset submission");
     }
   };
 
@@ -762,13 +813,18 @@ export default function ReviewCyclesPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {statusBadgeSmall(emp.status)}
                       {emp.status === 'draft' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => handleForceSubmit(emp)}
-                        >
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => handleForceSubmit(emp)}>
                           <Upload size={12} /> Force Submit
+                        </Button>
+                      )}
+                      {emp.status === 'submitted' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => handleGenerateAssessment(emp)}>
+                          <Zap size={12} /> Generate Assessment
+                        </Button>
+                      )}
+                      {emp.status === 'assessment_generated' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-warning" onClick={() => handleResetSubmission(emp)}>
+                          <RotateCcw size={12} /> Reset to Submitted
                         </Button>
                       )}
                     </div>

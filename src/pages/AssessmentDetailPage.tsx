@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAssessmentStore, Assessment, assessmentStatusConfig } from '@/stores/assessmentStore';
+import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, Question } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useCycleStore } from '@/stores/cycleStore';
+import { useRegistryStore } from '@/stores/registryStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import EvalResults from '@/components/assessment/EvalResults';
 import ManagerReviewPanel from '@/components/assessment/ManagerReviewPanel';
+import AddQuestionDialog from '@/components/assessment/AddQuestionDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Play, BarChart3, ClipboardCheck, Clock,
-  CheckCircle, Loader2, RotateCcw,
+  CheckCircle, Loader2, RotateCcw, RefreshCw, Trash2, Plus,
 } from 'lucide-react';
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
@@ -32,19 +39,24 @@ function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): 
 export default function AssessmentDetailPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const navigate = useNavigate();
-  const { assessments, fetchAssessments } = useAssessmentStore();
+  const { assessments, fetchAssessments, softDeleteAssessment, addAssessment, removeAssessmentQuestion, addAssessmentQuestion } = useAssessmentStore();
   const { getAttemptForAssessment, fetchAttempts, retryEvaluation } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { reviews, fetchReviews } = useReviewStore();
   const { cycles, fetchCycles } = useCycleStore();
+  const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState('');
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [addQuestionOpen, setAddQuestionOpen] = useState(false);
+  const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchReviews(); fetchCycles();
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchReviews(); fetchCycles(); fetchRegistry();
   }, []);
 
   const assessment = useMemo(
@@ -59,6 +71,8 @@ export default function AssessmentDetailPage() {
   const domain = domains.find((d) => d.id === assessment?.domain_id);
   const cycleName = assessment?.cycle_id ? cycles.find((c) => c.id === assessment.cycle_id)?.name : '';
   const isOwner = assessment?.employee_id === user?.id;
+  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+  const canManage = !isOwner && isAdmin && assessment?.status === 'pending';
   const isPendingEval = attempt?.status === 'submitted' && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === 'evaluated' || attempt?.status === 'reviewed';
 
@@ -76,6 +90,69 @@ export default function AssessmentDetailPage() {
   // Determine back path
   const backPath = window.location.pathname.startsWith('/team-assessments') ? '/team-assessments' : '/assessments';
   const backLabel = backPath === '/team-assessments' ? 'Back to Team Assessments' : 'Back to My Assessments';
+
+  // Regenerate assessment handler
+  const handleRegenerate = async () => {
+    if (!assessment) return;
+    setRegenerating(true);
+    try {
+      const oldQuestionIds = assessment.assessment_questions.map(q => q.question_id);
+      const sub = submissions.find(s => s.id === assessment.submission_id);
+      if (!sub) { toast.error("Submission not found"); setRegenerating(false); return; }
+
+      await softDeleteAssessment(assessment.id);
+
+      const publishedQuestions = questions.filter(q => q.status === 'published');
+      const newId = await addAssessment({
+        tenant_id: assessment.tenant_id,
+        employee_id: assessment.employee_id,
+        submission_id: assessment.submission_id,
+        domain_id: assessment.domain_id,
+        cycle_id: assessment.cycle_id ?? undefined,
+        ratings: sub.ratings,
+        publishedQuestions,
+        excludeQuestionIds: oldQuestionIds,
+      });
+      if (!newId) { toast.error("Failed to generate new assessment"); setRegenerating(false); return; }
+
+      await markAssessmentGenerated(sub.id);
+      toast.success("Assessment regenerated with fresh questions");
+      navigate(backPath.includes('team') ? `/team-assessments/${newId}` : `/assessments/${newId}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to regenerate");
+    }
+    setRegenerating(false);
+    setConfirmRegenerate(false);
+  };
+
+  // Remove question handler
+  const handleRemoveQuestion = async (questionId: string) => {
+    if (!assessment) return;
+    if (assessment.assessment_questions.length <= 1) {
+      toast.error("Cannot remove the last question");
+      return;
+    }
+    try {
+      await removeAssessmentQuestion(assessment.id, questionId);
+      toast.success("Question removed");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove question");
+    }
+    setConfirmRemoveQuestion(null);
+  };
+
+  // Add questions handler
+  const handleAddQuestions = async (newQuestions: AssessmentQuestion[]) => {
+    if (!assessment) return;
+    try {
+      for (const q of newQuestions) {
+        await addAssessmentQuestion(assessment.id, q);
+      }
+      toast.success(`${newQuestions.length} question(s) added`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add questions");
+    }
+  };
 
   if (!assessment) {
     return (
@@ -182,7 +259,66 @@ export default function AssessmentDetailPage() {
             </Button>
           </div>
         )}
+
+        {/* Admin override: Regenerate */}
+        {canManage && (
+          <Button size="sm" variant="outline" onClick={() => setConfirmRegenerate(true)} className="gap-1.5 text-warning" disabled={regenerating}>
+            <RefreshCw size={14} className={regenerating ? 'animate-spin' : ''} /> Regenerate Assessment
+          </Button>
+        )}
       </div>
+
+      {/* Admin: Question Management for pending assessments */}
+      {canManage && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Assessment Questions</h3>
+            <Button size="sm" variant="outline" onClick={() => setAddQuestionOpen(true)} className="gap-1.5 h-7 text-xs">
+              <Plus size={12} /> Add Question
+            </Button>
+          </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Question</TableHead>
+                  <TableHead>Skill</TableHead>
+                  <TableHead>Level</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="w-16 text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assessment.assessment_questions.map((aq, idx) => {
+                  const q = questionMap.get(aq.question_id);
+                  return (
+                    <TableRow key={aq.question_id}>
+                      <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="text-sm text-foreground max-w-xs truncate">{q?.question_text || aq.question_id}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px]">{skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{aq.target_level}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{q?.question_type || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setConfirmRemoveQuestion(aq.question_id)}
+                        >
+                          <Trash2 size={12} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {/* Evaluation Results */}
       {isEvaluated && attempt && (
@@ -193,6 +329,52 @@ export default function AssessmentDetailPage() {
       {!isOwner && review && attempt && (
         <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
       )}
+
+      {/* Confirm Regenerate Dialog */}
+      <AlertDialog open={confirmRegenerate} onOpenChange={setConfirmRegenerate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate Assessment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the current assessment and create a new one with different questions.
+              Previously used questions will be excluded. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRegenerate} disabled={regenerating}>
+              {regenerating ? 'Regenerating…' : 'Regenerate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Remove Question Dialog */}
+      <AlertDialog open={!!confirmRemoveQuestion} onOpenChange={() => setConfirmRemoveQuestion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Question?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This question will be removed from the assessment. The employee will not see it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmRemoveQuestion && handleRemoveQuestion(confirmRemoveQuestion)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Question Dialog */}
+      <AddQuestionDialog
+        open={addQuestionOpen}
+        onOpenChange={setAddQuestionOpen}
+        skillIds={assessment.skill_ids}
+        existingQuestionIds={assessment.assessment_questions.map(q => q.question_id)}
+        onAdd={handleAddQuestions}
+      />
     </div>
   );
 }

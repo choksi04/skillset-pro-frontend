@@ -56,6 +56,7 @@ interface RegistryStore {
   submitRegistry: (submissionId: string) => Promise<void>;
   markAssessmentGenerated: (submissionId: string) => Promise<void>;
   assignEmployeeToDomain: (employeeId: string, domainId: string, tenantId: string) => Promise<void>;
+  resetSubmissionStatus: (submissionId: string) => Promise<void>;
 }
 
 export const useRegistryStore = create<RegistryStore>((set, get) => ({
@@ -198,6 +199,23 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
 
     set((state) => ({
       assignments: [...state.assignments, { employee_id: employeeId, domain_id: domainId, tenant_id: tenantId }],
+    }));
+  },
+
+  resetSubmissionStatus: async (submissionId) => {
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_registry_submissions').update({
+      status: 'submitted', modified_by: userId, modified_at: now, updated_at: now,
+    }).eq('id', submissionId);
+    if (error) {
+      console.error('Failed to reset submission status:', error);
+      throw error;
+    }
+    set((state) => ({
+      submissions: state.submissions.map((s) =>
+        s.id === submissionId ? { ...s, status: 'submitted' as const, updated_at: now } : s
+      ),
     }));
   },
 }));
