@@ -302,4 +302,94 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       ),
     }));
   },
+
+  softDeleteAssessment: async (id) => {
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase
+      .from('assessments')
+      .update({ deleted_on: now, deleted_by: userId, modified_by: userId, modified_at: now })
+      .eq('id', id);
+    if (error) {
+      console.error('Failed to soft-delete assessment:', error);
+      throw error;
+    }
+    set((state) => ({
+      assessments: state.assessments.filter((a) => a.id !== id),
+    }));
+  },
+
+  removeAssessmentQuestion: async (assessmentId, questionId) => {
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('assessment_questions')
+      .delete()
+      .eq('assessment_id', assessmentId)
+      .eq('question_id', questionId);
+    if (error) {
+      console.error('Failed to remove assessment question:', error);
+      throw error;
+    }
+    set((state) => ({
+      assessments: state.assessments.map((a) => {
+        if (a.id !== assessmentId) return a;
+        const updatedQuestions = a.assessment_questions.filter((q) => q.question_id !== questionId);
+        return {
+          ...a,
+          assessment_questions: updatedQuestions,
+          skill_ids: [...new Set(updatedQuestions.map((q) => q.skill_id))],
+          updated_at: now,
+        };
+      }),
+    }));
+    // Update duration
+    const assessment = get().assessments.find((a) => a.id === assessmentId);
+    if (assessment) {
+      const newDuration = Math.max(30, assessment.assessment_questions.length * 10);
+      await supabase.from('assessments').update({ duration_minutes: newDuration, modified_by: userId, modified_at: now }).eq('id', assessmentId);
+      set((state) => ({
+        assessments: state.assessments.map((a) => a.id === assessmentId ? { ...a, duration_minutes: newDuration } : a),
+      }));
+    }
+  },
+
+  addAssessmentQuestion: async (assessmentId, question) => {
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('assessment_questions')
+      .insert({
+        assessment_id: assessmentId,
+        question_id: question.question_id,
+        skill_id: question.skill_id,
+        target_level: question.target_level,
+        created_by: userId,
+      });
+    if (error) {
+      console.error('Failed to add assessment question:', error);
+      throw error;
+    }
+    set((state) => ({
+      assessments: state.assessments.map((a) => {
+        if (a.id !== assessmentId) return a;
+        const updatedQuestions = [...a.assessment_questions, question];
+        return {
+          ...a,
+          assessment_questions: updatedQuestions,
+          skill_ids: [...new Set(updatedQuestions.map((q) => q.skill_id))],
+          updated_at: now,
+        };
+      }),
+    }));
+    // Update duration
+    const assessment = get().assessments.find((a) => a.id === assessmentId);
+    if (assessment) {
+      const newDuration = Math.max(30, assessment.assessment_questions.length * 10);
+      await supabase.from('assessments').update({ duration_minutes: newDuration, modified_by: userId, modified_at: now }).eq('id', assessmentId);
+      set((state) => ({
+        assessments: state.assessments.map((a) => a.id === assessmentId ? { ...a, duration_minutes: newDuration } : a),
+      }));
+    }
+  },
 }));
