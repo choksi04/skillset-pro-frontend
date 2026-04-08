@@ -133,33 +133,40 @@ export default function ReviewCyclesPage() {
     setSaving(false);
   };
 
-  const runReadinessCheck = async (cycleId: string) => {
+  const openReadinessDialog = (cycleId: string) => {
     setReadinessTarget(cycleId);
-    setReadinessLoading(true);
+    setReadinessStep(1);
+    setReadinessChecks([]);
+    setSelectedDomains([]);
+    setExpandedChecks(new Set());
     setReadinessOpen(true);
-    setSelectedDomains(activeDomains.map(d => d.id)); // Default: all active domains selected
+  };
 
-    const checks: { label: string; pass: boolean; detail?: string }[] = [];
+  const runReadinessCheck = async (domainIds: string[]) => {
+    setReadinessLoading(true);
+    setReadinessStep(2);
+    setExpandedChecks(new Set());
 
+    const selectedDomainObjs = activeDomains.filter(d => domainIds.includes(d.id));
+    const checks: { label: string; pass: boolean; details?: string[] }[] = [];
+
+    // 1. Skills mapped
+    const domainsWithoutSkills = selectedDomainObjs.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
     checks.push({
-      label: 'At least one active domain exists',
-      pass: activeDomains.length > 0,
-      detail: activeDomains.length > 0 ? `${activeDomains.length} active domain(s)` : 'No active domains found',
-    });
-
-    const domainsWithoutSkills = activeDomains.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
-    checks.push({
-      label: 'All domains have skills mapped',
+      label: 'All selected domains have skills mapped',
       pass: domainsWithoutSkills.length === 0,
-      detail: domainsWithoutSkills.length > 0 ? `Missing: ${domainsWithoutSkills.map(d => d.name).join(', ')}` : 'All domains have mapped skills',
+      details: domainsWithoutSkills.length > 0
+        ? domainsWithoutSkills.map(d => d.name)
+        : ['All selected domains have mapped skills'],
     });
 
+    // 2. Published questions coverage
     const publishedQuestions = questions.filter(q => q.status === 'published');
     const levelMap = getLevelToCompetencyMap(levels);
     const questionTypes = ['mcq', 'scenario', 'coding'];
     const gaps: string[] = [];
 
-    for (const domain of activeDomains) {
+    for (const domain of selectedDomainObjs) {
       const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
       for (const skillId of domainSkillIds) {
         const skill = skills.find(s => s.id === skillId);
@@ -180,30 +187,37 @@ export default function ReviewCyclesPage() {
     checks.push({
       label: 'Sufficient published questions for all skills',
       pass: gaps.length === 0,
-      detail: gaps.length > 0 ? `${gaps.length} gap(s) found. ${gaps.slice(0, 5).join('; ')}${gaps.length > 5 ? ` ...and ${gaps.length - 5} more` : ''}` : 'All skill/level/type combinations covered',
+      details: gaps.length > 0 ? gaps : ['All skill/level/type combinations covered'],
     });
 
+    // 3. Assigned employees
     const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
     const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
-    const domainsWithoutEmployees = activeDomains.filter(d => !assignedDomainIds.has(d.id));
+    const domainsWithoutEmployees = selectedDomainObjs.filter(d => !assignedDomainIds.has(d.id));
     checks.push({
-      label: 'All domains have assigned employees',
+      label: 'All selected domains have assigned employees',
       pass: domainsWithoutEmployees.length === 0,
-      detail: domainsWithoutEmployees.length > 0 ? `Missing: ${domainsWithoutEmployees.map(d => d.name).join(', ')}` : 'All domains have employees',
+      details: domainsWithoutEmployees.length > 0
+        ? domainsWithoutEmployees.map(d => d.name)
+        : ['All selected domains have employees'],
     });
 
-    const domainsWithoutLead = activeDomains.filter(d => !d.domain_lead_id);
+    // 4. Domain lead
+    const domainsWithoutLead = selectedDomainObjs.filter(d => !d.domain_lead_id);
     checks.push({
-      label: 'All domains have a domain lead assigned',
+      label: 'All selected domains have a domain lead',
       pass: domainsWithoutLead.length === 0,
-      detail: domainsWithoutLead.length > 0 ? `Missing: ${domainsWithoutLead.map(d => d.name).join(', ')}` : 'All domains have leads',
+      details: domainsWithoutLead.length > 0
+        ? domainsWithoutLead.map(d => d.name)
+        : ['All selected domains have leads'],
     });
 
-    const otherActive = cycles.find(c => c.status === 'active' && c.id !== cycleId);
+    // 5. No other active cycle
+    const otherActive = cycles.find(c => c.status === 'active' && c.id !== readinessTarget);
     checks.push({
       label: 'No other cycle currently active',
       pass: !otherActive,
-      detail: otherActive ? `"${otherActive.name}" is currently active and will be auto-closed` : 'No conflicts',
+      details: otherActive ? [`"${otherActive.name}" is currently active and will be auto-closed`] : ['No conflicts'],
     });
 
     setReadinessChecks(checks);
