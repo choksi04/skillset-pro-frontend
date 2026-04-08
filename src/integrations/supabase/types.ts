@@ -348,6 +348,57 @@ export type Database = {
           },
         ]
       }
+      competency_levels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          label: string
+          level: number
+          min_questions: number
+          modified_at: string | null
+          modified_by: string | null
+          name: string
+          score_range_max: number
+          score_range_min: number
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          label: string
+          level: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name: string
+          score_range_max?: number
+          score_range_min?: number
+          status?: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          label?: string
+          level?: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name?: string
+          score_range_max?: number
+          score_range_min?: number
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       domain_skill_mappings: {
         Row: {
           created_at: string
@@ -623,57 +674,6 @@ export type Database = {
           review_id?: string
           self_rating?: number
           skill_id?: string
-          tenant_id?: string
-        }
-        Relationships: []
-      }
-      question_settings: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string
-          id: string
-          label: string
-          level: number
-          min_questions: number
-          modified_at: string | null
-          modified_by: string | null
-          name: string
-          score_range_max: number
-          score_range_min: number
-          status: string
-          tenant_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string
-          id?: string
-          label: string
-          level: number
-          min_questions?: number
-          modified_at?: string | null
-          modified_by?: string | null
-          name: string
-          score_range_max?: number
-          score_range_min?: number
-          status?: string
-          tenant_id?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string
-          id?: string
-          label?: string
-          level?: number
-          min_questions?: number
-          modified_at?: string | null
-          modified_by?: string | null
-          name?: string
-          score_range_max?: number
-          score_range_min?: number
-          status?: string
           tenant_id?: string
         }
         Relationships: []
