@@ -67,9 +67,11 @@ export default function ReviewCyclesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
-  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; detail?: string }[]>([]);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[] }[]>([]);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [readinessStep, setReadinessStep] = useState<1 | 2>(1);
+  const [expandedChecks, setExpandedChecks] = useState<Set<number>>(new Set());
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [pendingEmployees, setPendingEmployees] = useState<{ id: string; name: string; email: string; submissionId?: string; status: string }[]>([]);
   const [overrideLoading, setOverrideLoading] = useState(false);
@@ -131,33 +133,40 @@ export default function ReviewCyclesPage() {
     setSaving(false);
   };
 
-  const runReadinessCheck = async (cycleId: string) => {
+  const openReadinessDialog = (cycleId: string) => {
     setReadinessTarget(cycleId);
-    setReadinessLoading(true);
+    setReadinessStep(1);
+    setReadinessChecks([]);
+    setSelectedDomains([]);
+    setExpandedChecks(new Set());
     setReadinessOpen(true);
-    setSelectedDomains(activeDomains.map(d => d.id)); // Default: all active domains selected
+  };
 
-    const checks: { label: string; pass: boolean; detail?: string }[] = [];
+  const runReadinessCheck = async (domainIds: string[]) => {
+    setReadinessLoading(true);
+    setReadinessStep(2);
+    setExpandedChecks(new Set());
 
+    const selectedDomainObjs = activeDomains.filter(d => domainIds.includes(d.id));
+    const checks: { label: string; pass: boolean; details?: string[] }[] = [];
+
+    // 1. Skills mapped
+    const domainsWithoutSkills = selectedDomainObjs.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
     checks.push({
-      label: 'At least one active domain exists',
-      pass: activeDomains.length > 0,
-      detail: activeDomains.length > 0 ? `${activeDomains.length} active domain(s)` : 'No active domains found',
-    });
-
-    const domainsWithoutSkills = activeDomains.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
-    checks.push({
-      label: 'All domains have skills mapped',
+      label: 'All selected domains have skills mapped',
       pass: domainsWithoutSkills.length === 0,
-      detail: domainsWithoutSkills.length > 0 ? `Missing: ${domainsWithoutSkills.map(d => d.name).join(', ')}` : 'All domains have mapped skills',
+      details: domainsWithoutSkills.length > 0
+        ? domainsWithoutSkills.map(d => d.name)
+        : ['All selected domains have mapped skills'],
     });
 
+    // 2. Published questions coverage
     const publishedQuestions = questions.filter(q => q.status === 'published');
     const levelMap = getLevelToCompetencyMap(levels);
     const questionTypes = ['mcq', 'scenario', 'coding'];
     const gaps: string[] = [];
 
-    for (const domain of activeDomains) {
+    for (const domain of selectedDomainObjs) {
       const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
       for (const skillId of domainSkillIds) {
         const skill = skills.find(s => s.id === skillId);
@@ -178,30 +187,37 @@ export default function ReviewCyclesPage() {
     checks.push({
       label: 'Sufficient published questions for all skills',
       pass: gaps.length === 0,
-      detail: gaps.length > 0 ? `${gaps.length} gap(s) found. ${gaps.slice(0, 5).join('; ')}${gaps.length > 5 ? ` ...and ${gaps.length - 5} more` : ''}` : 'All skill/level/type combinations covered',
+      details: gaps.length > 0 ? gaps : ['All skill/level/type combinations covered'],
     });
 
+    // 3. Assigned employees
     const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
     const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
-    const domainsWithoutEmployees = activeDomains.filter(d => !assignedDomainIds.has(d.id));
+    const domainsWithoutEmployees = selectedDomainObjs.filter(d => !assignedDomainIds.has(d.id));
     checks.push({
-      label: 'All domains have assigned employees',
+      label: 'All selected domains have assigned employees',
       pass: domainsWithoutEmployees.length === 0,
-      detail: domainsWithoutEmployees.length > 0 ? `Missing: ${domainsWithoutEmployees.map(d => d.name).join(', ')}` : 'All domains have employees',
+      details: domainsWithoutEmployees.length > 0
+        ? domainsWithoutEmployees.map(d => d.name)
+        : ['All selected domains have employees'],
     });
 
-    const domainsWithoutLead = activeDomains.filter(d => !d.domain_lead_id);
+    // 4. Domain lead
+    const domainsWithoutLead = selectedDomainObjs.filter(d => !d.domain_lead_id);
     checks.push({
-      label: 'All domains have a domain lead assigned',
+      label: 'All selected domains have a domain lead',
       pass: domainsWithoutLead.length === 0,
-      detail: domainsWithoutLead.length > 0 ? `Missing: ${domainsWithoutLead.map(d => d.name).join(', ')}` : 'All domains have leads',
+      details: domainsWithoutLead.length > 0
+        ? domainsWithoutLead.map(d => d.name)
+        : ['All selected domains have leads'],
     });
 
-    const otherActive = cycles.find(c => c.status === 'active' && c.id !== cycleId);
+    // 5. No other active cycle
+    const otherActive = cycles.find(c => c.status === 'active' && c.id !== readinessTarget);
     checks.push({
       label: 'No other cycle currently active',
       pass: !otherActive,
-      detail: otherActive ? `"${otherActive.name}" is currently active and will be auto-closed` : 'No conflicts',
+      details: otherActive ? [`"${otherActive.name}" is currently active and will be auto-closed`] : ['No conflicts'],
     });
 
     setReadinessChecks(checks);
@@ -478,7 +494,7 @@ export default function ReviewCyclesPage() {
                       <div className="flex items-center gap-1 justify-end">
                         {cycle.status === "draft" && (
                           <>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success" onClick={() => runReadinessCheck(cycle.id)}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success" onClick={() => openReadinessDialog(cycle.id)}>
                               <Play size={12} /> Activate
                             </Button>
                             <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive" onClick={() => setConfirmDelete(cycle.id)}>
@@ -604,70 +620,118 @@ export default function ReviewCyclesPage() {
       {/* Readiness Check + Domain Selection Dialog */}
       <AlertDialog open={readinessOpen} onOpenChange={(open) => { if (!open) { setReadinessOpen(false); setReadinessTarget(null); } }}>
         <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <ClipboardCheck size={18} /> Pre-Activation Readiness Check
-            </AlertDialogTitle>
-            <AlertDialogDescription>Review the checklist and select participating domains.</AlertDialogDescription>
-          </AlertDialogHeader>
-          {readinessLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Running checks…</div>
-          ) : (
-            <div className="space-y-4">
-              {/* Readiness Checks */}
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {readinessChecks.map((check, i) => (
-                  <div key={i} className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                    {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
-                    <div>
-                      <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
-                      {check.detail && <p className="text-xs text-muted-foreground mt-0.5">{check.detail}</p>}
-                    </div>
-                  </div>
+          {readinessStep === 1 ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <ClipboardCheck size={18} /> Select Participating Domains
+                </AlertDialogTitle>
+                <AlertDialogDescription>Choose which domains to include in this cycle. Readiness checks will only run against selected domains.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {activeDomains.map((domain) => (
+                  <label key={domain.id} className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
+                    <Checkbox
+                      checked={selectedDomains.includes(domain.id)}
+                      onCheckedChange={() => toggleDomain(domain.id)}
+                    />
+                    <span className="text-sm text-foreground font-medium">{domain.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {mappings.filter(m => m.domain_id === domain.id).length} skills
+                    </span>
+                  </label>
                 ))}
-              </div>
-
-              {/* Domain Selection */}
-              <div className="border-t border-border pt-3">
-                <p className="text-sm font-medium text-foreground mb-2">Select Participating Domains</p>
-                <p className="text-xs text-muted-foreground mb-3">Only employees assigned to selected domains will be eligible for this cycle.</p>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {activeDomains.map((domain) => (
-                    <label key={domain.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
-                      <Checkbox
-                        checked={selectedDomains.includes(domain.id)}
-                        onCheckedChange={() => toggleDomain(domain.id)}
-                      />
-                      <span className="text-sm text-foreground">{domain.name}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {mappings.filter(m => m.domain_id === domain.id).length} skills
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {selectedDomains.length === 0 && (
-                  <p className="text-xs text-destructive mt-1">Select at least one domain to proceed.</p>
+                {activeDomains.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No active domains found.</p>
                 )}
               </div>
-            </div>
+              {selectedDomains.length === 0 && activeDomains.length > 0 && (
+                <p className="text-xs text-destructive">Select at least one domain to proceed.</p>
+              )}
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button
+                  onClick={() => runReadinessCheck(selectedDomains)}
+                  disabled={selectedDomains.length === 0}
+                >
+                  Check Readiness →
+                </Button>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <ClipboardCheck size={18} /> Pre-Activation Readiness Check
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Checking {selectedDomains.length} selected domain(s): {selectedDomains.map(id => domains.find(d => d.id === id)?.name).filter(Boolean).join(', ')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {readinessLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Running checks…</div>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {readinessChecks.map((check, i) => {
+                    const MAX_VISIBLE = 10;
+                    const isExpanded = expandedChecks.has(i);
+                    const items = check.details || [];
+                    const visibleItems = !check.pass && items.length > MAX_VISIBLE && !isExpanded ? items.slice(0, MAX_VISIBLE) : items;
+                    const hasMore = !check.pass && items.length > MAX_VISIBLE && !isExpanded;
+
+                    return (
+                      <div key={i} className={`rounded-md px-3 py-2.5 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                        <div className="flex items-start gap-2">
+                          {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
+                          <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                        </div>
+                        {items.length > 0 && (
+                          <ul className={`mt-1.5 ml-6 space-y-0.5 ${check.pass ? 'text-muted-foreground' : 'text-foreground'}`}>
+                            {visibleItems.map((item, j) => (
+                              <li key={j} className="text-xs flex items-start gap-1.5">
+                                <span className="shrink-0 mt-1">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                            {hasMore && (
+                              <li>
+                                <button
+                                  className="text-xs text-primary hover:underline mt-0.5"
+                                  onClick={() => setExpandedChecks(prev => new Set([...prev, i]))}
+                                >
+                                  Show all {items.length} items
+                                </button>
+                              </li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setReadinessStep(1)} className="mr-auto text-xs gap-1">
+                  ← Back to Domain Selection
+                </Button>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                {!readinessLoading && (
+                  <AlertDialogAction
+                    onClick={() => {
+                      setReadinessOpen(false);
+                      setConfirmActivate(readinessTarget);
+                    }}
+                    disabled={
+                      selectedDomains.length === 0 ||
+                      readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')
+                    }
+                  >
+                    Proceed to Activate
+                  </AlertDialogAction>
+                )}
+              </AlertDialogFooter>
+            </>
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            {!readinessLoading && (
-              <AlertDialogAction
-                onClick={() => {
-                  setReadinessOpen(false);
-                  setConfirmActivate(readinessTarget);
-                }}
-                disabled={
-                  selectedDomains.length === 0 ||
-                  readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')
-                }
-              >
-                Proceed to Activate
-              </AlertDialogAction>
-            )}
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
