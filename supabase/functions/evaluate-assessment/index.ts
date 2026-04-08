@@ -29,22 +29,73 @@ interface EvaluationResult {
   confidence: number;
 }
 
+/**
+ * Evaluate MCQ by parsing correctIndex from question_text JSON.
+ * User answer is a letter (A/B/C/D) converted to index 0-3.
+ */
 function evaluateMCQ(answer: AnswerPayload): EvaluationResult {
-  const guidelines = answer.evaluation_guidelines.toLowerCase();
-  const correctMatch = guidelines.match(/correct\s*(?:answer)?[:\s]*([A-D])/i);
-  const correctAnswer = correctMatch?.[1]?.toUpperCase();
-  const userAnswer = answer.answer_text.trim().toUpperCase();
-  const isCorrect = correctAnswer === userAnswer;
+  let correctIndex: number | null = null;
+
+  // Primary: parse question_text JSON for correctIndex
+  try {
+    const parsed = JSON.parse(answer.question_text);
+    if (typeof parsed.correctIndex === 'number') {
+      correctIndex = parsed.correctIndex;
+    }
+  } catch { /* not JSON, fall through */ }
+
+  // Fallback: try evaluation_guidelines for "correctIndex: N" or "Correct answer: X"
+  if (correctIndex === null && answer.evaluation_guidelines) {
+    const idxMatch = answer.evaluation_guidelines.match(/correctIndex[:\s]*(\d)/i);
+    if (idxMatch) {
+      correctIndex = parseInt(idxMatch[1], 10);
+    } else {
+      const letterMatch = answer.evaluation_guidelines.match(/correct\s*(?:answer)?[:\s]*([A-D])/i);
+      if (letterMatch) {
+        correctIndex = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+      }
+    }
+  }
+
+  // Convert user answer letter to index
+  const userText = answer.answer_text.trim().toUpperCase();
+  let userIndex: number | null = null;
+  if (/^[A-D]$/.test(userText)) {
+    userIndex = userText.charCodeAt(0) - 65;
+  } else {
+    // Try parsing as number (0-3)
+    const num = parseInt(userText, 10);
+    if (!isNaN(num) && num >= 0 && num <= 3) {
+      userIndex = num;
+    }
+  }
+
+  if (correctIndex === null) {
+    // Cannot determine correct answer — return 0 with explanation
+    return {
+      question_id: answer.question_id,
+      score: 0,
+      feedback: 'Could not determine the correct answer from question data. Please review manually.',
+      dimensions: [
+        { dimension: 'Correctness', score: 0, comment: 'Correct answer index not found in question data.' },
+        { dimension: 'Knowledge', score: 0, comment: 'Unable to evaluate.' },
+      ],
+      confidence: 0.1,
+    };
+  }
+
+  const isCorrect = userIndex === correctIndex;
   const score = isCorrect ? 100 : 0;
+  const correctLetter = String.fromCharCode(65 + correctIndex);
 
   return {
     question_id: answer.question_id,
     score,
     feedback: isCorrect
       ? 'Correct answer selected.'
-      : `Incorrect. The correct answer was ${correctAnswer ?? 'not determined'}.`,
+      : `Incorrect. The correct answer was ${correctLetter}.`,
     dimensions: [
-      { dimension: 'Correctness', score: isCorrect ? 100 : 0, comment: isCorrect ? 'Answer matches the correct option.' : 'Answer does not match the correct option.' },
+      { dimension: 'Correctness', score: isCorrect ? 100 : 0, comment: isCorrect ? 'Answer matches the correct option.' : `Selected answer does not match correct option (${correctLetter}).` },
       { dimension: 'Knowledge', score: isCorrect ? 90 : 10, comment: isCorrect ? 'Demonstrates knowledge of the concept.' : 'Incorrect selection suggests gaps in understanding.' },
     ],
     confidence: 0.99,
@@ -79,30 +130,35 @@ serve(async (req) => {
 
     // AI evaluate scenario/coding questions in batch
     if (aiAnswers.length > 0) {
-      const systemPrompt = `You are an expert technical assessment evaluator. Evaluate each answer objectively.
+      const systemPrompt = `You are an expert technical assessment evaluator. Evaluate each answer with rigorous accuracy and provide step-by-step reasoning.
 
 For each answer, you MUST return a JSON object with:
 - "question_id": the question ID (string)
 - "score": integer 0-100
-- "feedback": 1-3 sentence feedback (string)
+- "reasoning": step-by-step explanation of how you arrived at the score (string)
+- "feedback": 1-3 sentence actionable feedback for the employee (string)
 - "dimensions": array of exactly 4 objects, each with "dimension" (string), "score" (integer 0-100), "comment" (string)
   Dimensions: "Concept Understanding", "Technical Correctness", "Solution Practicality", "Clarity"
 - "confidence": float 0.0-1.0
 
-Scoring guide:
-- 0-39: Insufficient/incorrect
-- 40-59: Basic understanding, gaps present
-- 60-74: Competent, mostly correct
-- 75-89: Strong, with minor issues
-- 90-100: Excellent, comprehensive
+Scoring guide (be precise and consistent):
+- 0-10: Empty, irrelevant, or no meaningful attempt
+- 11-39: Insufficient — shows minimal understanding, major errors or omissions
+- 40-59: Basic understanding — partially correct but significant gaps
+- 60-74: Competent — mostly correct with minor issues
+- 75-89: Strong — comprehensive with only minor imperfections
+- 90-100: Excellent — thorough, accurate, well-structured, demonstrates deep expertise
 
-Empty or very short answers should score 0-10.
+CRITICAL RULES:
+- Empty or very short answers (< 10 chars) MUST score 0-10
+- Evaluate against the provided evaluation guidelines when available
+- Be consistent: similar quality answers must receive similar scores
+- Each dimension score should be justified independently
 
 Return ONLY a JSON array of evaluation objects. No other text.`;
 
       const questionsText = aiAnswers.map((a, i) => {
         let questionDisplay = a.question_text;
-        // Try to parse JSON question text for better display
         try {
           const parsed = JSON.parse(a.question_text);
           if (parsed.problemStatement) questionDisplay = parsed.problemStatement;
@@ -118,7 +174,7 @@ ${a.evaluation_guidelines ? `Evaluation Guidelines: ${a.evaluation_guidelines}` 
 Employee Answer: ${a.answer_text || '(no answer provided)'}`;
       }).join('\n\n');
 
-      const userPrompt = `Evaluate the following ${aiAnswers.length} answer(s):\n\n${questionsText}\n\nReturn a JSON array with one evaluation object per question.`;
+      const userPrompt = `Evaluate the following ${aiAnswers.length} answer(s):\n\n${questionsText}\n\nReturn a JSON array with one evaluation object per question. Include step-by-step reasoning for each score.`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -127,7 +183,7 @@ Employee Answer: ${a.answer_text || '(no answer provided)'}`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -181,7 +237,6 @@ Employee Answer: ${a.answer_text || '(no answer provided)'}`;
         }
       } catch (parseError) {
         console.error("Failed to parse AI evaluation:", parseError, jsonStr);
-        // Fallback: return zero scores for AI questions
         for (const a of aiAnswers) {
           evaluations.push({
             question_id: a.question_id,

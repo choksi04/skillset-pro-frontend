@@ -491,10 +491,7 @@ export default function AssessmentExecPage() {
                         <div className="rounded-lg bg-muted p-3 space-y-1">
                           <p className="text-xs font-semibold text-muted-foreground">Example Input</p>
                           <pre className="text-xs font-mono text-foreground">{codingData.exampleInput}</pre>
-                          {codingData.exampleOutput && <>
-                            <p className="text-xs font-semibold text-muted-foreground mt-2">Expected Output</p>
-                            <pre className="text-xs font-mono text-foreground">{codingData.exampleOutput}</pre>
-                          </>}
+                          {/* Expected output hidden to prevent answer leaking */}
                         </div>
                       )}
                       <div>

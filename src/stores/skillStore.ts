@@ -64,7 +64,6 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   initialized: false,
 
   fetchSkills: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const [skillsRes, catsRes] = await Promise.all([

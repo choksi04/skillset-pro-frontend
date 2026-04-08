@@ -48,6 +48,7 @@ interface QuestionStore {
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
   toggleQuestionStatus: (id: string) => Promise<void>;
   publishQuestion: (id: string) => Promise<void>;
+  bulkPublish: (ids: string[]) => Promise<number>;
   deleteQuestion: (id: string) => Promise<{ success: boolean; error?: string }>;
   checkQuestionUsage: (id: string) => Promise<boolean>;
 }
@@ -60,7 +61,6 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   settingsLoaded: false,
 
   fetchQuestions: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const { data, error } = await supabase
@@ -87,7 +87,6 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 
   fetchSettings: async () => {
-    if (get().settingsLoaded) return;
     try {
       const { data, error } = await supabase
         .from('question_settings')
@@ -172,6 +171,22 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
 
   publishQuestion: async (id) => {
     await get().updateQuestion(id, { status: 'published' });
+  },
+
+  bulkPublish: async (ids) => {
+    if (ids.length === 0) return 0;
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('questions').update({
+      status: 'published', updated_at: now, modified_by: userId, modified_at: now,
+    }).in('id', ids);
+    if (error) { console.error('Failed to bulk publish:', error); return 0; }
+    set((state) => ({
+      questions: state.questions.map((q) =>
+        ids.includes(q.id) ? { ...q, status: 'published' as const, updated_at: now } : q
+      ),
+    }));
+    return ids.length;
   },
 
   checkQuestionUsage: async (id) => {

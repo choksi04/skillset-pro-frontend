@@ -103,7 +103,6 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   initialized: false,
 
   fetchReviews: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const [reviewsRes, notifsRes, entriesRes] = await Promise.all([

@@ -53,7 +53,6 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
   summary: null,
 
   fetchCycles: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const { data, error } = await supabase
