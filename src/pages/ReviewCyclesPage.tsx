@@ -5,9 +5,10 @@ import { useSkillStore } from "@/stores/skillStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
 import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
+import { useRegistryStore } from "@/stores/registryStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
@@ -31,60 +33,27 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
-  CalendarIcon,
-  Plus,
-  Play,
-  Square,
-  Trash2,
-  Bell,
-  Users,
-  CheckCircle,
-  Clock,
-  ClipboardCheck,
-  BarChart3,
-  Send,
-  AlertTriangle,
-  Timer,
+  CalendarIcon, Plus, Play, Square, Trash2, Bell, Users, CheckCircle,
+  Clock, ClipboardCheck, BarChart3, Send, AlertTriangle, Timer, Shield, Upload,
 } from "lucide-react";
 
 const statusBadge = (status: string) => {
   switch (status) {
     case "active":
-      return (
-        <Badge className="bg-success/15 text-success border-success/20 text-xs gap-1">
-          <Play size={10} /> Active
-        </Badge>
-      );
+      return <Badge className="bg-success/15 text-success border-success/20 text-xs gap-1"><Play size={10} /> Active</Badge>;
     case "closed":
-      return (
-        <Badge variant="secondary" className="text-xs gap-1">
-          <Square size={10} /> Closed
-        </Badge>
-      );
+      return <Badge variant="secondary" className="text-xs gap-1"><Square size={10} /> Closed</Badge>;
     default:
-      return (
-        <Badge variant="outline" className="text-xs">
-          Draft
-        </Badge>
-      );
+      return <Badge variant="outline" className="text-xs">Draft</Badge>;
   }
 };
 
 export default function ReviewCyclesPage() {
   const { user } = useAuth();
   const {
-    cycles,
-    activeCycle,
-    loading,
-    summary,
-    fetchCycles,
-    createCycle,
-    activateCycle,
-    closeCycle,
-    deleteCycle,
-    sendReminder,
-    computeSummary,
-    getDaysRemaining,
+    cycles, activeCycle, loading, summary, cycleDomainSelections,
+    fetchCycles, createCycle, activateCycle, closeCycle, deleteCycle,
+    sendReminder, computeSummary, getDaysRemaining, getSelectedDomainIds, forceSubmitEmployee,
   } = useCycleStore();
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -100,23 +69,23 @@ export default function ReviewCyclesPage() {
   const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
   const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; detail?: string }[]>([]);
   const [readinessLoading, setReadinessLoading] = useState(false);
+  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [pendingEmployees, setPendingEmployees] = useState<{ id: string; name: string; email: string; submissionId?: string; status: string }[]>([]);
+  const [overrideLoading, setOverrideLoading] = useState(false);
 
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { configs, fetchConfigs } = useAssessmentConfigStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
+  const { submissions, fetchRegistry } = useRegistryStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
   useEffect(() => {
-    fetchCycles();
-    fetchDomains();
-    fetchSkills();
-    fetchQuestions();
-    fetchConfigs();
-    fetchLevels();
-  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels]);
+    fetchCycles(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchConfigs(); fetchLevels(); fetchRegistry();
+  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels, fetchRegistry]);
 
   useEffect(() => {
     if (activeCycle) computeSummary(tenantId);
@@ -124,30 +93,38 @@ export default function ReviewCyclesPage() {
 
   const daysRemaining = getDaysRemaining();
 
+  const activeDomains = useMemo(() => domains.filter(d => d.status === 'active'), [domains]);
+
+  // Get selected domains for the active cycle
+  const activeCycleDomainIds = useMemo(() => {
+    if (!activeCycle) return [];
+    return getSelectedDomainIds(activeCycle.id);
+  }, [activeCycle, cycleDomainSelections]);
+
+  const activeCycleDomainNames = useMemo(() => {
+    return activeCycleDomainIds
+      .map(id => domains.find(d => d.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+  }, [activeCycleDomainIds, domains]);
+
   const handleCreate = async () => {
     if (!name.trim() || !startDate || !endDate) {
-      toast.error("Please fill all required fields");
-      return;
+      toast.error("Please fill all required fields"); return;
     }
     if (startDate >= endDate) {
-      toast.error("Start date must be before end date");
-      return;
+      toast.error("Start date must be before end date"); return;
     }
     setSaving(true);
     try {
       await createCycle({
-        tenant_id: tenantId,
-        name: name.trim(),
+        tenant_id: tenantId, name: name.trim(),
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         grace_period_days: graceDays,
       });
       toast.success("Cycle created");
-      setSheetOpen(false);
-      setName("");
-      setStartDate(undefined);
-      setEndDate(undefined);
-      setGraceDays(3);
+      setSheetOpen(false); setName(""); setStartDate(undefined); setEndDate(undefined); setGraceDays(3);
     } catch (err: any) {
       toast.error(err.message || "Failed to create cycle");
     }
@@ -158,29 +135,23 @@ export default function ReviewCyclesPage() {
     setReadinessTarget(cycleId);
     setReadinessLoading(true);
     setReadinessOpen(true);
+    setSelectedDomains(activeDomains.map(d => d.id)); // Default: all active domains selected
 
     const checks: { label: string; pass: boolean; detail?: string }[] = [];
 
-    // 1. At least one active domain exists
-    const activeDomains = domains.filter(d => d.status === 'active');
     checks.push({
       label: 'At least one active domain exists',
       pass: activeDomains.length > 0,
       detail: activeDomains.length > 0 ? `${activeDomains.length} active domain(s)` : 'No active domains found',
     });
 
-    // 2. All active domains have skills mapped
-    const domainsWithoutSkills = activeDomains.filter(d => {
-      const mapped = mappings.filter(m => m.domain_id === d.id);
-      return mapped.length === 0;
-    });
+    const domainsWithoutSkills = activeDomains.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
     checks.push({
       label: 'All domains have skills mapped',
       pass: domainsWithoutSkills.length === 0,
       detail: domainsWithoutSkills.length > 0 ? `Missing: ${domainsWithoutSkills.map(d => d.name).join(', ')}` : 'All domains have mapped skills',
     });
 
-    // 3. Sufficient published questions per skill/level/type
     const publishedQuestions = questions.filter(q => q.status === 'published');
     const levelMap = getLevelToCompetencyMap(levels);
     const questionTypes = ['mcq', 'scenario', 'coding'];
@@ -210,7 +181,6 @@ export default function ReviewCyclesPage() {
       detail: gaps.length > 0 ? `${gaps.length} gap(s) found. ${gaps.slice(0, 5).join('; ')}${gaps.length > 5 ? ` ...and ${gaps.length - 5} more` : ''}` : 'All skill/level/type combinations covered',
     });
 
-    // 4. All domains have at least one assigned employee
     const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
     const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
     const domainsWithoutEmployees = activeDomains.filter(d => !assignedDomainIds.has(d.id));
@@ -220,7 +190,6 @@ export default function ReviewCyclesPage() {
       detail: domainsWithoutEmployees.length > 0 ? `Missing: ${domainsWithoutEmployees.map(d => d.name).join(', ')}` : 'All domains have employees',
     });
 
-    // 5. All domains have a domain lead
     const domainsWithoutLead = activeDomains.filter(d => !d.domain_lead_id);
     checks.push({
       label: 'All domains have a domain lead assigned',
@@ -228,7 +197,6 @@ export default function ReviewCyclesPage() {
       detail: domainsWithoutLead.length > 0 ? `Missing: ${domainsWithoutLead.map(d => d.name).join(', ')}` : 'All domains have leads',
     });
 
-    // 6. No other active cycle
     const otherActive = cycles.find(c => c.status === 'active' && c.id !== cycleId);
     checks.push({
       label: 'No other cycle currently active',
@@ -240,11 +208,20 @@ export default function ReviewCyclesPage() {
     setReadinessLoading(false);
   };
 
+  const toggleDomain = (domainId: string) => {
+    setSelectedDomains(prev =>
+      prev.includes(domainId) ? prev.filter(id => id !== domainId) : [...prev, domainId]
+    );
+  };
+
   const handleActivate = async () => {
     if (!confirmActivate) return;
+    if (selectedDomains.length === 0) {
+      toast.error("Please select at least one domain"); return;
+    }
     try {
-      await activateCycle(confirmActivate);
-      toast.success("Cycle activated. All employees have been notified.");
+      await activateCycle(confirmActivate, selectedDomains);
+      toast.success("Cycle activated. Eligible employees have been notified.");
     } catch (err: any) {
       toast.error(err.message || "Failed to activate cycle");
     }
@@ -271,6 +248,89 @@ export default function ReviewCyclesPage() {
     if (!activeCycle) return;
     const count = await sendReminder(activeCycle.id);
     toast.success(`Reminder sent to ${count} employee(s) who haven't submitted.`);
+  };
+
+  // Manual override: load pending employees for active cycle
+  const openOverridePanel = async () => {
+    if (!activeCycle) return;
+    setOverrideOpen(true);
+    setOverrideLoading(true);
+
+    const domainIds = getSelectedDomainIds(activeCycle.id);
+    
+    // Get all eligible employees
+    const { data: assignments } = await supabase
+      .from('employee_domain_assignments')
+      .select('employee_id')
+      .eq('tenant_id', tenantId)
+      .in('domain_id', domainIds.length > 0 ? domainIds : ['__none__']);
+
+    const { data: directUsers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .in('domain_id', domainIds.length > 0 ? domainIds : ['__none__']);
+
+    const eligibleIds = new Set([
+      ...(assignments || []).map((a: any) => a.employee_id),
+      ...(directUsers || []).map((u: any) => u.id),
+    ]);
+
+    // Get user details
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, full_name, email')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .in('id', Array.from(eligibleIds));
+
+    // Get submissions for this cycle
+    const cycleSubmissions = submissions.filter(s => s.cycle === activeCycle.name);
+    const subMap = new Map(cycleSubmissions.map(s => [s.employee_id, s]));
+
+    const list = (users || []).map((u: any) => {
+      const sub = subMap.get(u.id);
+      return {
+        id: u.id,
+        name: u.full_name,
+        email: u.email,
+        submissionId: sub?.id,
+        status: sub ? sub.status : 'not_started',
+      };
+    }).sort((a, b) => {
+      const order: Record<string, number> = { not_started: 0, draft: 1, submitted: 2, assessment_generated: 3 };
+      return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+    });
+
+    setPendingEmployees(list);
+    setOverrideLoading(false);
+  };
+
+  const handleForceSubmit = async (emp: typeof pendingEmployees[0]) => {
+    if (!emp.submissionId) {
+      toast.error("Employee has no draft submission to force-submit");
+      return;
+    }
+    try {
+      await forceSubmitEmployee(emp.submissionId);
+      toast.success(`Submission force-submitted for ${emp.name}`);
+      setPendingEmployees(prev =>
+        prev.map(e => e.id === emp.id ? { ...e, status: 'submitted' } : e)
+      );
+      await fetchRegistry();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to force-submit");
+    }
+  };
+
+  const statusBadgeSmall = (status: string) => {
+    switch (status) {
+      case 'submitted': return <Badge className="bg-success/15 text-success text-[10px]">Submitted</Badge>;
+      case 'draft': return <Badge className="bg-warning/15 text-warning text-[10px]">Draft</Badge>;
+      case 'assessment_generated': return <Badge className="bg-primary/15 text-primary text-[10px]">Assessment Gen.</Badge>;
+      default: return <Badge variant="outline" className="text-[10px]">Not Started</Badge>;
+    }
   };
 
   return (
@@ -302,29 +362,26 @@ export default function ReviewCyclesPage() {
                   {format(parseISO(activeCycle.end_date), "MMM d, yyyy")}
                   {activeCycle.grace_period_days > 0 && ` · +${activeCycle.grace_period_days} day grace period`}
                 </p>
+                {activeCycleDomainNames && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Domains: <span className="font-medium text-foreground">{activeCycleDomainNames}</span>
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {daysRemaining !== null && (
-                  <div
-                    className={`flex items-center gap-1.5 text-sm font-semibold ${daysRemaining <= 3 ? "text-destructive" : daysRemaining <= 7 ? "text-warning" : "text-foreground"}`}
-                  >
+                  <div className={`flex items-center gap-1.5 text-sm font-semibold ${daysRemaining <= 3 ? "text-destructive" : daysRemaining <= 7 ? "text-warning" : "text-foreground"}`}>
                     <Timer size={14} />
-                    {daysRemaining > 0
-                      ? `${daysRemaining} days left`
-                      : daysRemaining === 0
-                        ? "Ends today"
-                        : "Grace period"}
+                    {daysRemaining > 0 ? `${daysRemaining} days left` : daysRemaining === 0 ? "Ends today" : "Grace period"}
                   </div>
                 )}
+                <Button size="sm" variant="outline" onClick={openOverridePanel} className="gap-1.5">
+                  <Shield size={14} /> Manage Employees
+                </Button>
                 <Button size="sm" variant="outline" onClick={handleReminder} className="gap-1.5">
                   <Bell size={14} /> Send Reminder
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setConfirmClose(activeCycle.id)}
-                  className="gap-1.5 text-destructive hover:text-destructive"
-                >
+                <Button size="sm" variant="outline" onClick={() => setConfirmClose(activeCycle.id)} className="gap-1.5 text-destructive hover:text-destructive">
                   <Square size={14} /> Close Cycle
                 </Button>
               </div>
@@ -332,50 +389,36 @@ export default function ReviewCyclesPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <Users size={16} className="mx-auto text-muted-foreground mb-1" />
-                  <p className="text-lg font-bold text-foreground">{summary.totalEmployees}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Total Employees</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <Send size={16} className="mx-auto text-success mb-1" />
-                  <p className="text-lg font-bold text-foreground">{summary.submitted}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Submitted</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <AlertTriangle size={16} className="mx-auto text-warning mb-1" />
-                  <p className="text-lg font-bold text-foreground">
-                    {Math.max(0, summary.totalEmployees - summary.submitted)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Pending</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <ClipboardCheck size={16} className="mx-auto text-primary mb-1" />
-                  <p className="text-lg font-bold text-foreground">{summary.assessmentsCompleted}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Assessed</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <Clock size={16} className="mx-auto text-warning mb-1" />
-                  <p className="text-lg font-bold text-foreground">{summary.managerReviewsPending}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Reviews Pending</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <CheckCircle size={16} className="mx-auto text-success mb-1" />
-                  <p className="text-lg font-bold text-foreground">{summary.approved}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Approved</p>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="p-3 text-center">
+                <Users size={16} className="mx-auto text-muted-foreground mb-1" />
+                <p className="text-lg font-bold text-foreground">{summary.totalEmployees}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Eligible</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-3 text-center">
+                <Send size={16} className="mx-auto text-success mb-1" />
+                <p className="text-lg font-bold text-foreground">{summary.submitted}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Submitted</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-3 text-center">
+                <AlertTriangle size={16} className="mx-auto text-warning mb-1" />
+                <p className="text-lg font-bold text-foreground">{Math.max(0, summary.totalEmployees - summary.submitted)}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Pending</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-3 text-center">
+                <ClipboardCheck size={16} className="mx-auto text-primary mb-1" />
+                <p className="text-lg font-bold text-foreground">{summary.assessmentsCompleted}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Assessed</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-3 text-center">
+                <Clock size={16} className="mx-auto text-warning mb-1" />
+                <p className="text-lg font-bold text-foreground">{summary.managerReviewsPending}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Reviews Pending</p>
+              </CardContent></Card>
+              <Card><CardContent className="p-3 text-center">
+                <CheckCircle size={16} className="mx-auto text-success mb-1" />
+                <p className="text-lg font-bold text-foreground">{summary.approved}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Approved</p>
+              </CardContent></Card>
             </div>
 
             {/* Progress bar */}
@@ -386,10 +429,7 @@ export default function ReviewCyclesPage() {
                   {summary.totalEmployees > 0 ? Math.round((summary.approved / summary.totalEmployees) * 100) : 0}%
                 </span>
               </div>
-              <Progress
-                value={summary.totalEmployees > 0 ? (summary.approved / summary.totalEmployees) * 100 : 0}
-                className="h-2"
-              />
+              <Progress value={summary.totalEmployees > 0 ? (summary.approved / summary.totalEmployees) * 100 : 0} className="h-2" />
             </div>
           </div>
         </div>
@@ -403,7 +443,7 @@ export default function ReviewCyclesPage() {
               <TableHead>Cycle Name</TableHead>
               <TableHead>Start Date</TableHead>
               <TableHead>End Date</TableHead>
-              <TableHead>Grace Period</TableHead>
+              <TableHead>Domains</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -416,58 +456,49 @@ export default function ReviewCyclesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              cycles.map((cycle) => (
-                <TableRow key={cycle.id}>
-                  <TableCell className="font-medium text-foreground">{cycle.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format(parseISO(cycle.start_date), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format(parseISO(cycle.end_date), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{cycle.grace_period_days} days</TableCell>
-                  <TableCell>{statusBadge(cycle.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-1 justify-end">
-                      {cycle.status === "draft" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs gap-1 text-success"
-                            onClick={() => runReadinessCheck(cycle.id)}
-                          >
-                            <Play size={12} /> Activate
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs gap-1 text-destructive"
-                            onClick={() => setConfirmDelete(cycle.id)}
-                          >
-                            <Trash2 size={12} /> Delete
-                          </Button>
-                        </>
-                      )}
-                      {cycle.status === "active" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs gap-1 text-destructive"
-                          onClick={() => setConfirmClose(cycle.id)}
-                        >
-                          <Square size={12} /> Close
-                        </Button>
-                      )}
-                      {cycle.status === "closed" && cycle.closed_at && (
-                        <span className="text-xs text-muted-foreground">
-                          Closed {format(parseISO(cycle.closed_at), "MMM d")}
+              cycles.map((cycle) => {
+                const cycleDomains = getSelectedDomainIds(cycle.id);
+                const domainNames = cycleDomains.map(id => domains.find(d => d.id === id)?.name).filter(Boolean);
+                return (
+                  <TableRow key={cycle.id}>
+                    <TableCell className="font-medium text-foreground">{cycle.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{format(parseISO(cycle.start_date), "MMM d, yyyy")}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{format(parseISO(cycle.end_date), "MMM d, yyyy")}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {domainNames.length > 0 ? (
+                        <span className="truncate max-w-[200px] inline-block" title={domainNames.join(', ')}>
+                          {domainNames.length <= 2 ? domainNames.join(', ') : `${domainNames.length} domains`}
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
                       )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell>{statusBadge(cycle.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        {cycle.status === "draft" && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success" onClick={() => runReadinessCheck(cycle.id)}>
+                              <Play size={12} /> Activate
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive" onClick={() => setConfirmDelete(cycle.id)}>
+                              <Trash2 size={12} /> Delete
+                            </Button>
+                          </>
+                        )}
+                        {cycle.status === "active" && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive" onClick={() => setConfirmClose(cycle.id)}>
+                            <Square size={12} /> Close
+                          </Button>
+                        )}
+                        {cycle.status === "closed" && cycle.closed_at && (
+                          <span className="text-xs text-muted-foreground">Closed {format(parseISO(cycle.closed_at), "MMM d")}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -485,69 +516,39 @@ export default function ReviewCyclesPage() {
               <Label>Cycle Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. 2026-Q2" maxLength={50} />
             </div>
-
             <div className="space-y-2">
               <Label>Start Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}
-                  >
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {startDate ? format(startDate, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
-
             <div className="space-y-2">
               <Label>End Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}
-                  >
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {endDate ? format(endDate, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
+                  <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
-
             <div className="space-y-2">
               <Label>Grace Period (days)</Label>
-              <Input
-                type="number"
-                value={graceDays}
-                onChange={(e) => setGraceDays(Number(e.target.value))}
-                min={0}
-                max={30}
-              />
-              <p className="text-xs text-muted-foreground">
-                Employees can submit during this period after the end date.
-              </p>
+              <Input type="number" value={graceDays} onChange={(e) => setGraceDays(Number(e.target.value))} min={0} max={30} />
+              <p className="text-xs text-muted-foreground">Employees can submit during this period after the end date.</p>
             </div>
-
             <Button onClick={handleCreate} disabled={saving} className="w-full">
               {saving ? "Creating…" : "Create Cycle"}
             </Button>
@@ -555,14 +556,14 @@ export default function ReviewCyclesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Confirm dialogs */}
+      {/* Confirm Activate */}
       <AlertDialog open={!!confirmActivate} onOpenChange={() => setConfirmActivate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Activate Cycle?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will enable skill registry submissions for all employees and send notifications. Any previously
-              active cycle will be closed.
+              This will enable skill registry submissions for employees in {selectedDomains.length} selected domain(s) and send notifications.
+              {cycles.find(c => c.status === 'active' && c.id !== confirmActivate) && " Any previously active cycle will be closed."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -572,71 +573,82 @@ export default function ReviewCyclesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Confirm Close */}
       <AlertDialog open={!!confirmClose} onOpenChange={() => setConfirmClose(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Close Cycle?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will lock new submissions and assessment attempts. Manager reviews can still be completed after
-              closure.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This will lock new submissions and assessment attempts. Manager reviews can still be completed after closure.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClose}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Close Cycle
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleClose} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Close Cycle</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Confirm Delete */}
       <AlertDialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Cycle?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This cycle will be permanently deleted. This cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This cycle will be permanently deleted. This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Readiness Check Dialog */}
+      {/* Readiness Check + Domain Selection Dialog */}
       <AlertDialog open={readinessOpen} onOpenChange={(open) => { if (!open) { setReadinessOpen(false); setReadinessTarget(null); } }}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <ClipboardCheck size={18} /> Pre-Activation Readiness Check
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Review the checklist below before activating this cycle.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Review the checklist and select participating domains.</AlertDialogDescription>
           </AlertDialogHeader>
           {readinessLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Running checks…</div>
           ) : (
-            <div className="space-y-2 my-2 max-h-64 overflow-y-auto">
-              {readinessChecks.map((check, i) => (
-                <div key={i} className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                  {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
-                  <div>
-                    <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
-                    {check.detail && <p className="text-xs text-muted-foreground mt-0.5">{check.detail}</p>}
+            <div className="space-y-4">
+              {/* Readiness Checks */}
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {readinessChecks.map((check, i) => (
+                  <div key={i} className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                    {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
+                    <div>
+                      <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                      {check.detail && <p className="text-xs text-muted-foreground mt-0.5">{check.detail}</p>}
+                    </div>
                   </div>
+                ))}
+              </div>
+
+              {/* Domain Selection */}
+              <div className="border-t border-border pt-3">
+                <p className="text-sm font-medium text-foreground mb-2">Select Participating Domains</p>
+                <p className="text-xs text-muted-foreground mb-3">Only employees assigned to selected domains will be eligible for this cycle.</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {activeDomains.map((domain) => (
+                    <label key={domain.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={selectedDomains.includes(domain.id)}
+                        onCheckedChange={() => toggleDomain(domain.id)}
+                      />
+                      <span className="text-sm text-foreground">{domain.name}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {mappings.filter(m => m.domain_id === domain.id).length} skills
+                      </span>
+                    </label>
+                  ))}
                 </div>
-              ))}
+                {selectedDomains.length === 0 && (
+                  <p className="text-xs text-destructive mt-1">Select at least one domain to proceed.</p>
+                )}
+              </div>
             </div>
           )}
           <AlertDialogFooter>
@@ -647,7 +659,10 @@ export default function ReviewCyclesPage() {
                   setReadinessOpen(false);
                   setConfirmActivate(readinessTarget);
                 }}
-                disabled={readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')}
+                disabled={
+                  selectedDomains.length === 0 ||
+                  readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')
+                }
               >
                 Proceed to Activate
               </AlertDialogAction>
@@ -655,6 +670,51 @@ export default function ReviewCyclesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manual Override / Manage Employees Sheet */}
+      <Sheet open={overrideOpen} onOpenChange={setOverrideOpen}>
+        <SheetContent className="sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Shield size={18} /> Manage Employee Submissions
+            </SheetTitle>
+            <SheetDescription>
+              View eligible employee status and perform manual overrides for the active cycle.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">
+            {overrideLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading employees…</div>
+            ) : pendingEmployees.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No eligible employees found for this cycle.</p>
+            ) : (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                {pendingEmployees.map((emp) => (
+                  <div key={emp.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-border bg-card">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{emp.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{emp.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {statusBadgeSmall(emp.status)}
+                      {emp.status === 'draft' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => handleForceSubmit(emp)}
+                        >
+                          <Upload size={12} /> Force Submit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

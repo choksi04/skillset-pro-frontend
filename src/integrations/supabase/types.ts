@@ -441,6 +441,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cycle_domain_selections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cycle_id: string
+          domain_id: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cycle_id: string
+          domain_id: string
+          id?: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cycle_id?: string
+          domain_id?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       domain_skill_mappings: {
         Row: {
           created_at: string

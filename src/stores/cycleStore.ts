@@ -18,6 +18,12 @@ export interface ReviewCycle {
   modified_by?: string;
 }
 
+export interface CycleDomainSelection {
+  cycle_id: string;
+  domain_id: string;
+  tenant_id: string;
+}
+
 export interface CycleSummary {
   totalEmployees: number;
   submitted: number;
@@ -33,16 +39,19 @@ interface CycleStore {
   loading: boolean;
   initialized: boolean;
   summary: CycleSummary | null;
+  cycleDomainSelections: CycleDomainSelection[];
 
   fetchCycles: () => Promise<void>;
   createCycle: (params: { tenant_id: string; name: string; start_date: string; end_date: string; grace_period_days?: number }) => Promise<void>;
-  activateCycle: (cycleId: string) => Promise<void>;
+  activateCycle: (cycleId: string, selectedDomainIds: string[]) => Promise<void>;
   closeCycle: (cycleId: string) => Promise<void>;
   deleteCycle: (cycleId: string) => Promise<void>;
   sendReminder: (cycleId: string) => Promise<number>;
   computeSummary: (tenantId: string) => Promise<void>;
   isSubmissionAllowed: () => boolean;
   getDaysRemaining: () => number | null;
+  getSelectedDomainIds: (cycleId: string) => string[];
+  forceSubmitEmployee: (submissionId: string) => Promise<void>;
 }
 
 export const useCycleStore = create<CycleStore>((set, get) => ({
@@ -51,22 +60,27 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
   loading: false,
   initialized: false,
   summary: null,
+  cycleDomainSelections: [],
 
   fetchCycles: async () => {
     set({ loading: true });
     try {
-      const { data, error } = await supabase
-        .from('review_cycles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+      const [cyclesRes, selectionsRes] = await Promise.all([
+        supabase.from('review_cycles').select('*').order('created_at', { ascending: false }),
+        supabase.from('cycle_domain_selections').select('*'),
+      ]);
+      if (cyclesRes.error) throw cyclesRes.error;
 
-      const cycles: ReviewCycle[] = (data || []).map((c: any) => ({
+      const cycles: ReviewCycle[] = (cyclesRes.data || []).map((c: any) => ({
         id: c.id, tenant_id: c.tenant_id, name: c.name,
         start_date: c.start_date, end_date: c.end_date,
         grace_period_days: c.grace_period_days, status: c.status as any,
         closed_at: c.closed_at, created_at: c.created_at,
         created_by: c.created_by, modified_at: c.modified_at, modified_by: c.modified_by,
+      }));
+
+      const cycleDomainSelections: CycleDomainSelection[] = (selectionsRes.data || []).map((s: any) => ({
+        cycle_id: s.cycle_id, domain_id: s.domain_id, tenant_id: s.tenant_id,
       }));
 
       let active = cycles.find((c) => c.status === 'active') || null;
@@ -86,7 +100,7 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
         }
       }
 
-      set({ cycles, activeCycle: active?.status === 'active' ? active : null, loading: false, initialized: true });
+      set({ cycles, cycleDomainSelections, activeCycle: active?.status === 'active' ? active : null, loading: false, initialized: true });
     } catch (err) {
       console.error('Failed to fetch cycles:', err);
       set({ loading: false, initialized: true });
@@ -108,7 +122,7 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
     set((s) => ({ cycles: [newCycle, ...s.cycles] }));
   },
 
-  activateCycle: async (cycleId) => {
+  activateCycle: async (cycleId, selectedDomainIds) => {
     const cycle = get().cycles.find((c) => c.id === cycleId);
     if (!cycle) return;
     const userId = getCurrentUserId();
@@ -122,12 +136,44 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
       }).eq('id', currentActive.id);
     }
 
+    // Save selected domains
+    // Remove old selections for this cycle first
+    await supabase.from('cycle_domain_selections').delete().eq('cycle_id', cycleId);
+    if (selectedDomainIds.length > 0) {
+      await supabase.from('cycle_domain_selections').insert(
+        selectedDomainIds.map((domainId) => ({
+          cycle_id: cycleId, domain_id: domainId, tenant_id: cycle.tenant_id, created_by: userId,
+        }))
+      );
+    }
+
     // Activate new cycle
     await supabase.from('review_cycles').update({
       status: 'active', modified_at: now, modified_by: userId,
     }).eq('id', cycleId);
 
-    // Send notifications to ALL active users in tenant (role-specific messages)
+    // Get eligible employees: only from selected domains
+    const { data: domainAssignments } = await supabase
+      .from('employee_domain_assignments')
+      .select('employee_id, domain_id')
+      .eq('tenant_id', cycle.tenant_id)
+      .in('domain_id', selectedDomainIds);
+
+    const eligibleEmployeeIds = new Set((domainAssignments || []).map((a: any) => a.employee_id));
+
+    // Also include users with domain_id directly set (legacy)
+    const { data: directUsers } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('tenant_id', cycle.tenant_id)
+      .eq('status', 'active')
+      .in('domain_id', selectedDomainIds);
+
+    for (const u of directUsers || []) {
+      eligibleEmployeeIds.add(u.id);
+    }
+
+    // Send notifications to eligible users + all managers/admins
     const { data: allUsers } = await supabase
       .from('users')
       .select('id, role')
@@ -135,32 +181,44 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
       .eq('status', 'active');
 
     if (allUsers && allUsers.length > 0) {
-      const notifications = allUsers.map((u: any) => {
-        let message = '';
-        let actionLink = '/skill-registry';
-        if (u.role === 'employee') {
-          message = `A new review cycle '${cycle.name}' has started. Submit your skill ratings by ${format(parseISO(cycle.end_date), 'MMM d, yyyy')}.`;
-        } else if (u.role === 'manager') {
-          message = `A new review cycle '${cycle.name}' has started. Monitor your team's progress.`;
-          actionLink = '/review-cycles';
-        } else {
-          message = `Review cycle '${cycle.name}' is now active.`;
-          actionLink = '/review-cycles';
-        }
-        return {
-          id: `notif-cycle-${Date.now()}-${u.id}`,
-          tenant_id: cycle.tenant_id,
-          target_role: u.role,
-          target_user_id: u.id,
-          message,
-          type: 'cycle_activated',
-          reference_id: cycleId,
-          action_link: actionLink,
-          read: false,
-        };
-      });
-      await supabase.from('notifications').insert(notifications);
+      const notifications = allUsers
+        .filter((u: any) => {
+          // Include all managers/admins, and employees only if eligible
+          if (u.role === 'employee') return eligibleEmployeeIds.has(u.id);
+          return true;
+        })
+        .map((u: any) => {
+          let message = '';
+          let actionLink = '/skill-registry';
+          if (u.role === 'employee') {
+            message = `A new review cycle '${cycle.name}' has started. Submit your skill ratings by ${format(parseISO(cycle.end_date), 'MMM d, yyyy')}.`;
+          } else if (u.role === 'manager') {
+            message = `A new review cycle '${cycle.name}' has started. Monitor your team's progress.`;
+            actionLink = '/review-cycles';
+          } else {
+            message = `Review cycle '${cycle.name}' is now active.`;
+            actionLink = '/review-cycles';
+          }
+          return {
+            id: `notif-cycle-${Date.now()}-${u.id}`,
+            tenant_id: cycle.tenant_id,
+            target_role: u.role,
+            target_user_id: u.id,
+            message,
+            type: 'cycle_activated',
+            reference_id: cycleId,
+            action_link: actionLink,
+            read: false,
+          };
+        });
+      if (notifications.length > 0) {
+        await supabase.from('notifications').insert(notifications);
+      }
     }
+
+    const newSelections: CycleDomainSelection[] = selectedDomainIds.map((domainId) => ({
+      cycle_id: cycleId, domain_id: domainId, tenant_id: cycle.tenant_id,
+    }));
 
     const updated = { ...cycle, status: 'active' as const, modified_at: now };
     set((s) => ({
@@ -170,6 +228,10 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
           : c
       ),
       activeCycle: updated,
+      cycleDomainSelections: [
+        ...s.cycleDomainSelections.filter((sel) => sel.cycle_id !== cycleId),
+        ...newSelections,
+      ],
     }));
   },
 
@@ -187,10 +249,12 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
   },
 
   deleteCycle: async (cycleId) => {
+    await supabase.from('cycle_domain_selections').delete().eq('cycle_id', cycleId);
     await supabase.from('review_cycles').delete().eq('id', cycleId);
     set((s) => ({
       cycles: s.cycles.filter((c) => c.id !== cycleId),
       activeCycle: s.activeCycle?.id === cycleId ? null : s.activeCycle,
+      cycleDomainSelections: s.cycleDomainSelections.filter((sel) => sel.cycle_id !== cycleId),
     }));
   },
 
@@ -198,13 +262,40 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
     const cycle = get().cycles.find((c) => c.id === cycleId);
     if (!cycle) return 0;
 
-    // Find employees who haven't submitted for this cycle
-    const { data: employees } = await supabase
-      .from('users')
-      .select('id')
-      .eq('tenant_id', cycle.tenant_id)
-      .eq('role', 'employee')
-      .eq('status', 'active');
+    // Get selected domains for this cycle
+    const selectedDomainIds = get().getSelectedDomainIds(cycleId);
+
+    // Find eligible employees (assigned to selected domains)
+    let employeeIds: string[] = [];
+    if (selectedDomainIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from('employee_domain_assignments')
+        .select('employee_id')
+        .eq('tenant_id', cycle.tenant_id)
+        .in('domain_id', selectedDomainIds);
+      
+      const { data: directUsers } = await supabase
+        .from('users')
+        .select('id')
+        .eq('tenant_id', cycle.tenant_id)
+        .eq('status', 'active')
+        .in('domain_id', selectedDomainIds);
+
+      const idSet = new Set([
+        ...(assignments || []).map((a: any) => a.employee_id),
+        ...(directUsers || []).map((u: any) => u.id),
+      ]);
+      employeeIds = Array.from(idSet);
+    } else {
+      // Fallback: all employees
+      const { data: employees } = await supabase
+        .from('users')
+        .select('id')
+        .eq('tenant_id', cycle.tenant_id)
+        .eq('role', 'employee')
+        .eq('status', 'active');
+      employeeIds = (employees || []).map((e: any) => e.id);
+    }
 
     const { data: submissions } = await supabase
       .from('skill_registry_submissions')
@@ -213,14 +304,14 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
       .is('deleted_on', null);
 
     const submittedIds = new Set((submissions || []).map((s: any) => s.employee_id));
-    const pending = (employees || []).filter((e: any) => !submittedIds.has(e.id));
+    const pending = employeeIds.filter((id) => !submittedIds.has(id));
 
     if (pending.length > 0) {
-      const notifications = pending.map((emp: any) => ({
-        id: `notif-remind-${Date.now()}-${emp.id}`,
+      const notifications = pending.map((empId) => ({
+        id: `notif-remind-${Date.now()}-${empId}`,
         tenant_id: cycle.tenant_id,
         target_role: 'employee',
-        target_user_id: emp.id,
+        target_user_id: empId,
         message: `Reminder: Please submit your skill ratings for '${cycle.name}' before ${format(parseISO(cycle.end_date), 'MMM d, yyyy')}.`,
         type: 'submission_reminder',
         reference_id: cycleId,
@@ -237,8 +328,35 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
     const active = get().activeCycle;
     if (!active) { set({ summary: null }); return; }
 
-    const [empRes, subRes, assRes, attRes, revRes] = await Promise.all([
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('role', 'employee').eq('status', 'active'),
+    const selectedDomainIds = get().getSelectedDomainIds(active.id);
+
+    // Count eligible employees (from selected domains only)
+    let totalEmployees = 0;
+    if (selectedDomainIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from('employee_domain_assignments')
+        .select('employee_id')
+        .eq('tenant_id', tenantId)
+        .in('domain_id', selectedDomainIds);
+      
+      const { data: directUsers } = await supabase
+        .from('users')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+        .in('domain_id', selectedDomainIds);
+
+      const uniqueIds = new Set([
+        ...(assignments || []).map((a: any) => a.employee_id),
+        ...(directUsers || []).map((u: any) => u.id),
+      ]);
+      totalEmployees = uniqueIds.size;
+    } else {
+      const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('role', 'employee').eq('status', 'active');
+      totalEmployees = count || 0;
+    }
+
+    const [subRes, assRes, attRes, revRes] = await Promise.all([
       supabase.from('skill_registry_submissions').select('id', { count: 'exact', head: true }).eq('cycle', active.name).is('deleted_on', null),
       supabase.from('assessments').select('id', { count: 'exact', head: true }).is('deleted_on', null),
       supabase.from('assessment_attempts').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'evaluated']).is('deleted_on', null),
@@ -250,7 +368,7 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
 
     set({
       summary: {
-        totalEmployees: empRes.count || 0,
+        totalEmployees,
         submitted: subRes.count || 0,
         assessmentsPending: (assRes.count || 0) - (attRes.count || 0),
         assessmentsCompleted: attRes.count || 0,
@@ -274,5 +392,20 @@ export const useCycleStore = create<CycleStore>((set, get) => ({
     const end = parseISO(active.end_date);
     const days = differenceInDays(end, new Date());
     return days;
+  },
+
+  getSelectedDomainIds: (cycleId) => {
+    return get().cycleDomainSelections
+      .filter((s) => s.cycle_id === cycleId)
+      .map((s) => s.domain_id);
+  },
+
+  forceSubmitEmployee: async (submissionId) => {
+    const now = new Date().toISOString();
+    const userId = getCurrentUserId();
+    const { error } = await supabase.from('skill_registry_submissions').update({
+      status: 'submitted', submitted_at: now, updated_at: now, modified_by: userId, modified_at: now,
+    }).eq('id', submissionId);
+    if (error) throw error;
   },
 }));
