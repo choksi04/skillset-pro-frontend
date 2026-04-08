@@ -61,6 +61,8 @@ function CommentInput({ initial, onSave, onCancel }: { initial: string; onSave: 
 
 function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: SkillReviewEntry; skillName: string; reviewId: string; isCompleted: boolean }) {
   const { setSkillAction, setSkillComment } = useReviewStore();
+  const { levels } = useCompetencyLevelStore();
+  const ratingLabels = getRatingLabels(levels);
   const [commentOpen, setCommentOpen] = useState(false);
   const [adjustLevel, setAdjustLevel] = useState<number>(entry.ai_calculated_level);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -78,10 +80,10 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
     <>
       <tr className="border-b border-border hover:bg-muted/30 transition-colors">
         <td className="py-3 px-4"><span className="text-sm font-medium text-foreground">{skillName}</span></td>
-        <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating]}</Badge></td>
+        <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating] ?? `Level ${entry.self_rating}`}</Badge></td>
         <td className="py-3 px-4">
           <div className="flex flex-col items-center gap-1">
-            <Badge className={`text-xs ${levelColors[entry.ai_calculated_level]}`}>L{entry.ai_calculated_level}</Badge>
+            <Badge className={`text-xs ${getLevelColorClass(entry.ai_calculated_level)}`}>L{entry.ai_calculated_level}</Badge>
             <ScoreBar score={entry.ai_score} />
           </div>
         </td>
@@ -113,7 +115,7 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
             <Label className="text-xs text-muted-foreground">New Level</Label>
             <Select value={String(adjustLevel)} onValueChange={(v) => setAdjustLevel(Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{[1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={String(l)}>{levelLabels[l]}</SelectItem>)}</SelectContent>
+              <SelectContent>{[1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={String(l)}>{getFormattedLevelLabel(levels, l)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <DialogFooter>

@@ -4,6 +4,7 @@ import { useReviewStore, OfficialSkillEntry } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useRegistryStore } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getLevelColorClass, getShortLevelLabel } from '@/stores/competencyLevelStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -271,13 +272,13 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     {[1, 2, 3, 4, 5].map(l => (
                       <TableCell key={l} className="text-center">
-                        <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? levelColors[l] : 'opacity-40'}`}>
+                        <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? getLevelColorClass(l) : 'opacity-40'}`}>
                           {row.levels[l]}
                         </Badge>
                       </TableCell>
                     ))}
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${levelColors[Math.round(row.avgLevel)] || ''}`}>
+                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.avgLevel))}`}>
                         {row.avgLevel}
                       </Badge>
                     </TableCell>
@@ -325,8 +326,8 @@ export default function AllRegistriesPage() {
                       <Badge variant="outline" className="text-[10px]">L{row.assessmentAvg}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${levelColors[Math.round(row.finalAvg)] || ''}`}>
-                        {levelLabels[Math.round(row.finalAvg)] || `L${row.finalAvg}`}
+                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.finalAvg))}`}>
+                        {getShortLevelLabel(useCompetencyLevelStore.getState().levels, Math.round(row.finalAvg))}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
