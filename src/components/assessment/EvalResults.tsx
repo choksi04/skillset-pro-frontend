@@ -23,12 +23,26 @@ function parseMCQForDisplay(questionText: string) {
     const parsed = JSON.parse(questionText);
     if (parsed.questionText && Array.isArray(parsed.options)) {
       return {
+        questionText: parsed.questionText as string,
         options: parsed.options as string[],
         correctIndex: typeof parsed.correctIndex === 'number' ? parsed.correctIndex : null,
       };
     }
   } catch { /* not JSON */ }
   return null;
+}
+
+/** Extract human-readable question text from potentially JSON-encoded question_text */
+function getDisplayQuestionText(questionText: string, questionType?: string): string {
+  try {
+    const parsed = JSON.parse(questionText);
+    if (questionType === 'mcq' && parsed.questionText) return parsed.questionText;
+    if (questionType === 'coding' && parsed.problemStatement) return parsed.problemStatement;
+    if (parsed.questionText) return parsed.questionText;
+    if (parsed.question_text) return parsed.question_text;
+    if (parsed.problemStatement) return parsed.problemStatement;
+  } catch { /* not JSON, use as-is */ }
+  return questionText;
 }
 
 export default function EvalResults({ attempt, assessment }: EvalResultsProps) {

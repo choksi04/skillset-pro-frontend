@@ -95,10 +95,9 @@ function evaluateMCQ(answer: AnswerPayload): EvaluationResult {
       ? 'Correct answer selected.'
       : `Incorrect. The correct answer was ${correctLetter}.`,
     dimensions: [
-      { dimension: 'Correctness', score: isCorrect ? 100 : 0, comment: isCorrect ? 'Answer matches the correct option.' : `Selected answer does not match correct option (${correctLetter}).` },
-      { dimension: 'Knowledge', score: isCorrect ? 90 : 10, comment: isCorrect ? 'Demonstrates knowledge of the concept.' : 'Incorrect selection suggests gaps in understanding.' },
+      { dimension: 'Correctness', score, comment: isCorrect ? 'Answer matches the correct option.' : `Selected answer does not match correct option (${correctLetter}).` },
     ],
-    confidence: 0.99,
+    confidence: isCorrect ? 1.0 : 0,
   };
 }
 

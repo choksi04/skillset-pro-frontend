@@ -36,6 +36,7 @@ export interface SkillScore {
  * Falls back to hardcoded thresholds if fetch fails.
  */
 async function fetchAndScoreToLevel(score: number): Promise<number> {
+  if (score === 0) return 1;
   try {
     const { data } = await supabase.from('competency_levels').select('*').eq('status', 'active').order('level');
     if (data && data.length > 0) {
