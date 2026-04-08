@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useCycleStore, ReviewCycle } from "@/stores/cycleStore";
+import { useDomainStore } from "@/stores/domainStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useQuestionStore } from "@/stores/questionStore";
+import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
+import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,12 +96,27 @@ export default function ReviewCyclesPage() {
   const [confirmActivate, setConfirmActivate] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; detail?: string }[]>([]);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+
+  const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { questions, fetchQuestions } = useQuestionStore();
+  const { configs, fetchConfigs } = useAssessmentConfigStore();
+  const { levels, fetchLevels } = useCompetencyLevelStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
   useEffect(() => {
     fetchCycles();
-  }, [fetchCycles]);
+    fetchDomains();
+    fetchSkills();
+    fetchQuestions();
+    fetchConfigs();
+    fetchLevels();
+  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels]);
 
   useEffect(() => {
     if (activeCycle) computeSummary(tenantId);
@@ -133,6 +154,92 @@ export default function ReviewCyclesPage() {
     setSaving(false);
   };
 
+  const runReadinessCheck = async (cycleId: string) => {
+    setReadinessTarget(cycleId);
+    setReadinessLoading(true);
+    setReadinessOpen(true);
+
+    const checks: { label: string; pass: boolean; detail?: string }[] = [];
+
+    // 1. At least one active domain exists
+    const activeDomains = domains.filter(d => d.status === 'active');
+    checks.push({
+      label: 'At least one active domain exists',
+      pass: activeDomains.length > 0,
+      detail: activeDomains.length > 0 ? `${activeDomains.length} active domain(s)` : 'No active domains found',
+    });
+
+    // 2. All active domains have skills mapped
+    const domainsWithoutSkills = activeDomains.filter(d => {
+      const mapped = mappings.filter(m => m.domain_id === d.id);
+      return mapped.length === 0;
+    });
+    checks.push({
+      label: 'All domains have skills mapped',
+      pass: domainsWithoutSkills.length === 0,
+      detail: domainsWithoutSkills.length > 0 ? `Missing: ${domainsWithoutSkills.map(d => d.name).join(', ')}` : 'All domains have mapped skills',
+    });
+
+    // 3. Sufficient published questions per skill/level/type
+    const publishedQuestions = questions.filter(q => q.status === 'published');
+    const levelMap = getLevelToCompetencyMap(levels);
+    const questionTypes = ['mcq', 'scenario', 'coding'];
+    const gaps: string[] = [];
+
+    for (const domain of activeDomains) {
+      const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
+      for (const skillId of domainSkillIds) {
+        const skill = skills.find(s => s.id === skillId);
+        for (const [levelNum, levelName] of Object.entries(levelMap)) {
+          for (const qType of questionTypes) {
+            const { min } = getQuestionLimits(configs, qType);
+            if (min <= 0) continue;
+            const count = publishedQuestions.filter(
+              q => q.skill_id === skillId && q.competency_level === levelName && q.question_type === qType
+            ).length;
+            if (count < min) {
+              gaps.push(`${skill?.skill_name || skillId} / L${levelNum} / ${qType}: ${count}/${min}`);
+            }
+          }
+        }
+      }
+    }
+    checks.push({
+      label: 'Sufficient published questions for all skills',
+      pass: gaps.length === 0,
+      detail: gaps.length > 0 ? `${gaps.length} gap(s) found. ${gaps.slice(0, 5).join('; ')}${gaps.length > 5 ? ` ...and ${gaps.length - 5} more` : ''}` : 'All skill/level/type combinations covered',
+    });
+
+    // 4. All domains have at least one assigned employee
+    const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
+    const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
+    const domainsWithoutEmployees = activeDomains.filter(d => !assignedDomainIds.has(d.id));
+    checks.push({
+      label: 'All domains have assigned employees',
+      pass: domainsWithoutEmployees.length === 0,
+      detail: domainsWithoutEmployees.length > 0 ? `Missing: ${domainsWithoutEmployees.map(d => d.name).join(', ')}` : 'All domains have employees',
+    });
+
+    // 5. All domains have a domain lead
+    const domainsWithoutLead = activeDomains.filter(d => !d.domain_lead_id);
+    checks.push({
+      label: 'All domains have a domain lead assigned',
+      pass: domainsWithoutLead.length === 0,
+      detail: domainsWithoutLead.length > 0 ? `Missing: ${domainsWithoutLead.map(d => d.name).join(', ')}` : 'All domains have leads',
+    });
+
+    // 6. No other active cycle
+    const otherActive = cycles.find(c => c.status === 'active' && c.id !== cycleId);
+    checks.push({
+      label: 'No other cycle currently active',
+      pass: !otherActive,
+      detail: otherActive ? `"${otherActive.name}" is currently active and will be auto-closed` : 'No conflicts',
+    });
+
+    setReadinessChecks(checks);
+    setReadinessLoading(false);
+  };
+
   const handleActivate = async () => {
     if (!confirmActivate) return;
     try {
@@ -142,6 +249,8 @@ export default function ReviewCyclesPage() {
       toast.error(err.message || "Failed to activate cycle");
     }
     setConfirmActivate(null);
+    setReadinessOpen(false);
+    setReadinessTarget(null);
   };
 
   const handleClose = async () => {
@@ -326,7 +435,7 @@ export default function ReviewCyclesPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-xs gap-1 text-success"
-                            onClick={() => setConfirmActivate(cycle.id)}
+                            onClick={() => runReadinessCheck(cycle.id)}
                           >
                             <Play size={12} /> Activate
                           </Button>
@@ -500,6 +609,49 @@ export default function ReviewCyclesPage() {
             >
               Delete
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Readiness Check Dialog */}
+      <AlertDialog open={readinessOpen} onOpenChange={(open) => { if (!open) { setReadinessOpen(false); setReadinessTarget(null); } }}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ClipboardCheck size={18} /> Pre-Activation Readiness Check
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Review the checklist below before activating this cycle.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {readinessLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Running checks…</div>
+          ) : (
+            <div className="space-y-2 my-2 max-h-64 overflow-y-auto">
+              {readinessChecks.map((check, i) => (
+                <div key={i} className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                  {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
+                  <div>
+                    <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                    {check.detail && <p className="text-xs text-muted-foreground mt-0.5">{check.detail}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {!readinessLoading && (
+              <AlertDialogAction
+                onClick={() => {
+                  setReadinessOpen(false);
+                  setConfirmActivate(readinessTarget);
+                }}
+                disabled={readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')}
+              >
+                Proceed to Activate
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

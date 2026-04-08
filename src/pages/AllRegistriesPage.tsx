@@ -4,6 +4,7 @@ import { useReviewStore, OfficialSkillEntry } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useRegistryStore } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getLevelColorClass, getShortLevelLabel } from '@/stores/competencyLevelStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,17 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Download, Search, Database, Users, BarChart3 } from 'lucide-react';
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic', 2: 'L2 – Working', 3: 'L3 – Independent', 4: 'L4 – Advanced', 5: 'L5 – Expert',
-};
-
-const levelColors: Record<number, string> = {
-  1: 'bg-muted text-muted-foreground',
-  2: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-  3: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
-  4: 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
-  5: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-};
+// levelLabels and levelColors now come from competencyLevelStore
 
 // ── Skills view aggregation ──
 interface SkillAgg {
@@ -281,13 +272,13 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     {[1, 2, 3, 4, 5].map(l => (
                       <TableCell key={l} className="text-center">
-                        <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? levelColors[l] : 'opacity-40'}`}>
+                        <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? getLevelColorClass(l) : 'opacity-40'}`}>
                           {row.levels[l]}
                         </Badge>
                       </TableCell>
                     ))}
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${levelColors[Math.round(row.avgLevel)] || ''}`}>
+                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.avgLevel))}`}>
                         {row.avgLevel}
                       </Badge>
                     </TableCell>
@@ -335,8 +326,8 @@ export default function AllRegistriesPage() {
                       <Badge variant="outline" className="text-[10px]">L{row.assessmentAvg}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${levelColors[Math.round(row.finalAvg)] || ''}`}>
-                        {levelLabels[Math.round(row.finalAvg)] || `L${row.finalAvg}`}
+                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.finalAvg))}`}>
+                        {getShortLevelLabel(useCompetencyLevelStore.getState().levels, Math.round(row.finalAvg))}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>

@@ -4,7 +4,8 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useRegistryStore, ratingLabels, RatingLevel } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getFormattedLevelLabel, getShortLevelLabel, getLevelColorClass } from '@/stores/competencyLevelStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,21 +25,7 @@ import {
 
 // ── Shared constants ──
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic',
-  2: 'L2 – Working',
-  3: 'L3 – Independent',
-  4: 'L4 – Advanced',
-  5: 'L5 – Expert',
-};
-
-const levelFullLabels: Record<number, string> = {
-  1: 'L1 – Basic Awareness',
-  2: 'L2 – Working Knowledge',
-  3: 'L3 – Independent',
-  4: 'L4 – Advanced',
-  5: 'L5 – Expert',
-};
+// levelLabels and levelFullLabels now come from competencyLevelStore
 
 const CHART_COLORS = [
   'hsl(210, 75%, 42%)',   // primary
@@ -76,16 +63,10 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 // ── Level Badge ──
 
 function LevelBadge({ level }: { level: number }) {
-  const colors: Record<number, string> = {
-    1: 'bg-muted text-muted-foreground',
-    2: 'bg-info/15 text-info',
-    3: 'bg-accent/15 text-accent',
-    4: 'bg-warning/15 text-warning',
-    5: 'bg-success/15 text-success',
-  };
+  const { levels } = useCompetencyLevelStore();
   return (
-    <Badge className={`text-xs ${colors[level] ?? 'bg-muted text-muted-foreground'}`}>
-      {levelLabels[level] ?? `L${level}`}
+    <Badge className={`text-xs ${getLevelColorClass(level)}`}>
+      {getShortLevelLabel(levels, level)}
     </Badge>
   );
 }
@@ -262,7 +243,7 @@ function DistributionTab({
     entries.forEach((e) => { counts[e.final_level] = (counts[e.final_level] ?? 0) + 1; });
     return Object.entries(counts)
       .filter(([, v]) => v > 0)
-      .map(([k, v]) => ({ name: levelLabels[Number(k)], value: v, level: Number(k) }));
+      .map(([k, v]) => ({ name: getShortLevelLabel(useCompetencyLevelStore.getState().levels, Number(k)), value: v, level: Number(k) }));
   }, [entries]);
 
   // Per-domain avg level (bar)

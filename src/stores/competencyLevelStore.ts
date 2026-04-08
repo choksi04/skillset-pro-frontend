@@ -153,3 +153,31 @@ export function getRatingDescriptions(levels: CompetencyLevel[]): Record<number,
   }
   return map;
 }
+
+/** Semantic color classes for level badges */
+const LEVEL_COLOR_CLASSES: Record<number, string> = {
+  1: 'bg-muted text-muted-foreground',
+  2: 'bg-info/15 text-info',
+  3: 'bg-accent/15 text-accent',
+  4: 'bg-warning/15 text-warning',
+  5: 'bg-success/15 text-success',
+};
+
+/** Get CSS class for a level number badge */
+export function getLevelColorClass(level: number): string {
+  return LEVEL_COLOR_CLASSES[level] ?? 'bg-muted text-muted-foreground';
+}
+
+/** Get formatted level label like "L1 – Basic Awareness" */
+export function getFormattedLevelLabel(levels: CompetencyLevel[], levelNum: number): string {
+  const l = levels.find(lv => lv.level === levelNum);
+  return l ? `L${l.level} – ${l.label}` : `L${levelNum}`;
+}
+
+/** Get short formatted level label like "L1 – Basic" */
+export function getShortLevelLabel(levels: CompetencyLevel[], levelNum: number): string {
+  const l = levels.find(lv => lv.level === levelNum);
+  if (!l) return `L${levelNum}`;
+  const shortLabel = l.label.split(' ')[0]; // First word
+  return `L${l.level} – ${shortLabel}`;
+}

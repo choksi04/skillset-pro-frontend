@@ -4,7 +4,8 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
-import { useRegistryStore, ratingLabels, RatingLevel } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels, getLevelColorClass, getFormattedLevelLabel } from '@/stores/competencyLevelStore';
 import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,12 +30,7 @@ import {
   ChevronDown, ChevronUp, Bell, Eye, Send, Shield, AlertTriangle, UserCog,
 } from 'lucide-react';
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic Awareness', 2: 'L2 – Working Knowledge', 3: 'L3 – Independent', 4: 'L4 – Advanced', 5: 'L5 – Expert',
-};
-const levelColors: Record<number, string> = {
-  1: 'bg-muted text-muted-foreground', 2: 'bg-info/15 text-info', 3: 'bg-accent/15 text-accent', 4: 'bg-warning/15 text-warning', 5: 'bg-success/15 text-success',
-};
+// levelLabels and levelColors now come from competencyLevelStore
 const actionLabels: Record<ReviewAction, { label: string; icon: React.ReactNode; color: string }> = {
   approve: { label: 'Approve', icon: <CheckCircle size={14} />, color: 'bg-success/15 text-success border-success/20' },
   adjust: { label: 'Adjust', icon: <RefreshCw size={14} />, color: 'bg-warning/15 text-warning border-warning/20' },
@@ -53,6 +49,8 @@ function ScoreBar({ score }: { score: number }) {
 
 function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: SkillReviewEntry; skillName: string; reviewId: string; isCompleted: boolean }) {
   const { setSkillAction, setSkillComment } = useReviewStore();
+  const { levels } = useCompetencyLevelStore();
+  const ratingLabels = getRatingLabels(levels);
   const [commentOpen, setCommentOpen] = useState(false);
   const [adjustLevel, setAdjustLevel] = useState<number>(entry.ai_calculated_level);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -70,10 +68,10 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
     <>
       <tr className="border-b border-border hover:bg-muted/30 transition-colors">
         <td className="py-3 px-4"><span className="text-sm font-medium text-foreground">{skillName}</span></td>
-        <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating]}</Badge></td>
+         <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating] ?? `Level ${entry.self_rating}`}</Badge></td>
         <td className="py-3 px-4">
           <div className="flex flex-col items-center gap-1">
-            <Badge className={`text-xs ${levelColors[entry.ai_calculated_level]}`}>L{entry.ai_calculated_level}</Badge>
+            <Badge className={`text-xs ${getLevelColorClass(entry.ai_calculated_level)}`}>L{entry.ai_calculated_level}</Badge>
             <ScoreBar score={entry.ai_score} />
           </div>
         </td>
@@ -105,7 +103,7 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
             <Label className="text-xs text-muted-foreground">New Level</Label>
             <Select value={String(adjustLevel)} onValueChange={(v) => setAdjustLevel(Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{[1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={String(l)}>{levelLabels[l]}</SelectItem>)}</SelectContent>
+              <SelectContent>{[1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={String(l)}>{getFormattedLevelLabel(levels, l)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <DialogFooter>

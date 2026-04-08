@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels, SkillRegistrySubmission } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel, SkillSelfRating, SkillRegistrySubmission } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useReviewStore } from '@/stores/reviewStore';
@@ -377,7 +378,7 @@ export default function SkillRegistryDetailPage() {
                 return (
                   <div key={skillId} className="flex items-center justify-between rounded-md bg-muted px-3 py-1.5">
                     <span className="text-sm text-foreground">{skill?.skill_name}</span>
-                    <span className="text-xs text-muted-foreground">Level {rating} — {ratingLabels[rating]}</span>
+                    <span className="text-xs text-muted-foreground">Level {rating} — {getRatingLabels(useCompetencyLevelStore.getState().levels)[rating] ?? `Level ${rating}`}</span>
                   </div>
                 );
               })}
@@ -582,7 +583,7 @@ function SelfReviewForm({
                               )}
                             </div>
                             {ratings[skill.id] != null && (
-                              <Badge variant="secondary" className="text-xs ml-3 shrink-0">L{ratings[skill.id]} — {ratingLabels[ratings[skill.id]]}</Badge>
+                              <Badge variant="secondary" className="text-xs ml-3 shrink-0">L{ratings[skill.id]} — {getRatingLabels(useCompetencyLevelStore.getState().levels)[ratings[skill.id]] ?? `Level ${ratings[skill.id]}`}</Badge>
                             )}
                           </div>
                           <RatingSlider

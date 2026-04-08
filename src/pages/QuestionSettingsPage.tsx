@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCompetencyLevelStore, CompetencyLevel } from '@/stores/competencyLevelStore';
+import { useAssessmentConfigStore, AssessmentConfig } from '@/stores/assessmentConfigStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,10 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from '@/components/ui/sheet';
-import { Pencil, Loader2 } from 'lucide-react';
+import { Pencil, Loader2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const questionTypes = [
+const questionTypesMeta = [
   { type: 'scenario', label: 'Scenario', description: 'Open-ended questions that test practical application of knowledge. Evaluated by AI across multiple dimensions.' },
   { type: 'mcq', label: 'Multiple Choice', description: 'Single-answer questions with 4 options. Auto-scored based on correct answer selection.' },
   { type: 'coding', label: 'Coding', description: 'Problem-solving questions requiring code implementation. AI evaluates correctness, approach, and code quality.' },
@@ -20,7 +21,8 @@ const questionTypes = [
 
 export default function QuestionSettingsPage() {
   const { levels: settings, fetchLevels, updateLevel } = useCompetencyLevelStore();
-  useEffect(() => { fetchLevels(); }, [fetchLevels]);
+  const { configs, fetchConfigs, updateConfig } = useAssessmentConfigStore();
+  useEffect(() => { fetchLevels(); fetchConfigs(); }, [fetchLevels, fetchConfigs]);
 
   const [editSetting, setEditSetting] = useState<CompetencyLevel | null>(null);
   const [name, setName] = useState('');
@@ -30,6 +32,12 @@ export default function QuestionSettingsPage() {
   const [scoreMax, setScoreMax] = useState(100);
   const [minQuestions, setMinQuestions] = useState(3);
   const [saving, setSaving] = useState(false);
+
+  // Assessment config edit state
+  const [editConfig, setEditConfig] = useState<AssessmentConfig | null>(null);
+  const [cfgMin, setCfgMin] = useState(2);
+  const [cfgMax, setCfgMax] = useState(6);
+  const [cfgSaving, setCfgSaving] = useState(false);
 
   const openEdit = (s: CompetencyLevel) => {
     setEditSetting(s);
@@ -53,12 +61,29 @@ export default function QuestionSettingsPage() {
     setEditSetting(null);
   };
 
+  const openConfigEdit = (c: AssessmentConfig) => {
+    setEditConfig(c);
+    setCfgMin(c.min_questions);
+    setCfgMax(c.max_questions);
+  };
+
+  const handleConfigSave = async () => {
+    if (!editConfig) return;
+    if (cfgMin < 0) { toast.error('Min questions cannot be negative.'); return; }
+    if (cfgMax < cfgMin) { toast.error('Max must be ≥ min.'); return; }
+    setCfgSaving(true);
+    await updateConfig(editConfig.id, { min_questions: cfgMin, max_questions: cfgMax });
+    setCfgSaving(false);
+    toast.success('Assessment config updated.');
+    setEditConfig(null);
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-foreground">Question Settings</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure competency levels, score ranges, and minimum question requirements.
+          Configure competency levels, score ranges, and assessment question limits.
         </p>
       </div>
 
@@ -98,17 +123,45 @@ export default function QuestionSettingsPage() {
         </div>
       </div>
 
-      {/* Question Types (static) */}
+      {/* Assessment Config per Question Type */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Question Types</h3>
-        <p className="text-xs text-muted-foreground">Supported question formats for skill assessments.</p>
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+          <Settings2 size={14} /> Assessment Question Limits
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Configure how many questions of each type are included per skill in generated assessments.
+        </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {questionTypes.map((qt) => (
-            <Card key={qt.type}>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">{qt.label}</CardTitle></CardHeader>
-              <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{qt.description}</p></CardContent>
-            </Card>
-          ))}
+          {questionTypesMeta.map((qt) => {
+            const cfg = configs.find(c => c.config_type === 'global' && c.question_type === qt.type);
+            return (
+              <Card key={qt.type} className="relative group">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">{qt.label}</CardTitle>
+                    {cfg && (
+                      <Button
+                        size="icon" variant="ghost"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => openConfigEdit(cfg)}
+                      >
+                        <Pencil size={12} />
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{qt.description}</p>
+                  {cfg && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <Badge variant="outline" className="text-[10px]">Min: {cfg.min_questions}</Badge>
+                      <Badge variant="outline" className="text-[10px]">Max: {cfg.max_questions}</Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
@@ -131,7 +184,7 @@ export default function QuestionSettingsPage() {
         </Card>
       </div>
 
-      {/* Edit Sheet */}
+      {/* Edit Competency Level Sheet */}
       <Sheet open={!!editSetting} onOpenChange={(open) => { if (!open) setEditSetting(null); }}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
@@ -172,6 +225,35 @@ export default function QuestionSettingsPage() {
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 size={14} className="mr-1.5 animate-spin" />}
               Save Changes
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit Assessment Config Sheet */}
+      <Sheet open={!!editConfig} onOpenChange={(open) => { if (!open) setEditConfig(null); }}>
+        <SheetContent className="sm:max-w-sm">
+          <SheetHeader>
+            <SheetTitle>Edit {editConfig?.question_type?.toUpperCase()} Limits</SheetTitle>
+            <SheetDescription>Set min/max questions per skill for this question type in generated assessments.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-1.5">
+              <Label>Min Questions</Label>
+              <Input type="number" value={cfgMin} onChange={(e) => setCfgMin(Number(e.target.value))} min={0} max={20} />
+              <p className="text-xs text-muted-foreground">Minimum questions of this type per skill.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Max Questions</Label>
+              <Input type="number" value={cfgMax} onChange={(e) => setCfgMax(Number(e.target.value))} min={0} max={20} />
+              <p className="text-xs text-muted-foreground">Maximum questions of this type per skill.</p>
+            </div>
+          </div>
+          <SheetFooter className="mt-6">
+            <Button variant="outline" onClick={() => setEditConfig(null)}>Cancel</Button>
+            <Button onClick={handleConfigSave} disabled={cfgSaving}>
+              {cfgSaving && <Loader2 size={14} className="mr-1.5 animate-spin" />}
+              Save
             </Button>
           </SheetFooter>
         </SheetContent>
