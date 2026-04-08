@@ -1,53 +1,69 @@
 
 
-# Fix MCQ Evaluation Scoring & Per-Question Display
+# Fix Review Cycle Activation: Domain-First Flow & Formatted Errors
 
-## Problems Identified
+## Problem
 
-1. **MCQ wrong answer scores Knowledge=10 and Confidence=99%**: In `evaluate-assessment/index.ts` line 99, a wrong MCQ answer gets `Knowledge: 10` instead of `0`, and confidence is hardcoded to `0.99` regardless of correctness.
+1. **Readiness checks run against ALL active domains** — The current `runReadinessCheck` checks every active domain (line 148-197), even if the admin only wants to activate the cycle for specific ones. This causes false failures for domains not participating.
 
-2. **Score 0 mapping to Level 5**: The `fetchAndScoreToLevel` function in `attemptStore.ts` uses `scoreToLevelDynamic` which checks `score >= score_range_min && score <= score_range_max`. If Level 5 has `score_range_min=0`, a score of 0 could match Level 5. The function iterates from highest level down and returns the first match.
+2. **Error details are paragraph-formatted** — Gaps like question coverage are shown as a single semicolon-separated string, making them hard to read.
 
-3. **Questions showing as raw JSON**: In `EvalResults.tsx` line 185, `question?.question_text` is displayed directly. For MCQ/coding/scenario questions, the text is JSON-encoded, so it renders as `{"questionText":"...","options":[...]}`.
+3. **Flow is backwards** — Domain selection appears *below* the readiness results. The admin should pick domains *first*, then the checks run scoped to those domains.
 
 ## Changes
 
-### 1. Fix MCQ scoring in Edge Function (`evaluate-assessment/index.ts`)
+### 1. Restructure the readiness dialog into two steps
 
-- Wrong answer: all dimension scores = 0, confidence = 0 (not 0.99)
-- Correct answer: all dimension scores = 100, confidence = 1.0
-- Remove the `Knowledge` dimension for MCQ entirely — MCQs are binary (correct/incorrect), no need for multi-dimension breakdown
-- Simplify to a single `Correctness` dimension only
+**Step 1 — Domain Selection**: Show domain checkboxes with skill counts. A "Run Readiness Check" button triggers step 2.
+
+**Step 2 — Scoped Readiness Results**: Run all checks only against the selected domains. Show results with proper formatting.
+
+State: add `readinessStep: 1 | 2` to track which step is active.
+
+### 2. Scope all checks to selected domains only
+
+Refactor `runReadinessCheck` to accept a `domainIds: string[]` parameter. Every check filters against only those domains:
+- "Domains have skills mapped" — only checks selected domains
+- "Sufficient published questions" — only checks skills mapped to selected domains
+- "Domains have assigned employees" — only checks selected domains
+- "Domains have a domain lead" — only checks selected domains
+
+### 3. Format error details as bullet lists
+
+Replace the single `detail` string with a `details: string[]` array. Render each item as a separate line in the UI:
 
 ```
-Wrong:  score=0, dimensions=[{Correctness: 0}], confidence=0
-Correct: score=100, dimensions=[{Correctness: 100}], confidence=1.0
+✗ Sufficient published questions for all skills
+  • React / L1 / scenario: 0/2
+  • React / L1 / coding: 0/2
+  • React / L2 / scenario: 0/2
+  ...and 20 more
 ```
 
-### 2. Fix Level calculation (`attemptStore.ts`)
+For the gaps list, show up to 10 items with a "show all" toggle, each on its own line. For missing domains/employees/leads, show each domain name as a separate bullet.
 
-- In `fetchAndScoreToLevel`, ensure score=0 always returns level 1
-- Add an early return: `if (score === 0) return 1;` before calling `scoreToLevelDynamic`
+### 4. UI layout for the two-step dialog
 
-### 3. Fix Per-Question rendering (`EvalResults.tsx`)
+**Step 1 UI:**
+- Title: "Select Participating Domains"
+- Domain checkboxes (existing UI)
+- Footer: Cancel | "Check Readiness →" button (disabled if no domains selected)
 
-Add a helper function `getDisplayQuestionText(questionText: string, questionType: string)` that:
-- For MCQ: parses JSON, extracts `questionText` field, and renders question + lettered options
-- For coding: parses JSON, extracts `problemStatement`
-- For scenario: parses JSON, extracts `question_text` or `questionText`
-- Fallback: returns raw text if not JSON
-
-Apply this helper on line 185 where `question?.question_text` is shown, and in the expanded section to show the full question with options.
-
-### 4. Simplify MCQ evaluation display in EvalResults
-
-- For MCQ questions with score=0: hide the "Dimension Scores" grid (it's meaningless for a binary wrong answer)
-- For MCQ questions: hide "Confidence" display (it's always 100% or 0%)
-- Keep dimension display for scenario/coding questions (AI-evaluated)
+**Step 2 UI:**
+- Title: "Pre-Activation Readiness Check"
+- Subtitle showing selected domain count
+- Readiness check items with formatted detail lists
+- "← Back" link to return to step 1 and change selection
+- Footer: Cancel | "Proceed to Activate" (disabled if blocking checks fail)
 
 ## Files Modified
 
-- `supabase/functions/evaluate-assessment/index.ts` — Fix MCQ scoring logic
-- `src/stores/attemptStore.ts` — Add score=0 guard in level calculation  
-- `src/components/assessment/EvalResults.tsx` — Parse JSON question text for display, simplify MCQ result cards
+- `src/pages/ReviewCyclesPage.tsx` — Restructure readiness dialog, scope checks, format details
+
+## Technical Details
+
+- `readinessChecks` type changes from `{ label; pass; detail?: string }[]` to `{ label; pass; details?: string[] }[]`
+- `runReadinessCheck` signature becomes `runReadinessCheck(cycleId: string, domainIds: string[])` 
+- Gap display: render `details` as a `<ul>` with `<li>` items, capped at 10 visible with a "Show all N" toggle
+- The "Proceed to Activate" button remains disabled if any blocking check fails (same rules as current, excluding "No other cycle active" and "Sufficient questions")
 
