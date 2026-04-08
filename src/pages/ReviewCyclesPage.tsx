@@ -154,6 +154,92 @@ export default function ReviewCyclesPage() {
     setSaving(false);
   };
 
+  const runReadinessCheck = async (cycleId: string) => {
+    setReadinessTarget(cycleId);
+    setReadinessLoading(true);
+    setReadinessOpen(true);
+
+    const checks: { label: string; pass: boolean; detail?: string }[] = [];
+
+    // 1. At least one active domain exists
+    const activeDomains = domains.filter(d => d.status === 'active');
+    checks.push({
+      label: 'At least one active domain exists',
+      pass: activeDomains.length > 0,
+      detail: activeDomains.length > 0 ? `${activeDomains.length} active domain(s)` : 'No active domains found',
+    });
+
+    // 2. All active domains have skills mapped
+    const domainsWithoutSkills = activeDomains.filter(d => {
+      const mapped = mappings.filter(m => m.domain_id === d.id);
+      return mapped.length === 0;
+    });
+    checks.push({
+      label: 'All domains have skills mapped',
+      pass: domainsWithoutSkills.length === 0,
+      detail: domainsWithoutSkills.length > 0 ? `Missing: ${domainsWithoutSkills.map(d => d.name).join(', ')}` : 'All domains have mapped skills',
+    });
+
+    // 3. Sufficient published questions per skill/level/type
+    const publishedQuestions = questions.filter(q => q.status === 'published');
+    const levelMap = getLevelToCompetencyMap(levels);
+    const questionTypes = ['mcq', 'scenario', 'coding'];
+    const gaps: string[] = [];
+
+    for (const domain of activeDomains) {
+      const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
+      for (const skillId of domainSkillIds) {
+        const skill = skills.find(s => s.id === skillId);
+        for (const [levelNum, levelName] of Object.entries(levelMap)) {
+          for (const qType of questionTypes) {
+            const { min } = getQuestionLimits(configs, qType);
+            if (min <= 0) continue;
+            const count = publishedQuestions.filter(
+              q => q.skill_id === skillId && q.competency_level === levelName && q.question_type === qType
+            ).length;
+            if (count < min) {
+              gaps.push(`${skill?.skill_name || skillId} / L${levelNum} / ${qType}: ${count}/${min}`);
+            }
+          }
+        }
+      }
+    }
+    checks.push({
+      label: 'Sufficient published questions for all skills',
+      pass: gaps.length === 0,
+      detail: gaps.length > 0 ? `${gaps.length} gap(s) found. ${gaps.slice(0, 5).join('; ')}${gaps.length > 5 ? ` ...and ${gaps.length - 5} more` : ''}` : 'All skill/level/type combinations covered',
+    });
+
+    // 4. All domains have at least one assigned employee
+    const { data: assignmentData } = await supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId);
+    const assignedDomainIds = new Set((assignmentData || []).map((a: any) => a.domain_id));
+    const domainsWithoutEmployees = activeDomains.filter(d => !assignedDomainIds.has(d.id));
+    checks.push({
+      label: 'All domains have assigned employees',
+      pass: domainsWithoutEmployees.length === 0,
+      detail: domainsWithoutEmployees.length > 0 ? `Missing: ${domainsWithoutEmployees.map(d => d.name).join(', ')}` : 'All domains have employees',
+    });
+
+    // 5. All domains have a domain lead
+    const domainsWithoutLead = activeDomains.filter(d => !d.domain_lead_id);
+    checks.push({
+      label: 'All domains have a domain lead assigned',
+      pass: domainsWithoutLead.length === 0,
+      detail: domainsWithoutLead.length > 0 ? `Missing: ${domainsWithoutLead.map(d => d.name).join(', ')}` : 'All domains have leads',
+    });
+
+    // 6. No other active cycle
+    const otherActive = cycles.find(c => c.status === 'active' && c.id !== cycleId);
+    checks.push({
+      label: 'No other cycle currently active',
+      pass: !otherActive,
+      detail: otherActive ? `"${otherActive.name}" is currently active and will be auto-closed` : 'No conflicts',
+    });
+
+    setReadinessChecks(checks);
+    setReadinessLoading(false);
+  };
+
   const handleActivate = async () => {
     if (!confirmActivate) return;
     try {
@@ -163,6 +249,8 @@ export default function ReviewCyclesPage() {
       toast.error(err.message || "Failed to activate cycle");
     }
     setConfirmActivate(null);
+    setReadinessOpen(false);
+    setReadinessTarget(null);
   };
 
   const handleClose = async () => {
