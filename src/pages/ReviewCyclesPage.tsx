@@ -679,6 +679,25 @@ export default function ReviewCyclesPage() {
                 </AlertDialogTitle>
                 <AlertDialogDescription>Choose which domains to include in this cycle. Readiness checks will only run against selected domains.</AlertDialogDescription>
               </AlertDialogHeader>
+              {activeDomains.length > 0 && (
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs text-muted-foreground">{selectedDomains.length} of {activeDomains.length} selected</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    onClick={() => {
+                      if (selectedDomains.length === activeDomains.length) {
+                        setSelectedDomains([]);
+                      } else {
+                        setSelectedDomains(activeDomains.map(d => d.id));
+                      }
+                    }}
+                  >
+                    {selectedDomains.length === activeDomains.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {activeDomains.map((domain) => (
                   <label key={domain.id} className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
