@@ -56,6 +56,7 @@ interface RegistryStore {
   submitRegistry: (submissionId: string) => Promise<void>;
   markAssessmentGenerated: (submissionId: string) => Promise<void>;
   assignEmployeeToDomain: (employeeId: string, domainId: string, tenantId: string) => Promise<void>;
+  resetSubmissionStatus: (submissionId: string) => Promise<void>;
 }
 
 export const useRegistryStore = create<RegistryStore>((set, get) => ({

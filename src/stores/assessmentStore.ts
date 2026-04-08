@@ -156,6 +156,9 @@ interface AssessmentStore {
   addAssessment: (params: GenerateAssessmentParams) => Promise<string>;
   getAssessmentsForEmployee: (employeeId: string) => Assessment[];
   updateAssessmentStatus: (id: string, status: string) => Promise<void>;
+  softDeleteAssessment: (id: string) => Promise<void>;
+  removeAssessmentQuestion: (assessmentId: string, questionId: string) => Promise<void>;
+  addAssessmentQuestion: (assessmentId: string, question: AssessmentQuestion) => Promise<void>;
 }
 
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
