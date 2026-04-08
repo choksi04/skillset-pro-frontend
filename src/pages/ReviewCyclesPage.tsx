@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useCycleStore, ReviewCycle } from "@/stores/cycleStore";
+import { useDomainStore } from "@/stores/domainStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useQuestionStore } from "@/stores/questionStore";
+import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
+import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,6 +96,16 @@ export default function ReviewCyclesPage() {
   const [confirmActivate, setConfirmActivate] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; detail?: string }[]>([]);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+
+  const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
+  const { questions, fetchQuestions } = useQuestionStore();
+  const { configs, fetchConfigs } = useAssessmentConfigStore();
+  const { levels, fetchLevels } = useCompetencyLevelStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
