@@ -173,6 +173,22 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
     await get().updateQuestion(id, { status: 'published' });
   },
 
+  bulkPublish: async (ids) => {
+    if (ids.length === 0) return 0;
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('questions').update({
+      status: 'published', updated_at: now, modified_by: userId, modified_at: now,
+    }).in('id', ids);
+    if (error) { console.error('Failed to bulk publish:', error); return 0; }
+    set((state) => ({
+      questions: state.questions.map((q) =>
+        ids.includes(q.id) ? { ...q, status: 'published' as const, updated_at: now } : q
+      ),
+    }));
+    return ids.length;
+  },
+
   checkQuestionUsage: async (id) => {
     const { data } = await supabase
       .from('assessment_questions')
