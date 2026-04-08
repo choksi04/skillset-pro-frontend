@@ -64,7 +64,6 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
   initialized: false,
 
   fetchRegistry: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const [subsRes, assignRes] = await Promise.all([

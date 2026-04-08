@@ -60,7 +60,6 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   settingsLoaded: false,
 
   fetchQuestions: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const { data, error } = await supabase
@@ -87,7 +86,6 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   },
 
   fetchSettings: async () => {
-    if (get().settingsLoaded) return;
     try {
       const { data, error } = await supabase
         .from('question_settings')

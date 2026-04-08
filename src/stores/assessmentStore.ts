@@ -197,7 +197,6 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
   initialized: false,
 
   fetchAssessments: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const { data: assessmentRows, error } = await supabase

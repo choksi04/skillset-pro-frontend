@@ -45,7 +45,6 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
   initialized: false,
 
   fetchDomains: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const [domainsRes, mappingsRes] = await Promise.all([

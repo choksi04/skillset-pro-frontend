@@ -75,7 +75,6 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   initialized: false,
 
   fetchAttempts: async () => {
-    if (get().initialized) return;
     set({ loading: true });
     try {
       const { data: attemptRows, error } = await supabase
