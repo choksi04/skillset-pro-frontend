@@ -1,39 +1,53 @@
-# Rename "Question Settings" → "Assessment Configuration" & Fix Hardcoded Cards
 
-## What Changes
 
-### 1. Rename page and menu item
+# Fix MCQ Evaluation Scoring & Per-Question Display
 
-- **New menu title**: "Assessment Config"
-- **New page heading**: "Assessment Configuration"
-- **New subtitle**: "Configure competency levels, assessment generation limits, and scoring rules."
-- **Change the route as well.**
+## Problems Identified
 
-Files to update:
+1. **MCQ wrong answer scores Knowledge=10 and Confidence=99%**: In `evaluate-assessment/index.ts` line 99, a wrong MCQ answer gets `Knowledge: 10` instead of `0`, and confidence is hardcoded to `0.99` regardless of correctness.
 
-- `AppSidebar.tsx` line 76: title → "Assessment Config"
-- `PageHeader.tsx` line 23: title → "Assessment Configuration"  
-- `QuestionSettingsPage.tsx` line 84: heading text
+2. **Score 0 mapping to Level 5**: The `fetchAndScoreToLevel` function in `attemptStore.ts` uses `scoreToLevelDynamic` which checks `score >= score_range_min && score <= score_range_max`. If Level 5 has `score_range_min=0`, a score of 0 could match Level 5. The function iterates from highest level down and returns the first match.
 
-### 2. Make Assessment Question Limits cards data-driven (not hardcoded)
+3. **Questions showing as raw JSON**: In `EvalResults.tsx` line 185, `question?.question_text` is displayed directly. For MCQ/coding/scenario questions, the text is JSON-encoded, so it renders as `{"questionText":"...","options":[...]}`.
 
-Currently, the three cards (Scenario, MCQ, Coding) come from a hardcoded `questionTypesMeta` array. If a new question type is added to `assessment_config` in the database, it won't appear.
+## Changes
 
-**Fix**: Remove the hardcoded `questionTypesMeta` array. Instead, render cards directly from `configs.filter(c => c.config_type === 'global')`. Each card shows the `question_type` as its title (formatted), and min/max badges. The description can be a short generic line or omitted — the important data is the min/max values.
+### 1. Fix MCQ scoring in Edge Function (`evaluate-assessment/index.ts`)
 
-For display labels, derive them from the `question_type` field itself (capitalize first letter, e.g. `mcq` → `MCQ`, `scenario` → `Scenario`, `coding` → `Coding`).
+- Wrong answer: all dimension scores = 0, confidence = 0 (not 0.99)
+- Correct answer: all dimension scores = 100, confidence = 1.0
+- Remove the `Knowledge` dimension for MCQ entirely — MCQs are binary (correct/incorrect), no need for multi-dimension breakdown
+- Simplify to a single `Correctness` dimension only
 
-### 3. Add inline help text clarifying the two "min questions" concepts
+```
+Wrong:  score=0, dimensions=[{Correctness: 0}], confidence=0
+Correct: score=100, dimensions=[{Correctness: 100}], confidence=1.0
+```
 
-- **Competency Levels section**: Add helper text: *"Min Questions defines the minimum number of published questions required per skill at this level before assessments can be generated. This is a readiness prerequisite, not a generation count."*
-- **Assessment Question Limits section**: Add helper text: *"These limits control how many questions of each type the system selects per skill when generating an assessment."*
+### 2. Fix Level calculation (`attemptStore.ts`)
 
-### 4. Scoring Rules — keep but clarify
+- In `fetchAndScoreToLevel`, ensure score=0 always returns level 1
+- Add an early return: `if (score === 0) return 1;` before calling `scoreToLevelDynamic`
 
-The Scoring Rules card stays on this page since it directly references the competency level score ranges configured above it. It's informational context that helps admins understand what their score range settings produce.
+### 3. Fix Per-Question rendering (`EvalResults.tsx`)
+
+Add a helper function `getDisplayQuestionText(questionText: string, questionType: string)` that:
+- For MCQ: parses JSON, extracts `questionText` field, and renders question + lettered options
+- For coding: parses JSON, extracts `problemStatement`
+- For scenario: parses JSON, extracts `question_text` or `questionText`
+- Fallback: returns raw text if not JSON
+
+Apply this helper on line 185 where `question?.question_text` is shown, and in the expanded section to show the full question with options.
+
+### 4. Simplify MCQ evaluation display in EvalResults
+
+- For MCQ questions with score=0: hide the "Dimension Scores" grid (it's meaningless for a binary wrong answer)
+- For MCQ questions: hide "Confidence" display (it's always 100% or 0%)
+- Keep dimension display for scenario/coding questions (AI-evaluated)
 
 ## Files Modified
 
-- `src/components/layout/AppSidebar.tsx` — menu title
-- `src/components/layout/PageHeader.tsx` — breadcrumb title
-- `src/pages/QuestionSettingsPage.tsx` — heading, remove hardcoded `questionTypesMeta`, render from DB configs
+- `supabase/functions/evaluate-assessment/index.ts` — Fix MCQ scoring logic
+- `src/stores/attemptStore.ts` — Add score=0 guard in level calculation  
+- `src/components/assessment/EvalResults.tsx` — Parse JSON question text for display, simplify MCQ result cards
+
