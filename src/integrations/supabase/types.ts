@@ -135,6 +135,48 @@ export type Database = {
           },
         ]
       }
+      assessment_config: {
+        Row: {
+          config_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          max_questions: number
+          min_questions: number
+          modified_at: string | null
+          modified_by: string | null
+          question_type: string
+          reference_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          config_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_questions?: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          question_type: string
+          reference_id?: string | null
+          tenant_id?: string
+        }
+        Update: {
+          config_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_questions?: number
+          min_questions?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          question_type?: string
+          reference_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       assessment_questions: {
         Row: {
           assessment_id: string
