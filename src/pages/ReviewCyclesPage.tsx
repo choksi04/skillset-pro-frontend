@@ -6,6 +6,7 @@ import { useQuestionStore } from "@/stores/questionStore";
 import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
 import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
 import { useRegistryStore } from "@/stores/registryStore";
+import { useAssessmentStore } from "@/stores/assessmentStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO } from "date-fns";
