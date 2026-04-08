@@ -656,10 +656,57 @@ export default function QuestionBankPage() {
       )}
 
 
+      {/* Bulk actions */}
+      {canEdit && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2">
+          <span className="text-sm font-medium text-foreground">{selectedIds.size} selected</span>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={async () => {
+              const draftIds = Array.from(selectedIds).filter(id => {
+                const q = questions.find(qq => qq.id === id);
+                return q && q.status === 'draft';
+              });
+              if (draftIds.length === 0) {
+                toast.error('No draft questions selected to publish.');
+                return;
+              }
+              const count = await bulkPublish(draftIds);
+              toast.success(`Published ${count} question(s).`);
+              setSelectedIds(new Set());
+            }}
+          >
+            <CheckCircle size={14} className="mr-1.5" /> Publish Selected
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              {canEdit && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={filtered.length > 0 && filtered.every(q => selectedIds.has(q.id))
+                      ? true
+                      : filtered.some(q => selectedIds.has(q.id))
+                        ? 'indeterminate'
+                        : false}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedIds(new Set(filtered.map(q => q.id)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                  />
+                </TableHead>
+              )}
               <TableHead className="w-[200px]">Skill</TableHead>
               <TableHead className="w-[120px]">Topic</TableHead>
               <TableHead className="w-[110px]">Level</TableHead>
@@ -673,7 +720,7 @@ export default function QuestionBankPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-16 text-sm text-muted-foreground">
+                <TableCell colSpan={canEdit ? 10 : 7} className="text-center py-16 text-sm text-muted-foreground">
                   No questions found matching your filters.
                 </TableCell>
               </TableRow>
@@ -683,6 +730,20 @@ export default function QuestionBankPage() {
                 const { display } = parseQuestionText(q.question_text, q.question_type);
                 return (
                   <TableRow key={q.id} className={q.status === 'disabled' ? 'opacity-50' : ''}>
+                    {canEdit && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(q.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (checked) next.add(q.id); else next.delete(q.id);
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-sm font-medium">{skill?.skill_name ?? 'Unknown'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{q.topic_id ? (topicMap.get(q.topic_id) || '—') : '—'}</TableCell>
                     <TableCell>
