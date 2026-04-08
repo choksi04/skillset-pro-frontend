@@ -83,7 +83,8 @@ export default function ReviewCyclesPage() {
   const { questions, fetchQuestions } = useQuestionStore();
   const { configs, fetchConfigs } = useAssessmentConfigStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
-  const { submissions, fetchRegistry } = useRegistryStore();
+  const { submissions, fetchRegistry, resetSubmissionStatus } = useRegistryStore();
+  const { assessments, addAssessment, fetchAssessments } = useAssessmentStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
