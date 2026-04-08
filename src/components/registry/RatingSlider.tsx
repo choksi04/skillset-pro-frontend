@@ -1,4 +1,5 @@
-import { RatingLevel, ratingLabels, ratingDescriptions } from '@/stores/registryStore';
+import { RatingLevel } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels, getRatingDescriptions } from '@/stores/competencyLevelStore';
 
 interface RatingSliderProps {
   value: RatingLevel | null;
@@ -7,13 +8,17 @@ interface RatingSliderProps {
   previousRating?: RatingLevel;
 }
 
-const levels: RatingLevel[] = [1, 2, 3, 4, 5];
+const levelNums: RatingLevel[] = [1, 2, 3, 4, 5];
 
 export default function RatingSlider({ value, onChange, disabled, previousRating }: RatingSliderProps) {
+  const { levels } = useCompetencyLevelStore();
+  const labels = getRatingLabels(levels);
+  const descriptions = getRatingDescriptions(levels);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1">
-        {levels.map((level) => (
+        {levelNums.map((level) => (
           <button
             key={level}
             disabled={disabled}
@@ -34,13 +39,13 @@ export default function RatingSlider({ value, onChange, disabled, previousRating
         <div className="rounded-md bg-muted/50 px-3 py-1.5">
           {value && (
             <>
-              <p className="text-xs font-medium text-foreground">Level {value} — {ratingLabels[value]}</p>
-              <p className="text-[11px] text-muted-foreground">{ratingDescriptions[value]}</p>
+              <p className="text-xs font-medium text-foreground">Level {value} — {labels[value] ?? `Level ${value}`}</p>
+              <p className="text-[11px] text-muted-foreground">{descriptions[value] ?? ''}</p>
             </>
           )}
           {previousRating && (
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Last cycle: <span className="font-medium text-foreground">L{previousRating} — {ratingLabels[previousRating]}</span>
+              Last cycle: <span className="font-medium text-foreground">L{previousRating} — {labels[previousRating] ?? `Level ${previousRating}`}</span>
             </p>
           )}
         </div>

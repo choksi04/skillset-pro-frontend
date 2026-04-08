@@ -4,7 +4,8 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useRegistryStore, ratingLabels, RatingLevel } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getFormattedLevelLabel, getShortLevelLabel, getLevelColorClass } from '@/stores/competencyLevelStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,21 +25,7 @@ import {
 
 // ── Shared constants ──
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic',
-  2: 'L2 – Working',
-  3: 'L3 – Independent',
-  4: 'L4 – Advanced',
-  5: 'L5 – Expert',
-};
-
-const levelFullLabels: Record<number, string> = {
-  1: 'L1 – Basic Awareness',
-  2: 'L2 – Working Knowledge',
-  3: 'L3 – Independent',
-  4: 'L4 – Advanced',
-  5: 'L5 – Expert',
-};
+// levelLabels and levelFullLabels now come from competencyLevelStore
 
 const CHART_COLORS = [
   'hsl(210, 75%, 42%)',   // primary

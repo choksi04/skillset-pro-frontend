@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels, SkillRegistrySubmission } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel, SkillSelfRating, SkillRegistrySubmission } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useReviewStore } from '@/stores/reviewStore';

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useRegistryStore, RatingLevel, SkillSelfRating, ratingLabels } from '@/stores/registryStore';
+import { useRegistryStore, RatingLevel, SkillSelfRating } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useReviewStore } from '@/stores/reviewStore';

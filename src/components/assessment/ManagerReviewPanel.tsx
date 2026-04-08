@@ -3,7 +3,8 @@ import { useReviewStore, ManagerReview, ReviewAction, SkillReviewEntry } from '@
 import { useSkillStore } from '@/stores/skillStore';
 import { useAttemptStore, AssessmentAttempt } from '@/stores/attemptStore';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
-import { useRegistryStore, ratingLabels } from '@/stores/registryStore';
+import { useRegistryStore } from '@/stores/registryStore';
+import { useCompetencyLevelStore, getRatingLabels, getLevelColorClass, getFormattedLevelLabel } from '@/stores/competencyLevelStore';
 import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,12 +29,7 @@ import {
   Send, Shield, AlertTriangle, UserCog, Bell,
 } from 'lucide-react';
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic Awareness', 2: 'L2 – Working Knowledge', 3: 'L3 – Independent', 4: 'L4 – Advanced', 5: 'L5 – Expert',
-};
-const levelColors: Record<number, string> = {
-  1: 'bg-muted text-muted-foreground', 2: 'bg-info/15 text-info', 3: 'bg-accent/15 text-accent', 4: 'bg-warning/15 text-warning', 5: 'bg-success/15 text-success',
-};
+// levelLabels and levelColors now come from competencyLevelStore
 const actionLabels: Record<ReviewAction, { label: string; icon: React.ReactNode; color: string }> = {
   approve: { label: 'Approve', icon: <CheckCircle size={14} />, color: 'bg-success/15 text-success border-success/20' },
   adjust: { label: 'Adjust', icon: <RefreshCw size={14} />, color: 'bg-warning/15 text-warning border-warning/20' },

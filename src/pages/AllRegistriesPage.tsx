@@ -17,17 +17,7 @@ import {
 } from '@/components/ui/table';
 import { Download, Search, Database, Users, BarChart3 } from 'lucide-react';
 
-const levelLabels: Record<number, string> = {
-  1: 'L1 – Basic', 2: 'L2 – Working', 3: 'L3 – Independent', 4: 'L4 – Advanced', 5: 'L5 – Expert',
-};
-
-const levelColors: Record<number, string> = {
-  1: 'bg-muted text-muted-foreground',
-  2: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-  3: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
-  4: 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
-  5: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-};
+// levelLabels and levelColors now come from competencyLevelStore
 
 // ── Skills view aggregation ──
 interface SkillAgg {
