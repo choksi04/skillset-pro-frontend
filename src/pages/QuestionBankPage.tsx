@@ -37,8 +37,9 @@ import {
 import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
   Sparkles, Trash2, MoreHorizontal, Loader2, ChevronDown, ChevronRight,
-  AlertTriangle, Copy, Eye, Bot, User,
+  AlertTriangle, Copy, Eye, Bot, User, CheckSquare,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 const statusStyles: Record<string, string> = {
