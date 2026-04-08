@@ -89,8 +89,8 @@ export default function ReviewCyclesPage() {
   const tenantId = user?.tenant_id ?? "tenant-001";
 
   useEffect(() => {
-    fetchCycles(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchConfigs(); fetchLevels(); fetchRegistry();
-  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels, fetchRegistry]);
+    fetchCycles(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchConfigs(); fetchLevels(); fetchRegistry(); fetchAssessments();
+  }, [fetchCycles, fetchDomains, fetchSkills, fetchQuestions, fetchConfigs, fetchLevels, fetchRegistry, fetchAssessments]);
 
   useEffect(() => {
     if (activeCycle) computeSummary(tenantId);
