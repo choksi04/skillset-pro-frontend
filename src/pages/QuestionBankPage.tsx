@@ -312,7 +312,7 @@ export default function QuestionBankPage() {
 
   // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
-    const minRequired = settings.length > 0 ? Math.min(...settings.map((s) => s.min_questions)) : 3;
+    const minRequired = clSettings.length > 0 ? Math.min(...clSettings.map((s) => s.min_questions)) : 3;
     const skillCoverage: Record<string, Record<string, number>> = {};
     for (const q of questions) {
       if (q.status === 'disabled') continue;
@@ -325,7 +325,7 @@ export default function QuestionBankPage() {
     for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
       const levels = filteredLevels.map((l) => {
-        const setting = settings.find((s) => s.name.toLowerCase() === l);
+        const setting = clSettings.find((s) => s.name.toLowerCase() === l);
         const min = setting?.min_questions ?? minRequired;
         return { level: l, count: counts[l] || 0, min };
       });
@@ -333,7 +333,7 @@ export default function QuestionBankPage() {
       if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
     }
     return result;
-  }, [questions, activeSkills, settings, skillFilter, levelFilter, dynamicLevels]);
+  }, [questions, activeSkills, clSettings, skillFilter, levelFilter, dynamicLevels]);
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {
