@@ -239,7 +239,6 @@ export default function CategoryDetailPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell"></TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {(skill.tags || []).slice(0, 3).map((tag) => (
