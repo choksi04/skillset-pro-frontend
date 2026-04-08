@@ -67,9 +67,11 @@ export default function ReviewCyclesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
-  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; detail?: string }[]>([]);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[] }[]>([]);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [readinessStep, setReadinessStep] = useState<1 | 2>(1);
+  const [expandedChecks, setExpandedChecks] = useState<Set<number>>(new Set());
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [pendingEmployees, setPendingEmployees] = useState<{ id: string; name: string; email: string; submissionId?: string; status: string }[]>([]);
   const [overrideLoading, setOverrideLoading] = useState(false);
