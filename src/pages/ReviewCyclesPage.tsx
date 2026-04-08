@@ -435,7 +435,7 @@ export default function ReviewCyclesPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-xs gap-1 text-success"
-                            onClick={() => setConfirmActivate(cycle.id)}
+                            onClick={() => runReadinessCheck(cycle.id)}
                           >
                             <Play size={12} /> Activate
                           </Button>
