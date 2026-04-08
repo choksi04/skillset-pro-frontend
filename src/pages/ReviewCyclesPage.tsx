@@ -343,6 +343,54 @@ export default function ReviewCyclesPage() {
     }
   };
 
+  const handleGenerateAssessment = async (emp: typeof pendingEmployees[0]) => {
+    if (!emp.submissionId || !activeCycle) return;
+    try {
+      const sub = submissions.find(s => s.id === emp.submissionId);
+      if (!sub) { toast.error("Submission not found"); return; }
+
+      const publishedQuestions = questions.filter(q => q.status === 'published');
+      const assessmentId = await addAssessment({
+        tenant_id: tenantId,
+        employee_id: emp.id,
+        submission_id: sub.id,
+        domain_id: sub.domain_id,
+        cycle_id: activeCycle.id,
+        ratings: sub.ratings,
+        publishedQuestions,
+      });
+      if (!assessmentId) { toast.error("Failed to generate assessment"); return; }
+
+      const { markAssessmentGenerated } = useRegistryStore.getState();
+      await markAssessmentGenerated(sub.id);
+      toast.success(`Assessment generated for ${emp.name}`);
+      setPendingEmployees(prev =>
+        prev.map(e => e.id === emp.id ? { ...e, status: 'assessment_generated' } : e)
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate assessment");
+    }
+  };
+
+  const handleResetSubmission = async (emp: typeof pendingEmployees[0]) => {
+    if (!emp.submissionId) return;
+    try {
+      // Soft-delete linked assessment if exists
+      const linkedAssessment = assessments.find(a => a.submission_id === emp.submissionId && a.status === 'pending');
+      if (linkedAssessment) {
+        const { softDeleteAssessment } = useAssessmentStore.getState();
+        await softDeleteAssessment(linkedAssessment.id);
+      }
+      await resetSubmissionStatus(emp.submissionId);
+      toast.success(`Submission reset to "submitted" for ${emp.name}`);
+      setPendingEmployees(prev =>
+        prev.map(e => e.id === emp.id ? { ...e, status: 'submitted' } : e)
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reset submission");
+    }
+  };
+
   const statusBadgeSmall = (status: string) => {
     switch (status) {
       case 'submitted': return <Badge className="bg-success/15 text-success text-[10px]">Submitted</Badge>;
