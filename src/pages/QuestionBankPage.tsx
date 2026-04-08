@@ -231,7 +231,7 @@ function FormattedQuestionContent({ text, guidelines, type }: {
 export default function QuestionBankPage() {
   const {
     questions, settings, fetchQuestions, fetchSettings,
-    toggleQuestionStatus, publishQuestion, deleteQuestion, addQuestions,
+    toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
   } = useQuestionStore();
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
   const { currentRole, user } = useAuth();
@@ -252,6 +252,7 @@ export default function QuestionBankPage() {
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // --- AI generation state ---
   const [aiOpen, setAiOpen] = useState(false);
