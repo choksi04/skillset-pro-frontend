@@ -26,6 +26,7 @@ import {
   ArrowLeft, Play, BarChart3, ClipboardCheck, Clock,
   CheckCircle, Loader2, RotateCcw, RefreshCw, Trash2, Plus,
 } from 'lucide-react';
+import { getQuestionPreviewText } from '@/lib/questionContent';
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
   if (review?.status === 'completed') return 'approved';
@@ -295,7 +296,7 @@ export default function AssessmentDetailPage() {
                   return (
                     <TableRow key={aq.question_id}>
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-sm text-foreground max-w-xs truncate">{q?.question_text || aq.question_id}</TableCell>
+                      <TableCell className="text-sm text-foreground max-w-xs truncate">{q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[10px]">{skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}</Badge>
                       </TableCell>
