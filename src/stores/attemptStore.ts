@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from './questionStore';
-import { CompetencyLevel as CompetencyLevelConfig, scoreToLevelDynamic } from './competencyLevelStore';
+import { CompetencyLevel as CompetencyLevelConfig, scoreToLevelDynamic, getCompetencyToLevelMap } from './competencyLevelStore';
 import { getCurrentUserId } from '@/lib/audit';
 
 export interface AnswerEntry {
@@ -28,6 +28,7 @@ export interface SkillScore {
   skill_id: string;
   avg_score: number;
   calculated_level: number;
+  target_level: number;
   question_count: number;
 }
 
@@ -141,7 +142,8 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
           .filter((ss: any) => ss.attempt_id === a.id)
           .map((ss: any) => ({
             skill_id: ss.skill_id, avg_score: ss.avg_score,
-            calculated_level: ss.calculated_level, question_count: ss.question_count,
+            calculated_level: ss.calculated_level, target_level: ss.target_level ?? ss.calculated_level,
+            question_count: ss.question_count,
           })),
         total_ai_score: a.total_ai_score, status: a.status,
         started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
@@ -279,13 +281,39 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         skillScoreMap[skillId].count += 1;
       }
 
-      // Use dynamic scoreToLevel
+      // Use dynamic scoreToLevel, capped at target level
       const skillScoreEntries = Object.entries(skillScoreMap);
       const skillScores: SkillScore[] = [];
+
+      // Build target level map per skill from assessment questions
+      let competencyToLevelMap: Record<string, number> = {};
+      try {
+        const { data: clData } = await supabase.from('competency_levels').select('*').eq('status', 'active');
+        if (clData && clData.length > 0) {
+          const clLevels: CompetencyLevelConfig[] = clData.map((s: any) => ({
+            id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
+            description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
+            min_questions: s.min_questions, status: s.status,
+          }));
+          competencyToLevelMap = getCompetencyToLevelMap(clLevels);
+        }
+      } catch { /* fallback */ }
+
+      // Determine the target level number for each skill
+      const skillTargetLevelMap: Record<string, number> = {};
+      for (const aq of assessmentQuestions) {
+        if (!skillTargetLevelMap[aq.skill_id]) {
+          const targetLevelNum = competencyToLevelMap[aq.target_level] ?? 5;
+          skillTargetLevelMap[aq.skill_id] = targetLevelNum;
+        }
+      }
+
       for (const [skill_id, { total, count }] of skillScoreEntries) {
         const avg_score = Math.round(total / count);
-        const calculated_level = await fetchAndScoreToLevel(avg_score);
-        skillScores.push({ skill_id, avg_score, calculated_level, question_count: count });
+        const rawLevel = await fetchAndScoreToLevel(avg_score);
+        const target_level = skillTargetLevelMap[skill_id] ?? 5;
+        const calculated_level = Math.min(rawLevel, target_level);
+        skillScores.push({ skill_id, avg_score, calculated_level, target_level, question_count: count });
       }
 
       // Clean previous data and write new
