@@ -105,6 +105,7 @@ function parseScenarioQuestion(text: string) {
 
 export default function AssessmentExecPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts, pauseAttempt, resumeAttempt, retryEvaluation } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
@@ -112,9 +113,12 @@ export default function AssessmentExecPage() {
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const autoStartTriggered = useRef(false);
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchLevels();
+    Promise.all([fetchAssessments(), fetchAttempts(), fetchQuestions(), fetchSkills(), fetchDomains(), fetchLevels()])
+      .then(() => setDataLoaded(true));
   }, []);
 
   const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
