@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, Question } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
+import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useCycleStore } from '@/stores/cycleStore';
 import { useRegistryStore } from '@/stores/registryStore';
@@ -50,15 +51,33 @@ export default function AssessmentDetailPage() {
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { user } = useAuth();
 
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
+
   const [employeeName, setEmployeeName] = useState('');
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
+  const [selfRatings, setSelfRatings] = useState<{ skill_id: string; rating: number }[]>([]);
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchReviews(); fetchCycles(); fetchRegistry();
+    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchReviews(); fetchCycles(); fetchRegistry(); fetchLevels();
   }, []);
+
+  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
+  const levelsByNumber = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const l of competencyLevels) { map[l.level] = l.label || l.name; }
+    return map;
+  }, [competencyLevels]);
+
+  // Fetch self-ratings for submission
+  useEffect(() => {
+    if (!assessment?.submission_id) return;
+    supabase.from('skill_self_ratings').select('skill_id, rating').eq('submission_id', assessment.submission_id).then(({ data }) => {
+      if (data) setSelfRatings(data);
+    });
+  }, [assessment?.submission_id]);
 
   const assessment = useMemo(
     () => assessments.find((a) => a.id === assessmentId),
@@ -222,10 +241,47 @@ export default function AssessmentDetailPage() {
         </Card>
       </div>
 
-      {/* Skills list */}
-      {skillNames && (
-        <div className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Skills: </span>{skillNames}
+      {/* Skills with Self-Ratings */}
+      {assessment.skill_ids.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-card-foreground">Skills & Self-Ratings</h3>
+            {selfRatings.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                Avg Self-Score: {Math.round(selfRatings.filter(r => assessment.skill_ids.includes(r.skill_id)).reduce((s, r) => s + r.rating, 0) / (selfRatings.filter(r => assessment.skill_ids.includes(r.skill_id)).length || 1))}
+              </Badge>
+            )}
+          </div>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Skill</TableHead>
+                  <TableHead className="w-32 text-center">Self-Rated Level</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assessment.skill_ids.map((sid) => {
+                  const skill = skillMap.get(sid);
+                  const rating = selfRatings.find(r => r.skill_id === sid);
+                  return (
+                    <TableRow key={sid}>
+                      <TableCell className="text-sm text-foreground">{skill?.skill_name || sid}</TableCell>
+                      <TableCell className="text-center">
+                        {rating ? (
+                          <Badge variant="outline" className="text-xs">
+                            {levelsByNumber[rating.rating] || `Level ${rating.rating}`}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
 
