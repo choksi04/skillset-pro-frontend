@@ -214,7 +214,19 @@ export default function AssessmentExecPage() {
     setQuestionStartTime(Date.now());
   };
 
-  const handlePause = async () => {
+  // Auto-start assessment from query param
+  useEffect(() => {
+    if (!dataLoaded || autoStartTriggered.current || activeAssessment) return;
+    const startId = searchParams.get('startId');
+    if (!startId) return;
+    const target = myAssessments.find((a) => a.id === startId);
+    if (!target) return;
+    autoStartTriggered.current = true;
+    searchParams.delete('startId');
+    setSearchParams(searchParams, { replace: true });
+    handleStartAssessment(target);
+  }, [dataLoaded, myAssessments, searchParams, activeAssessment]);
+
     if (!activeAssessment) return;
     const attempt = getAttemptForAssessment(activeAssessment.id);
     if (!attempt) return;
