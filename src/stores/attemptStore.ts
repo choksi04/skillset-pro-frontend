@@ -90,11 +90,11 @@ interface AttemptStore {
   fetchAttempts: () => Promise<void>;
   startAttempt: (assessmentId: string, tenantId: string, employeeId: string) => Promise<string>;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => Promise<void>;
-  submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string }[]) => Promise<void>;
+  submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
   getAttemptForAssessment: (assessmentId: string) => AssessmentAttempt | undefined;
   pauseAttempt: (attemptId: string, remainingSeconds: number) => Promise<void>;
   resumeAttempt: (attemptId: string) => Promise<void>;
-  retryEvaluation: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string }[]) => Promise<void>;
+  retryEvaluation: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
 }
 
 export const useAttemptStore = create<AttemptStore>((set, get) => ({
