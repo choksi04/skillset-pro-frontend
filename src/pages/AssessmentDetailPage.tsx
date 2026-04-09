@@ -71,6 +71,11 @@ export default function AssessmentDetailPage() {
     return map;
   }, [competencyLevels]);
 
+  const assessment = useMemo(
+    () => assessments.find((a) => a.id === assessmentId),
+    [assessments, assessmentId]
+  );
+
   // Fetch self-ratings for submission
   useEffect(() => {
     if (!assessment?.submission_id) return;
@@ -78,11 +83,6 @@ export default function AssessmentDetailPage() {
       if (data) setSelfRatings(data);
     });
   }, [assessment?.submission_id]);
-
-  const assessment = useMemo(
-    () => assessments.find((a) => a.id === assessmentId),
-    [assessments, assessmentId]
-  );
 
   const attempt = assessment ? getAttemptForAssessment(assessment.id) : null;
   const review = reviews.find((r) => r.assessment_id === assessment?.id);
