@@ -1,0 +1,1 @@
+ALTER TABLE public.attempt_skill_scores ADD COLUMN IF NOT EXISTS target_level integer NOT NULL DEFAULT 1;

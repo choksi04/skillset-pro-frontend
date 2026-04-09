@@ -351,6 +351,7 @@ export type Database = {
           modified_by: string | null
           question_count: number
           skill_id: string
+          target_level: number
         }
         Insert: {
           attempt_id: string
@@ -365,6 +366,7 @@ export type Database = {
           modified_by?: string | null
           question_count?: number
           skill_id: string
+          target_level?: number
         }
         Update: {
           attempt_id?: string
@@ -379,6 +381,7 @@ export type Database = {
           modified_by?: string | null
           question_count?: number
           skill_id?: string
+          target_level?: number
         }
         Relationships: [
           {

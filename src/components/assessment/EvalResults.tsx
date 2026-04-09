@@ -120,13 +120,18 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                     <span className="text-xs font-medium text-foreground">{skill?.skill_name ?? 'Unknown Skill'}</span>
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-semibold ${scoreColor(ss.avg_score)}`}>{ss.avg_score}%</span>
-                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-bold">Level {ss.calculated_level}</Badge>
                     </div>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${scoreBarColor(ss.avg_score)}`} style={{ width: `${ss.avg_score}%` }} />
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">{ss.question_count} questions evaluated</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[10px] text-muted-foreground">{ss.question_count} questions evaluated</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5">Target: L{ss.target_level}</Badge>
+                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-bold">Achieved: L{ss.calculated_level}</Badge>
+                    </div>
+                  </div>
                 </div>
               );
             })}
