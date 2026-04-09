@@ -343,8 +343,8 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
           ? supabase.from('attempt_skill_scores').insert(
               skillScores.map((ss) => ({
                 attempt_id: attemptId, skill_id: ss.skill_id, avg_score: ss.avg_score,
-                calculated_level: ss.calculated_level, question_count: ss.question_count,
-                created_by: userId,
+                calculated_level: ss.calculated_level, target_level: ss.target_level,
+                question_count: ss.question_count, created_by: userId,
               }))
             )
           : Promise.resolve(),
