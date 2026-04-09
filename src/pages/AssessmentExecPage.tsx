@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, questionTypeLabels, Question } from '@/stores/questionStore';
@@ -105,6 +105,7 @@ function parseScenarioQuestion(text: string) {
 
 export default function AssessmentExecPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { assessments, updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
   const { startAttempt, saveAnswer, submitAttempt, getAttemptForAssessment, fetchAttempts, pauseAttempt, resumeAttempt, retryEvaluation } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
@@ -112,9 +113,12 @@ export default function AssessmentExecPage() {
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { user } = useAuth();
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const autoStartTriggered = useRef(false);
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchLevels();
+    Promise.all([fetchAssessments(), fetchAttempts(), fetchQuestions(), fetchSkills(), fetchDomains(), fetchLevels()])
+      .then(() => setDataLoaded(true));
   }, []);
 
   const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
@@ -209,6 +213,19 @@ export default function AssessmentExecPage() {
     setMarkedForReview(new Set());
     setQuestionStartTime(Date.now());
   };
+
+  // Auto-start assessment from query param
+  useEffect(() => {
+    if (!dataLoaded || autoStartTriggered.current || activeAssessment) return;
+    const startId = searchParams.get('startId');
+    if (!startId) return;
+    const target = myAssessments.find((a) => a.id === startId);
+    if (!target) return;
+    autoStartTriggered.current = true;
+    searchParams.delete('startId');
+    setSearchParams(searchParams, { replace: true });
+    handleStartAssessment(target);
+  }, [dataLoaded, myAssessments, searchParams, activeAssessment]);
 
   const handlePause = async () => {
     if (!activeAssessment) return;

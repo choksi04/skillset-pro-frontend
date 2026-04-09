@@ -303,12 +303,12 @@ export default function AssessmentDetailPage() {
       {/* CTA Buttons */}
       <div className="flex items-center gap-3">
         {isOwner && status === "pending" && (
-          <Button onClick={() => navigate("/assessment-exec")} className="gap-1.5">
+          <Button onClick={() => navigate(`/assessment-exec?startId=${assessment.id}`)} className="gap-1.5">
             <Play size={14} /> Start Assessment
           </Button>
         )}
         {isOwner && status === "in_progress" && (
-          <Button onClick={() => navigate("/assessment-exec")} className="gap-1.5">
+          <Button onClick={() => navigate(`/assessment-exec?startId=${assessment.id}`)} className="gap-1.5">
             <Play size={14} /> Resume Assessment
           </Button>
         )}
