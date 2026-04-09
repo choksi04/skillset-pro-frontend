@@ -4,6 +4,7 @@ import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuest
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
+import { useCompetencyLevelStore } from "@/stores/competencyLevelStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 import { useCycleStore } from "@/stores/cycleStore";
@@ -78,6 +79,8 @@ export default function AssessmentDetailPage() {
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
 
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
+
   useEffect(() => {
     fetchAssessments();
     fetchAttempts();
@@ -87,7 +90,18 @@ export default function AssessmentDetailPage() {
     fetchReviews();
     fetchCycles();
     fetchRegistry();
+    fetchLevels();
   }, []);
+
+  // Build a map from level label/name to level number
+  const levelNumberMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const cl of competencyLevels) {
+      map.set(cl.label.toLowerCase(), cl.level);
+      map.set(cl.name.toLowerCase(), cl.level);
+    }
+    return map;
+  }, [competencyLevels]);
 
   const assessment = useMemo(() => assessments.find((a) => a.id === assessmentId), [assessments, assessmentId]);
 
@@ -394,7 +408,12 @@ export default function AssessmentDetailPage() {
                           {skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{aq.target_level}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {(() => {
+                          const lvl = levelNumberMap.get(aq.target_level.toLowerCase());
+                          return lvl != null ? `L${lvl} - ${aq.target_level}` : aq.target_level;
+                        })()}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
                       <TableCell className="text-right">
                         <Button
