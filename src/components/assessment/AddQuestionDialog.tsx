@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuestionStore, Question } from '@/stores/questionStore';
+import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { AssessmentQuestion } from '@/stores/assessmentStore';
 import {
@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
+import { getQuestionPreviewText } from '@/lib/questionContent';
 
 interface AddQuestionDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ export default function AddQuestionDialog({
     if (!search.trim()) return availableQuestions;
     const term = search.toLowerCase();
     return availableQuestions.filter(q =>
-      q.question_text.toLowerCase().includes(term) ||
+      getQuestionPreviewText(q.question_text, q.question_type).toLowerCase().includes(term) ||
       (skillMap.get(q.skill_id)?.skill_name || '').toLowerCase().includes(term) ||
       q.competency_level.toLowerCase().includes(term) ||
       q.question_type.toLowerCase().includes(term)
@@ -102,7 +103,9 @@ export default function AddQuestionDialog({
                   className="mt-0.5"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-foreground line-clamp-2">{q.question_text}</p>
+                  <p className="text-sm text-foreground line-clamp-2">
+                    {getQuestionPreviewText(q.question_text, q.question_type)}
+                  </p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Badge variant="outline" className="text-[10px]">{skillMap.get(q.skill_id)?.skill_name || q.skill_id}</Badge>
                     <Badge variant="outline" className="text-[10px]">{q.competency_level}</Badge>
