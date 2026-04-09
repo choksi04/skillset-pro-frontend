@@ -1,33 +1,29 @@
 
 
-# Fix: Employee Assignment Readiness Check Missing Legacy Users
+# Fix: Allow Admin/Manager to Manage Assessment Questions Beyond "Pending" Status
 
 ## Problem
-The readiness check (line 197) only queries `employee_domain_assignments` to determine if a domain has assigned employees. However, the system also supports direct `domain_id` assignment on the `users` table (legacy). The activation logic in `cycleStore.ts` correctly checks both sources, but the readiness check does not — causing false "missing employees" errors.
-
-## Fix
-In `src/pages/ReviewCyclesPage.tsx`, update the employee assignment check (lines 196-206) to also query users with `domain_id` matching the selected domains, merging both sources before determining which domains lack employees.
-
-### Changes in `src/pages/ReviewCyclesPage.tsx`
-
-Replace the current check (lines 196-206) with:
+The assessment for Jagdish has 0 questions and status `in_progress`. The admin cannot see the Regenerate or Add/Remove question controls because `canManage` on line 75 requires `assessment.status === 'pending'`:
 
 ```typescript
-// 3. Assigned employees — check both assignment table AND legacy domain_id on users
-const [assignmentRes, directUsersRes] = await Promise.all([
-  supabase.from('employee_domain_assignments').select('domain_id').eq('tenant_id', tenantId),
-  supabase.from('users').select('domain_id').eq('tenant_id', tenantId).eq('status', 'active').not('domain_id', 'is', null),
-]);
-const assignedDomainIds = new Set([
-  ...(assignmentRes.data || []).map((a: any) => a.domain_id),
-  ...(directUsersRes.data || []).map((u: any) => u.domain_id),
-]);
-const domainsWithoutEmployees = selectedDomainObjs.filter(d => !assignedDomainIds.has(d.id));
-// ... rest stays the same
+const canManage = !isOwner && isAdmin && assessment?.status === 'pending';
 ```
 
-This mirrors the same dual-source logic already used in `cycleStore.ts` activation flow.
+Since the assessment transitioned to `in_progress`, the controls are hidden.
+
+## Fix
+Expand `canManage` to allow question management for any assessment that has not yet been submitted or evaluated. This means allowing it for statuses: `pending` and `in_progress`.
+
+### Changes in `src/pages/AssessmentDetailPage.tsx`
+
+**Line 75** — update the `canManage` condition:
+
+```typescript
+const canManage = !isOwner && isAdmin && ['pending', 'in_progress'].includes(assessment?.status ?? '');
+```
+
+This allows admins/managers to add questions, remove questions, and regenerate assessments that are still in progress (not yet submitted by the employee).
 
 ## Files Modified
-- `src/pages/ReviewCyclesPage.tsx` — one block (~5 lines replaced)
+- `src/pages/AssessmentDetailPage.tsx` — one line changed
 
