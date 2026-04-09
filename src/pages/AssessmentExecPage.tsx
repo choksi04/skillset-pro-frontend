@@ -227,6 +227,7 @@ export default function AssessmentExecPage() {
     handleStartAssessment(target);
   }, [dataLoaded, myAssessments, searchParams, activeAssessment]);
 
+  const handlePause = async () => {
     if (!activeAssessment) return;
     const attempt = getAttemptForAssessment(activeAssessment.id);
     if (!attempt) return;
