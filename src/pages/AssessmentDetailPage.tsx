@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -184,9 +184,6 @@ export default function AssessmentDetailPage() {
       </div>
     );
   }
-
-  // Skill names for this assessment
-  const skillNames = assessment.skill_ids.map((id) => skillMap.get(id)?.skill_name).filter(Boolean).join(', ');
 
   return (
     <div className="space-y-6">
