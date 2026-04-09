@@ -1,47 +1,68 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useQuestionStore, Question } from '@/stores/questionStore';
-import { useSkillStore } from '@/stores/skillStore';
-import { useDomainStore } from '@/stores/domainStore';
-import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
-import { useReviewStore } from '@/stores/reviewStore';
-import { useCycleStore } from '@/stores/cycleStore';
-import { useRegistryStore } from '@/stores/registryStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import EvalResults from '@/components/assessment/EvalResults';
-import ManagerReviewPanel from '@/components/assessment/ManagerReviewPanel';
-import AddQuestionDialog from '@/components/assessment/AddQuestionDialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from "@/stores/assessmentStore";
+import { useAttemptStore } from "@/stores/attemptStore";
+import { useQuestionStore, Question } from "@/stores/questionStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useDomainStore } from "@/stores/domainStore";
+import { useReviewStore } from "@/stores/reviewStore";
+import { useCycleStore } from "@/stores/cycleStore";
+import { useRegistryStore } from "@/stores/registryStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import EvalResults from "@/components/assessment/EvalResults";
+import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
+import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import {
-  ArrowLeft, Play, BarChart3, ClipboardCheck, Clock,
-  CheckCircle, Loader2, RotateCcw, RefreshCw, Trash2, Plus,
-} from 'lucide-react';
-import { getQuestionPreviewText } from '@/lib/questionContent';
+  ArrowLeft,
+  Play,
+  BarChart3,
+  ClipboardCheck,
+  Clock,
+  CheckCircle,
+  Loader2,
+  RotateCcw,
+  RefreshCw,
+  Trash2,
+  Plus,
+} from "lucide-react";
+import { getQuestionPreviewText } from "@/lib/questionContent";
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === 'completed') return 'approved';
-  if (review) return 'review_pending';
-  if (attempt?.status === 'evaluated') return 'evaluated';
-  if (attempt?.status === 'submitted') return 'completed';
-  if (attempt?.status === 'in_progress' || assessment.status === 'in_progress') return 'in_progress';
+  if (review?.status === "completed") return "approved";
+  if (review) return "review_pending";
+  if (attempt?.status === "evaluated") return "evaluated";
+  if (attempt?.status === "submitted") return "completed";
+  if (attempt?.status === "in_progress" || assessment.status === "in_progress") return "in_progress";
   return assessment.status;
 }
 
 export default function AssessmentDetailPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const navigate = useNavigate();
-  const { assessments, fetchAssessments, softDeleteAssessment, addAssessment, removeAssessmentQuestion, addAssessmentQuestion } = useAssessmentStore();
+  const {
+    assessments,
+    fetchAssessments,
+    softDeleteAssessment,
+    addAssessment,
+    removeAssessmentQuestion,
+    addAssessmentQuestion,
+  } = useAssessmentStore();
   const { getAttemptForAssessment, fetchAttempts, retryEvaluation } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
@@ -51,50 +72,37 @@ export default function AssessmentDetailPage() {
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { user } = useAuth();
 
-  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
-
-  const [employeeName, setEmployeeName] = useState('');
+  const [employeeName, setEmployeeName] = useState("");
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
-  const [selfRatings, setSelfRatings] = useState<{ skill_id: string; rating: number }[]>([]);
 
   useEffect(() => {
-    fetchAssessments(); fetchAttempts(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchReviews(); fetchCycles(); fetchRegistry(); fetchLevels();
+    fetchAssessments();
+    fetchAttempts();
+    fetchQuestions();
+    fetchSkills();
+    fetchDomains();
+    fetchReviews();
+    fetchCycles();
+    fetchRegistry();
   }, []);
 
-  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
-  const levelsByNumber = useMemo(() => {
-    const map: Record<number, string> = {};
-    for (const l of competencyLevels) { map[l.level] = l.label || l.name; }
-    return map;
-  }, [competencyLevels]);
-
-  const assessment = useMemo(
-    () => assessments.find((a) => a.id === assessmentId),
-    [assessments, assessmentId]
-  );
-
-  // Fetch self-ratings for submission
-  useEffect(() => {
-    if (!assessment?.submission_id) return;
-    supabase.from('skill_self_ratings').select('skill_id, rating').eq('submission_id', assessment.submission_id).then(({ data }) => {
-      if (data) setSelfRatings(data);
-    });
-  }, [assessment?.submission_id]);
+  const assessment = useMemo(() => assessments.find((a) => a.id === assessmentId), [assessments, assessmentId]);
 
   const attempt = assessment ? getAttemptForAssessment(assessment.id) : null;
   const review = reviews.find((r) => r.assessment_id === assessment?.id);
-  const status = assessment ? getEffectiveStatus(assessment, attempt, review) : 'pending';
+  const status = assessment ? getEffectiveStatus(assessment, attempt, review) : "pending";
   const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
   const domain = domains.find((d) => d.id === assessment?.domain_id);
-  const cycleName = assessment?.cycle_id ? cycles.find((c) => c.id === assessment.cycle_id)?.name : '';
+  const cycleName = assessment?.cycle_id ? cycles.find((c) => c.id === assessment.cycle_id)?.name : "";
   const isOwner = assessment?.employee_id === user?.id;
-  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
-  const canManage = !isOwner && isAdmin && ['pending', 'in_progress'].includes(assessment?.status ?? '');
-  const isPendingEval = attempt?.status === 'submitted' && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
-  const isEvaluated = attempt?.status === 'evaluated' || attempt?.status === 'reviewed';
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
+  const isPendingEval =
+    attempt?.status === "submitted" && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
+  const isEvaluated = attempt?.status === "evaluated" || attempt?.status === "reviewed";
 
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
@@ -102,27 +110,36 @@ export default function AssessmentDetailPage() {
   // Fetch employee name for team view
   useEffect(() => {
     if (!assessment || isOwner) return;
-    supabase.from('users').select('full_name').eq('id', assessment.employee_id).single().then(({ data }) => {
-      if (data) setEmployeeName(data.full_name);
-    });
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", assessment.employee_id)
+      .single()
+      .then(({ data }) => {
+        if (data) setEmployeeName(data.full_name);
+      });
   }, [assessment, isOwner]);
 
   // Determine back path
-  const backPath = window.location.pathname.startsWith('/team-assessments') ? '/team-assessments' : '/assessments';
-  const backLabel = backPath === '/team-assessments' ? 'Back to Team Assessments' : 'Back to My Assessments';
+  const backPath = window.location.pathname.startsWith("/team-assessments") ? "/team-assessments" : "/assessments";
+  const backLabel = backPath === "/team-assessments" ? "Back to Team Assessments" : "Back to My Assessments";
 
   // Regenerate assessment handler
   const handleRegenerate = async () => {
     if (!assessment) return;
     setRegenerating(true);
     try {
-      const oldQuestionIds = assessment.assessment_questions.map(q => q.question_id);
-      const sub = submissions.find(s => s.id === assessment.submission_id);
-      if (!sub) { toast.error("Submission not found"); setRegenerating(false); return; }
+      const oldQuestionIds = assessment.assessment_questions.map((q) => q.question_id);
+      const sub = submissions.find((s) => s.id === assessment.submission_id);
+      if (!sub) {
+        toast.error("Submission not found");
+        setRegenerating(false);
+        return;
+      }
 
       await softDeleteAssessment(assessment.id);
 
-      const publishedQuestions = questions.filter(q => q.status === 'published');
+      const publishedQuestions = questions.filter((q) => q.status === "published");
       const newId = await addAssessment({
         tenant_id: assessment.tenant_id,
         employee_id: assessment.employee_id,
@@ -133,11 +150,15 @@ export default function AssessmentDetailPage() {
         publishedQuestions,
         excludeQuestionIds: oldQuestionIds,
       });
-      if (!newId) { toast.error("Failed to generate new assessment"); setRegenerating(false); return; }
+      if (!newId) {
+        toast.error("Failed to generate new assessment");
+        setRegenerating(false);
+        return;
+      }
 
       await markAssessmentGenerated(sub.id);
       toast.success("Assessment regenerated with fresh questions");
-      navigate(backPath.includes('team') ? `/team-assessments/${newId}` : `/assessments/${newId}`);
+      navigate(backPath.includes("team") ? `/team-assessments/${newId}` : `/assessments/${newId}`);
     } catch (err: any) {
       toast.error(err.message || "Failed to regenerate");
     }
@@ -177,7 +198,12 @@ export default function AssessmentDetailPage() {
   if (!assessment) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(backPath)}
+          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft size={14} /> {backLabel}
         </Button>
         <div className="text-center py-16 text-sm text-muted-foreground">Assessment not found.</div>
@@ -185,22 +211,45 @@ export default function AssessmentDetailPage() {
     );
   }
 
+  // Skill names for this assessment
+  const skillNames = assessment.skill_ids
+    .map((id) => skillMap.get(id)?.skill_name)
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-1">
-        <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(backPath)}
+          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2"
+        >
           <ArrowLeft size={14} /> {backLabel}
         </Button>
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-semibold text-foreground">
-            {!isOwner && employeeName ? `${employeeName} — ` : ''}{domain?.name ?? 'Assessment'}
+            {!isOwner && employeeName ? `${employeeName} — ` : ""}
+            {domain?.name ?? "Assessment"}
           </h2>
           <Badge className={`text-xs ${config.color}`}>{config.label}</Badge>
-          {assessment.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
+          {assessment.is_reassessment && (
+            <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">
+              Reassessment
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-muted-foreground">
-          {[cycleName, `${assessment.assessment_questions.length} questions`, `${assessment.duration_minutes} min`, new Date(assessment.created_at).toLocaleDateString()].filter(Boolean).join(' · ')}
+          {[
+            cycleName,
+            `${assessment.assessment_questions.length} questions`,
+            `${assessment.duration_minutes} min`,
+            new Date(assessment.created_at).toLocaleDateString(),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
 
@@ -215,7 +264,10 @@ export default function AssessmentDetailPage() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Duration</p>
-            <p className="text-2xl font-bold text-foreground">{assessment.duration_minutes}<span className="text-sm font-normal text-muted-foreground ml-0.5">min</span></p>
+            <p className="text-2xl font-bold text-foreground">
+              {assessment.duration_minutes}
+              <span className="text-sm font-normal text-muted-foreground ml-0.5">min</span>
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -228,7 +280,9 @@ export default function AssessmentDetailPage() {
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">AI Score</p>
             {attempt?.total_ai_score != null ? (
-              <p className={`text-2xl font-bold ${attempt.total_ai_score >= 75 ? 'text-success' : attempt.total_ai_score >= 50 ? 'text-warning' : 'text-destructive'}`}>
+              <p
+                className={`text-2xl font-bold ${attempt.total_ai_score >= 75 ? "text-success" : attempt.total_ai_score >= 50 ? "text-warning" : "text-destructive"}`}
+              >
                 {attempt.total_ai_score}%
               </p>
             ) : (
@@ -238,59 +292,23 @@ export default function AssessmentDetailPage() {
         </Card>
       </div>
 
-      {/* Skills with Self-Ratings */}
-      {assessment.skill_ids.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-card-foreground">Skills & Self-Ratings</h3>
-            {selfRatings.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                Avg Self-Score: {Math.round(selfRatings.filter(r => assessment.skill_ids.includes(r.skill_id)).reduce((s, r) => s + r.rating, 0) / (selfRatings.filter(r => assessment.skill_ids.includes(r.skill_id)).length || 1))}
-              </Badge>
-            )}
-          </div>
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Skill</TableHead>
-                  <TableHead className="w-32 text-center">Self-Rated Level</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assessment.skill_ids.map((sid) => {
-                  const skill = skillMap.get(sid);
-                  const rating = selfRatings.find(r => r.skill_id === sid);
-                  return (
-                    <TableRow key={sid}>
-                      <TableCell className="text-sm text-foreground">{skill?.skill_name || sid}</TableCell>
-                      <TableCell className="text-center">
-                        {rating ? (
-                          <Badge variant="outline" className="text-xs">
-                            {levelsByNumber[rating.rating] || `Level ${rating.rating}`}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+      {/* Skills list */}
+      {skillNames && (
+        <div className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Skills: </span>
+          {skillNames}
         </div>
       )}
 
       {/* CTA Buttons */}
       <div className="flex items-center gap-3">
-        {isOwner && status === 'pending' && (
-          <Button onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+        {isOwner && status === "pending" && (
+          <Button onClick={() => navigate("/assessment-exec")} className="gap-1.5">
             <Play size={14} /> Start Assessment
           </Button>
         )}
-        {isOwner && status === 'in_progress' && (
-          <Button onClick={() => navigate('/assessment-exec')} className="gap-1.5">
+        {isOwner && status === "in_progress" && (
+          <Button onClick={() => navigate("/assessment-exec")} className="gap-1.5">
             <Play size={14} /> Resume Assessment
           </Button>
         )}
@@ -299,16 +317,21 @@ export default function AssessmentDetailPage() {
             <Badge variant="outline" className="text-xs text-warning border-warning/20 gap-1">
               <Loader2 size={12} className="animate-spin" /> Pending Evaluation
             </Badge>
-            <Button size="sm" variant="outline" onClick={async () => {
-              if (!attempt) return;
-              const qMap = new Map<string, Question>(
-                assessment.assessment_questions
-                  .map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question])
-                  .filter(([, q]) => q != null)
-              );
-              await retryEvaluation(attempt.id, qMap as Map<string, any>, assessment.assessment_questions);
-              toast.info('Retrying AI evaluation...');
-            }} className="gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                if (!attempt) return;
+                const qMap = new Map<string, Question>(
+                  assessment.assessment_questions
+                    .map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question])
+                    .filter(([, q]) => q != null),
+                );
+                await retryEvaluation(attempt.id, qMap as Map<string, any>, assessment.assessment_questions);
+                toast.info("Retrying AI evaluation...");
+              }}
+              className="gap-1.5"
+            >
               <RotateCcw size={14} /> Retry Evaluation
             </Button>
           </div>
@@ -316,8 +339,14 @@ export default function AssessmentDetailPage() {
 
         {/* Admin override: Regenerate */}
         {canManage && (
-          <Button size="sm" variant="outline" onClick={() => setConfirmRegenerate(true)} className="gap-1.5 text-warning" disabled={regenerating}>
-            <RefreshCw size={14} className={regenerating ? 'animate-spin' : ''} /> Regenerate Assessment
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirmRegenerate(true)}
+            className="gap-1.5 text-warning"
+            disabled={regenerating}
+          >
+            <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} /> Regenerate Assessment
           </Button>
         )}
       </div>
@@ -327,7 +356,12 @@ export default function AssessmentDetailPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-foreground">Assessment Questions</h3>
-            <Button size="sm" variant="outline" onClick={() => setAddQuestionOpen(true)} className="gap-1.5 h-7 text-xs">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddQuestionOpen(true)}
+              className="gap-1.5 h-7 text-xs"
+            >
               <Plus size={12} /> Add Question
             </Button>
           </div>
@@ -349,12 +383,19 @@ export default function AssessmentDetailPage() {
                   return (
                     <TableRow key={aq.question_id}>
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-sm text-foreground max-w-xs truncate">{q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}</TableCell>
+                      <TableCell
+                        className="text-sm text-foreground max-w-xs truncate"
+                        title={q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
+                      >
+                        {q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-[10px]">{skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{aq.target_level}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{q?.question_type || '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"
@@ -375,9 +416,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {/* Evaluation Results */}
-      {isEvaluated && attempt && (
-        <EvalResults attempt={attempt} assessment={assessment} />
-      )}
+      {isEvaluated && attempt && <EvalResults attempt={attempt} assessment={assessment} />}
 
       {/* Manager Review Panel (inline for team assessments) */}
       {!isOwner && review && attempt && (
@@ -390,14 +429,14 @@ export default function AssessmentDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Regenerate Assessment?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the current assessment and create a new one with different questions.
-              Previously used questions will be excluded. This action cannot be undone.
+              This will delete the current assessment and create a new one with different questions. Previously used
+              questions will be excluded. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRegenerate} disabled={regenerating}>
-              {regenerating ? 'Regenerating…' : 'Regenerate'}
+              {regenerating ? "Regenerating…" : "Regenerate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -414,7 +453,10 @@ export default function AssessmentDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmRemoveQuestion && handleRemoveQuestion(confirmRemoveQuestion)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={() => confirmRemoveQuestion && handleRemoveQuestion(confirmRemoveQuestion)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -426,7 +468,7 @@ export default function AssessmentDetailPage() {
         open={addQuestionOpen}
         onOpenChange={setAddQuestionOpen}
         skillIds={assessment.skill_ids}
-        existingQuestionIds={assessment.assessment_questions.map(q => q.question_id)}
+        existingQuestionIds={assessment.assessment_questions.map((q) => q.question_id)}
         onAdd={handleAddQuestions}
       />
     </div>
