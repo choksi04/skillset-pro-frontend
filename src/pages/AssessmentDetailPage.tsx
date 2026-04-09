@@ -72,7 +72,7 @@ export default function AssessmentDetailPage() {
   const cycleName = assessment?.cycle_id ? cycles.find((c) => c.id === assessment.cycle_id)?.name : '';
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === 'admin' || user?.role === 'manager';
-  const canManage = !isOwner && isAdmin && assessment?.status === 'pending';
+  const canManage = !isOwner && isAdmin && ['pending', 'in_progress'].includes(assessment?.status ?? '');
   const isPendingEval = attempt?.status === 'submitted' && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === 'evaluated' || attempt?.status === 'reviewed';
 
