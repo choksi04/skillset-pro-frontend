@@ -850,9 +850,9 @@ export default function QuestionBankPage() {
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — fixed bottom */}
       {filtered.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+        <div className="flex-shrink-0 border-t border-border bg-background py-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
           <p className="text-sm text-muted-foreground">
             Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
             {filtered.length >= 10000 ? (
