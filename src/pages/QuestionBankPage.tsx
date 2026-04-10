@@ -37,10 +37,13 @@ import {
 import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
   Sparkles, Trash2, MoreHorizontal, Loader2, ChevronDown, ChevronRight,
-  AlertTriangle, Copy, Eye, Bot, User, CheckSquare,
+  AlertTriangle, Copy, Eye, Bot, User, CheckSquare, ChevronLeft,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import {
+  Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
+} from '@/components/ui/tooltip';
 
 const statusStyles: Record<string, string> = {
   published: 'bg-success/15 text-success border-success/20',
