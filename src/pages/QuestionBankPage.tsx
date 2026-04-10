@@ -309,12 +309,25 @@ export default function QuestionBankPage() {
     return result;
   }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
 
-  const stats = useMemo(() => ({
-    total: questions.length,
-    published: questions.filter((q) => q.status === 'published').length,
-    draft: questions.filter((q) => q.status === 'draft').length,
-    aiGenerated: questions.filter((q) => q.ai_generated).length,
-  }), [questions]);
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedQuestions = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
+
+  // Format large numbers: 10k, 100k etc.
+  function formatCount(n: number): string {
+    if (n >= 100000) return `${Math.round(n / 1000)}k`;
+    if (n >= 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    return n.toLocaleString();
+  }
+
+  function rawFormatCount(n: number): string {
+    return n.toLocaleString();
+  }
 
   // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
