@@ -448,17 +448,30 @@ export default function QuestionBankPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Total Questions', value: stats.total, icon: <HelpCircle size={18} /> },
-          { label: 'Published', value: stats.published, color: 'text-success' },
-          { label: 'Draft', value: stats.draft, color: 'text-warning' },
-          { label: 'AI Generated', value: stats.aiGenerated, icon: <Sparkles size={18} /> },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? 'text-card-foreground'}`}>{s.value}</p>
-          </div>
-        ))}
+        <TooltipProvider>
+          {[
+            { label: 'Total Questions', value: counts.total, icon: <HelpCircle size={18} /> },
+            { label: 'Published', value: counts.published, color: 'text-success' },
+            { label: 'Draft', value: counts.draft, color: 'text-warning' },
+            { label: 'AI Generated', value: counts.aiGenerated, icon: <Sparkles size={18} /> },
+          ].map((s) => (
+            <Tooltip key={s.label}>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-border bg-card p-4 cursor-default">
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                  <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? 'text-card-foreground'}`}>
+                    {s.value >= 10000 ? formatCount(s.value) : s.value}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              {s.value >= 10000 && (
+                <TooltipContent>
+                  <p>{rawFormatCount(s.value)}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          ))}
+        </TooltipProvider>
       </div>
 
       {/* AI Generation Section */}
