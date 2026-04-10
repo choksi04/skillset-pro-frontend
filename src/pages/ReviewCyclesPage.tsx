@@ -4,7 +4,7 @@ import { useDomainStore } from "@/stores/domainStore";
 import { useSkillStore } from "@/stores/skillStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
-import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, getLevelToIdMap } from "@/stores/competencyLevelStore";
 import { useRegistryStore } from "@/stores/registryStore";
 import { useAssessmentStore } from "@/stores/assessmentStore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,7 +69,7 @@ export default function ReviewCyclesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
-  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[] }[]>([]);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[]; type?: 'error' | 'warning' }[]>([]);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [readinessStep, setReadinessStep] = useState<1 | 2>(1);
@@ -151,7 +151,7 @@ export default function ReviewCyclesPage() {
     setExpandedChecks(new Set());
 
     const selectedDomainObjs = activeDomains.filter(d => domainIds.includes(d.id));
-    const checks: { label: string; pass: boolean; details?: string[] }[] = [];
+    const checks: { label: string; pass: boolean; details?: string[]; type?: 'error' | 'warning' }[] = [];
 
     // 1. Skills mapped
     const domainsWithoutSkills = selectedDomainObjs.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
@@ -161,11 +161,12 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutSkills.length > 0
         ? domainsWithoutSkills.map(d => d.name)
         : ['All selected domains have mapped skills'],
+      type: 'error' as const,
     });
 
     // 2. Published questions coverage
     const publishedQuestions = questions.filter(q => q.status === 'published');
-    const levelMap = getLevelToCompetencyMap(levels);
+    const levelIdMap = getLevelToIdMap(levels);
     const questionTypes = ['mcq', 'scenario', 'coding'];
     const gaps: string[] = [];
 
@@ -173,12 +174,12 @@ export default function ReviewCyclesPage() {
       const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
       for (const skillId of domainSkillIds) {
         const skill = skills.find(s => s.id === skillId);
-        for (const [levelNum, levelName] of Object.entries(levelMap)) {
+        for (const [levelNum, levelId] of Object.entries(levelIdMap)) {
           for (const qType of questionTypes) {
             const { min } = getQuestionLimits(configs, qType);
             if (min <= 0) continue;
             const count = publishedQuestions.filter(
-              q => q.skill_id === skillId && q.competency_level === levelName && q.question_type === qType
+              q => q.skill_id === skillId && q.competency_level === levelId && q.question_type === qType
             ).length;
             if (count < min) {
               gaps.push(`${skill?.skill_name || skillId} / L${levelNum} / ${qType}: ${count}/${min}`);
@@ -191,6 +192,7 @@ export default function ReviewCyclesPage() {
       label: 'Sufficient published questions for all skills',
       pass: gaps.length === 0,
       details: gaps.length > 0 ? gaps : ['All skill/level/type combinations covered'],
+      type: 'warning' as const,
     });
 
     // 3. Assigned employees — check both assignment table AND legacy domain_id on users
@@ -209,6 +211,7 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutEmployees.length > 0
         ? domainsWithoutEmployees.map(d => d.name)
         : ['All selected domains have employees'],
+      type: 'error',
     });
 
     // 4. Domain lead
@@ -219,6 +222,7 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutLead.length > 0
         ? domainsWithoutLead.map(d => d.name)
         : ['All selected domains have leads'],
+      type: 'error',
     });
 
     // 5. No other active cycle
@@ -227,6 +231,7 @@ export default function ReviewCyclesPage() {
       label: 'No other cycle currently active',
       pass: !otherActive,
       details: otherActive ? [`"${otherActive.name}" is currently active and will be auto-closed`] : ['No conflicts'],
+      type: 'warning',
     });
 
     setReadinessChecks(checks);
@@ -755,11 +760,19 @@ export default function ReviewCyclesPage() {
                     const visibleItems = !check.pass && items.length > MAX_VISIBLE && !isExpanded ? items.slice(0, MAX_VISIBLE) : items;
                     const hasMore = !check.pass && items.length > MAX_VISIBLE && !isExpanded;
 
+                    const isWarning = !check.pass && check.type === 'warning';
+                    const isError = !check.pass && check.type !== 'warning';
+
                     return (
-                      <div key={i} className={`rounded-md px-3 py-2.5 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                      <div key={i} className={`rounded-md px-3 py-2.5 text-sm ${check.pass ? 'bg-success/10' : isWarning ? 'bg-warning/10' : 'bg-destructive/10'}`}>
                         <div className="flex items-start gap-2">
-                          {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
-                          <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                          {check.pass
+                            ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" />
+                            : isWarning
+                              ? <AlertTriangle size={16} className="text-warning mt-0.5 shrink-0" />
+                              : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />
+                          }
+                          <p className={`font-medium ${check.pass ? 'text-success' : isWarning ? 'text-warning' : 'text-destructive'}`}>{check.label}{isWarning ? ' (warning)' : ''}</p>
                         </div>
                         {items.length > 0 && (
                           <ul className={`mt-1.5 ml-6 space-y-0.5 ${check.pass ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -799,7 +812,7 @@ export default function ReviewCyclesPage() {
                     }}
                     disabled={
                       selectedDomains.length === 0 ||
-                      readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')
+                      readinessChecks.some(c => !c.pass && c.type === 'error')
                     }
                   >
                     Proceed to Activate
