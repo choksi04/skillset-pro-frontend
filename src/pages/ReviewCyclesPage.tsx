@@ -151,7 +151,7 @@ export default function ReviewCyclesPage() {
     setExpandedChecks(new Set());
 
     const selectedDomainObjs = activeDomains.filter(d => domainIds.includes(d.id));
-    const checks: { label: string; pass: boolean; details?: string[] }[] = [];
+    const checks: { label: string; pass: boolean; details?: string[]; type?: 'error' | 'warning' }[] = [];
 
     // 1. Skills mapped
     const domainsWithoutSkills = selectedDomainObjs.filter(d => mappings.filter(m => m.domain_id === d.id).length === 0);
@@ -211,6 +211,7 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutEmployees.length > 0
         ? domainsWithoutEmployees.map(d => d.name)
         : ['All selected domains have employees'],
+      type: 'error',
     });
 
     // 4. Domain lead
@@ -221,6 +222,7 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutLead.length > 0
         ? domainsWithoutLead.map(d => d.name)
         : ['All selected domains have leads'],
+      type: 'error',
     });
 
     // 5. No other active cycle
@@ -229,6 +231,7 @@ export default function ReviewCyclesPage() {
       label: 'No other cycle currently active',
       pass: !otherActive,
       details: otherActive ? [`"${otherActive.name}" is currently active and will be auto-closed`] : ['No conflicts'],
+      type: 'warning',
     });
 
     setReadinessChecks(checks);
