@@ -4,7 +4,7 @@ import { useDomainStore } from "@/stores/domainStore";
 import { useSkillStore } from "@/stores/skillStore";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useAssessmentConfigStore, getQuestionLimits } from "@/stores/assessmentConfigStore";
-import { useCompetencyLevelStore, getLevelToCompetencyMap } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, getLevelToIdMap } from "@/stores/competencyLevelStore";
 import { useRegistryStore } from "@/stores/registryStore";
 import { useAssessmentStore } from "@/stores/assessmentStore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -161,11 +161,12 @@ export default function ReviewCyclesPage() {
       details: domainsWithoutSkills.length > 0
         ? domainsWithoutSkills.map(d => d.name)
         : ['All selected domains have mapped skills'],
+      type: 'error' as const,
     });
 
     // 2. Published questions coverage
     const publishedQuestions = questions.filter(q => q.status === 'published');
-    const levelMap = getLevelToCompetencyMap(levels);
+    const levelIdMap = getLevelToIdMap(levels);
     const questionTypes = ['mcq', 'scenario', 'coding'];
     const gaps: string[] = [];
 
@@ -173,12 +174,12 @@ export default function ReviewCyclesPage() {
       const domainSkillIds = mappings.filter(m => m.domain_id === domain.id).map(m => m.skill_id);
       for (const skillId of domainSkillIds) {
         const skill = skills.find(s => s.id === skillId);
-        for (const [levelNum, levelName] of Object.entries(levelMap)) {
+        for (const [levelNum, levelId] of Object.entries(levelIdMap)) {
           for (const qType of questionTypes) {
             const { min } = getQuestionLimits(configs, qType);
             if (min <= 0) continue;
             const count = publishedQuestions.filter(
-              q => q.skill_id === skillId && q.competency_level === levelName && q.question_type === qType
+              q => q.skill_id === skillId && q.competency_level === levelId && q.question_type === qType
             ).length;
             if (count < min) {
               gaps.push(`${skill?.skill_name || skillId} / L${levelNum} / ${qType}: ${count}/${min}`);
@@ -191,6 +192,7 @@ export default function ReviewCyclesPage() {
       label: 'Sufficient published questions for all skills',
       pass: gaps.length === 0,
       details: gaps.length > 0 ? gaps : ['All skill/level/type combinations covered'],
+      type: 'warning' as const,
     });
 
     // 3. Assigned employees — check both assignment table AND legacy domain_id on users
