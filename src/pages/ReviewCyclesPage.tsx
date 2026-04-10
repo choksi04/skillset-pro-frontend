@@ -760,11 +760,19 @@ export default function ReviewCyclesPage() {
                     const visibleItems = !check.pass && items.length > MAX_VISIBLE && !isExpanded ? items.slice(0, MAX_VISIBLE) : items;
                     const hasMore = !check.pass && items.length > MAX_VISIBLE && !isExpanded;
 
+                    const isWarning = !check.pass && check.type === 'warning';
+                    const isError = !check.pass && check.type !== 'warning';
+
                     return (
-                      <div key={i} className={`rounded-md px-3 py-2.5 text-sm ${check.pass ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                      <div key={i} className={`rounded-md px-3 py-2.5 text-sm ${check.pass ? 'bg-success/10' : isWarning ? 'bg-warning/10' : 'bg-destructive/10'}`}>
                         <div className="flex items-start gap-2">
-                          {check.pass ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />}
-                          <p className={`font-medium ${check.pass ? 'text-success' : 'text-destructive'}`}>{check.label}</p>
+                          {check.pass
+                            ? <CheckCircle size={16} className="text-success mt-0.5 shrink-0" />
+                            : isWarning
+                              ? <AlertTriangle size={16} className="text-warning mt-0.5 shrink-0" />
+                              : <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />
+                          }
+                          <p className={`font-medium ${check.pass ? 'text-success' : isWarning ? 'text-warning' : 'text-destructive'}`}>{check.label}{isWarning ? ' (warning)' : ''}</p>
                         </div>
                         {items.length > 0 && (
                           <ul className={`mt-1.5 ml-6 space-y-0.5 ${check.pass ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -804,7 +812,7 @@ export default function ReviewCyclesPage() {
                     }}
                     disabled={
                       selectedDomains.length === 0 ||
-                      readinessChecks.some(c => !c.pass && c.label !== 'No other cycle currently active' && c.label !== 'Sufficient published questions for all skills')
+                      readinessChecks.some(c => !c.pass && c.type === 'error')
                     }
                   >
                     Proceed to Activate
