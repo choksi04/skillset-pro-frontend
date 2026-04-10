@@ -234,7 +234,7 @@ function FormattedQuestionContent({ text, guidelines, type }: {
 
 export default function QuestionBankPage() {
   const {
-    questions, fetchQuestions,
+    questions, counts, fetchQuestions, fetchQuestionCounts,
     toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
   } = useQuestionStore();
   const { levels: clSettings, fetchLevels } = useCompetencyLevelStore();
@@ -242,7 +242,10 @@ export default function QuestionBankPage() {
   const { currentRole, user } = useAuth();
   const canEdit = currentRole === 'admin' || currentRole === 'manager';
 
-  useEffect(() => { fetchQuestions(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchSkills, fetchLevels]);
+  useEffect(() => { fetchQuestions(); fetchQuestionCounts(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchQuestionCounts, fetchSkills, fetchLevels]);
+
+  const PAGE_SIZE = 50;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // --- List state ---
   const [search, setSearch] = useState('');
