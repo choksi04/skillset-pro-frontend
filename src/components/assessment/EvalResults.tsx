@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
 import { useQuestionStore, questionTypeLabels } from '@/stores/questionStore';
-import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
+import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
 import { Badge } from '@/components/ui/badge';
@@ -51,7 +51,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
   const { skills } = useSkillStore();
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
+  const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
   useEffect(() => { fetchLevels(); }, [fetchLevels]);
 

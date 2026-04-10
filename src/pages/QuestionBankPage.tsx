@@ -4,7 +4,7 @@ import {
   useQuestionStore, Question, QuestionStatus, questionTypes,
   questionTypeLabels, CompetencyLevel, QuestionType,
 } from '@/stores/questionStore';
-import { useCompetencyLevelStore, getActiveLevelNames, getLevelLabelsMap } from '@/stores/competencyLevelStore';
+import { useCompetencyLevelStore, getActiveLevelIds, getLevelLabelsByIdMap, getLevelNameById } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -276,8 +276,8 @@ export default function QuestionBankPage() {
 
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const dynamicLevels = useMemo(() => getActiveLevelNames(clSettings), [clSettings]);
-  const dynamicLabels = useMemo(() => getLevelLabelsMap(clSettings), [clSettings]);
+  const dynamicLevels = useMemo(() => getActiveLevelIds(clSettings), [clSettings]);
+  const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(clSettings), [clSettings]);
   const topicMap = useMemo(() => {
     const m = new Map<string, string>();
     Object.values(topics).flat().forEach((t) => m.set(t.id, t.name));
@@ -354,13 +354,15 @@ export default function QuestionBankPage() {
 
     const skill = skills.find((s) => s.id === aiSkillId);
     const topic = aiTopicId ? topicMap.get(aiTopicId) : undefined;
+    // Get level NAME for AI prompt (AI needs human-readable name, not UUID)
+    const aiLevelName = getLevelNameById(clSettings, aiLevel) || aiLevel;
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-questions', {
         body: {
           skillName: skill?.skill_name ?? 'Unknown',
           topicName: topic || undefined,
-          competencyLevel: aiLevel,
+          competencyLevel: aiLevelName,
           questionType: aiQType,
           organizationContext: aiContext,
           count: aiCount,
