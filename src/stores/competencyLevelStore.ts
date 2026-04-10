@@ -71,6 +71,14 @@ export function getActiveLevelNames(levels: CompetencyLevel[]): string[] {
     .map(l => l.name);
 }
 
+/** Get active level UUIDs sorted by level number (for dropdowns/forms) */
+export function getActiveLevelIds(levels: CompetencyLevel[]): string[] {
+  return levels
+    .filter(l => l.status === 'active')
+    .sort((a, b) => a.level - b.level)
+    .map(l => l.id);
+}
+
 /** Get a map of name -> label for active levels */
 export function getLevelLabelsMap(levels: CompetencyLevel[]): Record<string, string> {
   return Object.fromEntries(
@@ -81,9 +89,29 @@ export function getLevelLabelsMap(levels: CompetencyLevel[]): Record<string, str
   );
 }
 
+/** Get a map of UUID id -> label for active levels (for display when column stores UUID) */
+export function getLevelLabelsByIdMap(levels: CompetencyLevel[]): Record<string, string> {
+  return Object.fromEntries(
+    levels
+      .filter(l => l.status === 'active')
+      .sort((a, b) => a.level - b.level)
+      .map(l => [l.id, l.label])
+  );
+}
+
 /** Get label for a specific level name */
 export function getLevelLabel(levels: CompetencyLevel[], name: string): string {
   return levels.find(l => l.name === name)?.label || name;
+}
+
+/** Get label for a specific level UUID */
+export function getLevelLabelById(levels: CompetencyLevel[], id: string): string {
+  return levels.find(l => l.id === id)?.label || id;
+}
+
+/** Get level name by UUID */
+export function getLevelNameById(levels: CompetencyLevel[], id: string): string {
+  return levels.find(l => l.id === id)?.name || '';
 }
 
 /** Get label for a numeric level */
@@ -109,10 +137,24 @@ export function getLevelToCompetencyMap(levels: CompetencyLevel[]): Record<numbe
   return map;
 }
 
+/** Map rating level (1-5) to competency UUID */
+export function getLevelToIdMap(levels: CompetencyLevel[]): Record<number, string> {
+  const active = levels.filter(l => l.status === 'active').sort((a, b) => a.level - b.level);
+  const map: Record<number, string> = {};
+  for (const l of active) map[l.level] = l.id;
+  return map;
+}
+
 /** Map competency name to numeric level */
 export function getCompetencyToLevelMap(levels: CompetencyLevel[]): Record<string, number> {
   const active = levels.filter(l => l.status === 'active').sort((a, b) => a.level - b.level);
   return Object.fromEntries(active.map(l => [l.name, l.level]));
+}
+
+/** Map competency UUID to numeric level */
+export function getIdToLevelMap(levels: CompetencyLevel[]): Record<string, number> {
+  const active = levels.filter(l => l.status === 'active').sort((a, b) => a.level - b.level);
+  return Object.fromEntries(active.map(l => [l.id, l.level]));
 }
 
 /** Dynamic scoreToLevel using score ranges from competency_levels table */
