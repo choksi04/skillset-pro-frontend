@@ -225,6 +225,13 @@ export type Database = {
             referencedRelation: "assessments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assessment_questions_target_level_fkey"
+            columns: ["target_level"]
+            isOneToOne: false
+            referencedRelation: "competency_levels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       assessments: {
@@ -808,7 +815,15 @@ export type Database = {
           topic_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "questions_competency_level_fkey"
+            columns: ["competency_level"]
+            isOneToOne: false
+            referencedRelation: "competency_levels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reassessment_requests: {
         Row: {

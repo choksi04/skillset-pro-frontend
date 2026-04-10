@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question, CompetencyLevel } from './questionStore';
 import { SkillSelfRating, RatingLevel } from './registryStore';
-import { CompetencyLevel as CompetencyLevelConfig, getLevelToCompetencyMap } from './competencyLevelStore';
+import { CompetencyLevel as CompetencyLevelConfig, getLevelToIdMap } from './competencyLevelStore';
 import { AssessmentConfig, getQuestionLimits } from './assessmentConfigStore';
 import { getCurrentUserId } from '@/lib/audit';
 
@@ -22,7 +22,7 @@ export const assessmentStatusConfig: Record<string, { label: string; color: stri
  * Questions are picked ONLY from the exact level matching the rating.
  */
 function getTargetCompetencyLevel(rating: RatingLevel, settings: CompetencyLevelConfig[]): CompetencyLevel | null {
-  const levelMap = getLevelToCompetencyMap(settings);
+  const levelMap = getLevelToIdMap(settings);
   return levelMap[rating] || null;
 }
 

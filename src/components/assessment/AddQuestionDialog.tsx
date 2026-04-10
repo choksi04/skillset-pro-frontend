@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
+import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
 import { AssessmentQuestion } from '@/stores/assessmentStore';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -25,10 +26,12 @@ export default function AddQuestionDialog({
 }: AddQuestionDialogProps) {
   const { questions } = useQuestionStore();
   const { skills } = useSkillStore();
+  const { levels: competencyLevels } = useCompetencyLevelStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
 
   const skillMap = useMemo(() => new Map(skills.map(s => [s.id, s])), [skills]);
+  const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
   const availableQuestions = useMemo(() => {
     const excludeSet = new Set(existingQuestionIds);
@@ -45,7 +48,7 @@ export default function AddQuestionDialog({
     return availableQuestions.filter(q =>
       getQuestionPreviewText(q.question_text, q.question_type).toLowerCase().includes(term) ||
       (skillMap.get(q.skill_id)?.skill_name || '').toLowerCase().includes(term) ||
-      q.competency_level.toLowerCase().includes(term) ||
+      (levelLabels[q.competency_level] || '').toLowerCase().includes(term) ||
       q.question_type.toLowerCase().includes(term)
     );
   }, [availableQuestions, search, skillMap]);
@@ -108,7 +111,7 @@ export default function AddQuestionDialog({
                   </p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Badge variant="outline" className="text-[10px]">{skillMap.get(q.skill_id)?.skill_name || q.skill_id}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{q.competency_level}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{levelLabels[q.competency_level] || q.competency_level}</Badge>
                     <Badge variant="outline" className="text-[10px]">{q.question_type}</Badge>
                   </div>
                 </div>

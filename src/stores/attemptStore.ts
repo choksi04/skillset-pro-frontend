@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from './questionStore';
-import { CompetencyLevel as CompetencyLevelConfig, scoreToLevelDynamic, getCompetencyToLevelMap } from './competencyLevelStore';
+import { CompetencyLevel as CompetencyLevelConfig, scoreToLevelDynamic, getIdToLevelMap } from './competencyLevelStore';
 import { getCurrentUserId } from '@/lib/audit';
 
 export interface AnswerEntry {
@@ -286,7 +286,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       const skillScores: SkillScore[] = [];
 
       // Build target level map per skill from assessment questions
-      let competencyToLevelMap: Record<string, number> = {};
+      let idToLevelMap: Record<string, number> = {};
       try {
         const { data: clData } = await supabase.from('competency_levels').select('*').eq('status', 'active');
         if (clData && clData.length > 0) {
@@ -295,7 +295,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
             description: s.description || '', score_range_min: s.score_range_min, score_range_max: s.score_range_max,
             min_questions: s.min_questions, status: s.status,
           }));
-          competencyToLevelMap = getCompetencyToLevelMap(clLevels);
+          idToLevelMap = getIdToLevelMap(clLevels);
         }
       } catch { /* fallback */ }
 
@@ -303,7 +303,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       const skillTargetLevelMap: Record<string, number> = {};
       for (const aq of assessmentQuestions) {
         if (!skillTargetLevelMap[aq.skill_id]) {
-          const targetLevelNum = competencyToLevelMap[aq.target_level] ?? 5;
+          const targetLevelNum = idToLevelMap[aq.target_level] ?? 5;
           skillTargetLevelMap[aq.skill_id] = targetLevelNum;
         }
       }

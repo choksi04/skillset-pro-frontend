@@ -93,12 +93,22 @@ export default function AssessmentDetailPage() {
     fetchLevels();
   }, []);
 
-  // Build a map from level label/name to level number
+  // Build a map from competency level UUID to level number
   const levelNumberMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const cl of competencyLevels) {
+      map.set(cl.id, cl.level);
       map.set(cl.label.toLowerCase(), cl.level);
       map.set(cl.name.toLowerCase(), cl.level);
+    }
+    return map;
+  }, [competencyLevels]);
+  
+  // Build a map from competency level UUID to label
+  const levelLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cl of competencyLevels) {
+      map.set(cl.id, cl.label);
     }
     return map;
   }, [competencyLevels]);
@@ -410,8 +420,9 @@ export default function AssessmentDetailPage() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {(() => {
-                          const lvl = levelNumberMap.get(aq.target_level.toLowerCase());
-                          return lvl != null ? `L${lvl} - ${aq.target_level}` : aq.target_level;
+                          const lvl = levelNumberMap.get(aq.target_level);
+                          const label = levelLabelMap.get(aq.target_level) || aq.target_level;
+                          return lvl != null ? `L${lvl} - ${label}` : label;
                         })()}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>

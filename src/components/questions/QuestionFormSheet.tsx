@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { useQuestionStore, Question, questionTypes, questionTypeLabels } from '@/stores/questionStore';
-import { useCompetencyLevelStore, getActiveLevelNames, getLevelLabelsMap } from '@/stores/competencyLevelStore';
+import { useCompetencyLevelStore, getActiveLevelIds, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -80,8 +80,8 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
 
   useEffect(() => { fetchLevels(); }, [fetchLevels]);
 
-  const dynamicLevels = useMemo(() => getActiveLevelNames(competencyLevels), [competencyLevels]);
-  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
+  const dynamicLevels = useMemo(() => getActiveLevelIds(competencyLevels), [competencyLevels]);
+  const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
   const [skillId, setSkillId] = useState('');
   const [topicId, setTopicId] = useState('');
