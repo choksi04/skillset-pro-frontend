@@ -430,8 +430,8 @@ export default function QuestionBankPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="flex-shrink-0 space-y-6 pb-4">
+    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Question Bank</h2>
@@ -721,7 +721,7 @@ export default function QuestionBankPage() {
       )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -852,7 +852,7 @@ export default function QuestionBankPage() {
 
       {/* Pagination — fixed bottom */}
       {filtered.length > 0 && (
-        <div className="flex-shrink-0 border-t border-border bg-background py-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+        <div className="sticky bottom-0 border-t border-border bg-background py-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
           <p className="text-sm text-muted-foreground">
             Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
             {filtered.length >= 10000 ? (
