@@ -849,7 +849,78 @@ export default function QuestionBankPage() {
         </Table>
       </div>
 
-      {/* Detail View Sheet */}
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
+            {filtered.length >= 10000 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-default underline decoration-dotted">{formatCount(filtered.length)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{rawFormatCount(filtered.length)}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              filtered.length
+            )} questions
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft size={14} /> Previous
+              </Button>
+              {(() => {
+                const pages: (number | 'ellipsis')[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 3) pages.push('ellipsis');
+                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                    pages.push(i);
+                  }
+                  if (currentPage < totalPages - 2) pages.push('ellipsis');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, idx) =>
+                  p === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="px-2 text-muted-foreground text-sm">…</span>
+                  ) : (
+                    <Button
+                      key={p}
+                      variant={currentPage === p ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  )
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next <ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {detailQuestion && (
         <QuestionDetailSheet
           question={detailQuestion}
