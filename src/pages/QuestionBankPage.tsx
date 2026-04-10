@@ -719,8 +719,9 @@ export default function QuestionBankPage() {
           </Button>
         </div>
       )}
+      </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
