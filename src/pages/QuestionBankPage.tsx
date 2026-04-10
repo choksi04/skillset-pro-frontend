@@ -430,7 +430,7 @@ export default function QuestionBankPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
