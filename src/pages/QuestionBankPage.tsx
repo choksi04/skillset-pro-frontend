@@ -721,7 +721,7 @@ export default function QuestionBankPage() {
       )}
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-22rem)]  overflow-y-auto">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
