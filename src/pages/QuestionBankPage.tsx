@@ -430,8 +430,8 @@ export default function QuestionBankPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="flex-shrink-0 space-y-6 pb-4">
+    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Question Bank</h2>
