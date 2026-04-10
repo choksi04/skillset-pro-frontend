@@ -325,7 +325,7 @@ export default function QuestionBankPage() {
     for (const skill of filteredSkills) {
       const counts = skillCoverage[skill.id] || {};
       const levels = filteredLevels.map((l) => {
-        const setting = clSettings.find((s) => s.name.toLowerCase() === l);
+        const setting = clSettings.find((s) => s.id === l);
         const min = setting?.min_questions ?? minRequired;
         return { level: l, count: counts[l] || 0, min };
       });
