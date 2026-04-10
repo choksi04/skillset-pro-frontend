@@ -69,7 +69,7 @@ export default function ReviewCyclesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [readinessTarget, setReadinessTarget] = useState<string | null>(null);
-  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[] }[]>([]);
+  const [readinessChecks, setReadinessChecks] = useState<{ label: string; pass: boolean; details?: string[]; type?: 'error' | 'warning' }[]>([]);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [readinessStep, setReadinessStep] = useState<1 | 2>(1);
