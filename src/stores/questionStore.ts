@@ -21,11 +21,21 @@ export interface Question {
   updated_at: string;
 }
 
+export interface QuestionCounts {
+  total: number;
+  published: number;
+  draft: number;
+  disabled: number;
+  aiGenerated: number;
+}
+
 interface QuestionStore {
   questions: Question[];
+  counts: QuestionCounts;
   loading: boolean;
   initialized: boolean;
   fetchQuestions: () => Promise<void>;
+  fetchQuestionCounts: () => Promise<void>;
   addQuestion: (q: Omit<Question, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   addQuestions: (qs: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
@@ -36,22 +46,60 @@ interface QuestionStore {
   checkQuestionUsage: (id: string) => Promise<boolean>;
 }
 
+const BATCH_SIZE = 1000;
+
 export const useQuestionStore = create<QuestionStore>((set, get) => ({
   questions: [],
+  counts: { total: 0, published: 0, draft: 0, disabled: 0, aiGenerated: 0 },
   loading: false,
   initialized: false,
+
+  fetchQuestionCounts: async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_question_counts');
+      if (error) throw error;
+      if (data) {
+        const d = data as any;
+        set({
+          counts: {
+            total: d.total ?? 0,
+            published: d.published ?? 0,
+            draft: d.draft ?? 0,
+            disabled: d.disabled ?? 0,
+            aiGenerated: d.ai_generated ?? 0,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch question counts:', err);
+    }
+  },
 
   fetchQuestions: async () => {
     set({ loading: true });
     try {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .is('deleted_on', null)
-        .order('created_at');
-      if (error) throw error;
+      const allRows: any[] = [];
+      let offset = 0;
+      let keepFetching = true;
 
-      const questions: Question[] = (data || []).map((q: any) => ({
+      while (keepFetching) {
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .is('deleted_on', null)
+          .order('created_at')
+          .range(offset, offset + BATCH_SIZE - 1);
+        if (error) throw error;
+        const rows = data || [];
+        allRows.push(...rows);
+        if (rows.length < BATCH_SIZE) {
+          keepFetching = false;
+        } else {
+          offset += BATCH_SIZE;
+        }
+      }
+
+      const questions: Question[] = allRows.map((q: any) => ({
         id: q.id, tenant_id: q.tenant_id, skill_id: q.skill_id,
         topic_id: q.topic_id || null,
         competency_level: q.competency_level as CompetencyLevel,
@@ -79,6 +127,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
         ...q, id, created_at: (data as any).created_at, updated_at: (data as any).updated_at,
       }],
     }));
+    // Refresh counts
+    get().fetchQuestionCounts();
   },
 
   addQuestions: async (qs) => {
@@ -98,6 +148,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       created_at: d.created_at, updated_at: d.updated_at,
     }));
     set((state) => ({ questions: [...state.questions, ...newQuestions] }));
+    // Refresh counts
+    get().fetchQuestionCounts();
   },
 
   updateQuestion: async (id, updates) => {
@@ -111,6 +163,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
         q.id === id ? { ...q, ...updates, updated_at: new Date().toISOString() } : q
       ),
     }));
+    // Refresh counts if status changed
+    if (updates.status) get().fetchQuestionCounts();
   },
 
   toggleQuestionStatus: async (id) => {
@@ -137,6 +191,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
         ids.includes(q.id) ? { ...q, status: 'published' as const, updated_at: now } : q
       ),
     }));
+    // Refresh counts
+    get().fetchQuestionCounts();
     return ids.length;
   },
 
@@ -168,6 +224,8 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
     set((state) => ({
       questions: state.questions.filter((q) => q.id !== id),
     }));
+    // Refresh counts
+    get().fetchQuestionCounts();
     return { success: true };
   },
 }));

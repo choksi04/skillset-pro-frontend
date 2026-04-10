@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { z } from 'zod';
 import {
   useQuestionStore, Question, QuestionStatus, questionTypes,
@@ -37,10 +37,13 @@ import {
 import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
   Sparkles, Trash2, MoreHorizontal, Loader2, ChevronDown, ChevronRight,
-  AlertTriangle, Copy, Eye, Bot, User, CheckSquare,
+  AlertTriangle, Copy, Eye, Bot, User, CheckSquare, ChevronLeft,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import {
+  Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
+} from '@/components/ui/tooltip';
 
 const statusStyles: Record<string, string> = {
   published: 'bg-success/15 text-success border-success/20',
@@ -231,7 +234,7 @@ function FormattedQuestionContent({ text, guidelines, type }: {
 
 export default function QuestionBankPage() {
   const {
-    questions, fetchQuestions,
+    questions, counts, fetchQuestions, fetchQuestionCounts,
     toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
   } = useQuestionStore();
   const { levels: clSettings, fetchLevels } = useCompetencyLevelStore();
@@ -239,7 +242,10 @@ export default function QuestionBankPage() {
   const { currentRole, user } = useAuth();
   const canEdit = currentRole === 'admin' || currentRole === 'manager';
 
-  useEffect(() => { fetchQuestions(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchSkills, fetchLevels]);
+  useEffect(() => { fetchQuestions(); fetchQuestionCounts(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchQuestionCounts, fetchSkills, fetchLevels]);
+
+  const PAGE_SIZE = 50;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // --- List state ---
   const [search, setSearch] = useState('');
@@ -303,12 +309,25 @@ export default function QuestionBankPage() {
     return result;
   }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
 
-  const stats = useMemo(() => ({
-    total: questions.length,
-    published: questions.filter((q) => q.status === 'published').length,
-    draft: questions.filter((q) => q.status === 'draft').length,
-    aiGenerated: questions.filter((q) => q.ai_generated).length,
-  }), [questions]);
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedQuestions = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
+
+  // Format large numbers: 10k, 100k etc.
+  function formatCount(n: number): string {
+    if (n >= 100000) return `${Math.round(n / 1000)}k`;
+    if (n >= 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    return n.toLocaleString();
+  }
+
+  function rawFormatCount(n: number): string {
+    return n.toLocaleString();
+  }
 
   // --- Coverage indicator (respects filters) ---
   const coverageData = useMemo(() => {
@@ -429,17 +448,30 @@ export default function QuestionBankPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Total Questions', value: stats.total, icon: <HelpCircle size={18} /> },
-          { label: 'Published', value: stats.published, color: 'text-success' },
-          { label: 'Draft', value: stats.draft, color: 'text-warning' },
-          { label: 'AI Generated', value: stats.aiGenerated, icon: <Sparkles size={18} /> },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? 'text-card-foreground'}`}>{s.value}</p>
-          </div>
-        ))}
+        <TooltipProvider>
+          {[
+            { label: 'Total Questions', value: counts.total, icon: <HelpCircle size={18} /> },
+            { label: 'Published', value: counts.published, color: 'text-success' },
+            { label: 'Draft', value: counts.draft, color: 'text-warning' },
+            { label: 'AI Generated', value: counts.aiGenerated, icon: <Sparkles size={18} /> },
+          ].map((s) => (
+            <Tooltip key={s.label}>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-border bg-card p-4 cursor-default">
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                  <p className={`text-2xl font-semibold mt-1 ${(s as any).color ?? 'text-card-foreground'}`}>
+                    {s.value >= 10000 ? formatCount(s.value) : s.value}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              {s.value >= 10000 && (
+                <TooltipContent>
+                  <p>{rawFormatCount(s.value)}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          ))}
+        </TooltipProvider>
       </div>
 
       {/* AI Generation Section */}
@@ -695,14 +727,14 @@ export default function QuestionBankPage() {
               {canEdit && (
                 <TableHead className="w-[40px]">
                   <Checkbox
-                    checked={filtered.length > 0 && filtered.every(q => selectedIds.has(q.id))
+                    checked={paginatedQuestions.length > 0 && paginatedQuestions.every(q => selectedIds.has(q.id))
                       ? true
-                      : filtered.some(q => selectedIds.has(q.id))
+                      : paginatedQuestions.some(q => selectedIds.has(q.id))
                         ? 'indeterminate'
                         : false}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setSelectedIds(new Set(filtered.map(q => q.id)));
+                        setSelectedIds(new Set(paginatedQuestions.map(q => q.id)));
                       } else {
                         setSelectedIds(new Set());
                       }
@@ -721,14 +753,14 @@ export default function QuestionBankPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {paginatedQuestions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={canEdit ? 10 : 7} className="text-center py-16 text-sm text-muted-foreground">
                   No questions found matching your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((q) => {
+              paginatedQuestions.map((q) => {
                 const skill = skillMap.get(q.skill_id);
                 const { display } = parseQuestionText(q.question_text, q.question_type);
                 return (
@@ -817,7 +849,78 @@ export default function QuestionBankPage() {
         </Table>
       </div>
 
-      {/* Detail View Sheet */}
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
+            {filtered.length >= 10000 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-default underline decoration-dotted">{formatCount(filtered.length)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{rawFormatCount(filtered.length)}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              filtered.length
+            )} questions
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft size={14} /> Previous
+              </Button>
+              {(() => {
+                const pages: (number | 'ellipsis')[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 3) pages.push('ellipsis');
+                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                    pages.push(i);
+                  }
+                  if (currentPage < totalPages - 2) pages.push('ellipsis');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, idx) =>
+                  p === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="px-2 text-muted-foreground text-sm">…</span>
+                  ) : (
+                    <Button
+                      key={p}
+                      variant={currentPage === p ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  )
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next <ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {detailQuestion && (
         <QuestionDetailSheet
           question={detailQuestion}
