@@ -727,14 +727,14 @@ export default function QuestionBankPage() {
               {canEdit && (
                 <TableHead className="w-[40px]">
                   <Checkbox
-                    checked={filtered.length > 0 && filtered.every(q => selectedIds.has(q.id))
+                    checked={paginatedQuestions.length > 0 && paginatedQuestions.every(q => selectedIds.has(q.id))
                       ? true
-                      : filtered.some(q => selectedIds.has(q.id))
+                      : paginatedQuestions.some(q => selectedIds.has(q.id))
                         ? 'indeterminate'
                         : false}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setSelectedIds(new Set(filtered.map(q => q.id)));
+                        setSelectedIds(new Set(paginatedQuestions.map(q => q.id)));
                       } else {
                         setSelectedIds(new Set());
                       }
