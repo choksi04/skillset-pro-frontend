@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore, questionTypeLabels, Question } from '@/stores/questionStore';
-import { useCompetencyLevelStore, getLevelLabelsMap } from '@/stores/competencyLevelStore';
+import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -121,7 +121,7 @@ export default function AssessmentExecPage() {
       .then(() => setDataLoaded(true));
   }, []);
 
-  const dynamicLabels = useMemo(() => getLevelLabelsMap(competencyLevels), [competencyLevels]);
+  const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
