@@ -753,14 +753,14 @@ export default function QuestionBankPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {paginatedQuestions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={canEdit ? 10 : 7} className="text-center py-16 text-sm text-muted-foreground">
                   No questions found matching your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((q) => {
+              paginatedQuestions.map((q) => {
                 const skill = skillMap.get(q.skill_id);
                 const { display } = parseQuestionText(q.question_text, q.question_type);
                 return (
