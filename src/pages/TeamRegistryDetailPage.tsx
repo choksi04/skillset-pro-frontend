@@ -1,210 +1,162 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
-import { useAssessmentStore } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useReviewStore } from '@/stores/reviewStore';
+import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
+import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
-import { useCycleStore } from '@/stores/cycleStore';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ScoreCard } from '@/components/registry/ScoreCard';
-import { ManagerAvatar } from '@/components/registry/ManagerAvatar';
-import { RegistrySkillTable } from '@/components/registry/RegistrySkillTable';
-import { deriveStatus, statusLabel, statusColor, avgRound, EnrichedSubmission } from '@/components/registry/registryHelpers';
-import { Button } from '@/components/ui/button';
+import { RatingLevel } from '@/stores/registryStore';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, BarChart3, ClipboardCheck, Award, UserCheck,
-} from 'lucide-react';
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '@/components/ui/accordion';
+import { ArrowLeft, FolderOpen, Search } from 'lucide-react';
 
 export default function TeamRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
   const navigate = useNavigate();
 
-  const { submissions, fetchRegistry } = useRegistryStore();
-  const { assessments, fetchAssessments } = useAssessmentStore();
-  const { attempts, fetchAttempts } = useAttemptStore();
-  const { reviews, officialEntries, fetchReviews } = useReviewStore();
+  const { registries, fetchRegistries, fetchItems } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
-  const { activeCycle, fetchCycles } = useCycleStore();
 
   useEffect(() => {
-    fetchRegistry(); fetchDomains(); fetchSkills(); fetchAssessments(); fetchAttempts(); fetchReviews(); fetchCycles();
+    fetchRegistries();
+    fetchDomains();
+    fetchSkills();
   }, []);
 
-  const submission = useMemo(() => submissions.find((s) => s.id === submissionId), [submissions, submissionId]);
+  const registry = useMemo(() => registries.find((r) => r.id === submissionId), [registries, submissionId]);
 
-  // Fetch employee + reviewer info
   const [employeeName, setEmployeeName] = useState('');
-  const [reviewerMap, setReviewerMap] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
+  const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    if (!submission) return;
-    supabase.from('users').select('id, full_name').eq('id', submission.employee_id).single().then(({ data }) => {
+    if (!registry) return;
+    supabase.from('users').select('id, full_name').eq('id', registry.employee_id).single().then(({ data }) => {
       if (data) setEmployeeName((data as any).full_name);
     });
-  }, [submission?.employee_id]);
+  }, [registry?.employee_id]);
 
   useEffect(() => {
-    const reviewerIds = [...new Set(reviews.map((r) => r.reviewer_id))];
-    if (reviewerIds.length === 0) return;
-    supabase.from('users').select('id, full_name, email, avatar_url').in('id', reviewerIds).then(({ data }) => {
-      if (data) {
-        const map: Record<string, { name: string; email: string; avatar_url: string }> = {};
-        data.forEach((u: any) => { map[u.id] = { name: u.full_name, email: u.email, avatar_url: u.avatar_url || '' }; });
-        setReviewerMap(map);
-      }
+    if (!submissionId) return;
+    fetchItems(submissionId).then((items) => {
+      const rMap: Record<string, RatingLevel> = {};
+      const cMap: Record<string, string> = {};
+      items.forEach((i) => {
+        rMap[i.skill_id] = i.self_score as RatingLevel;
+        if (i.comment) cMap[i.skill_id] = i.comment;
+      });
+      setRatings(rMap);
+      setComments(cMap);
     });
-  }, [reviews]);
+  }, [submissionId]);
 
-  const domain = useMemo(() => submission ? domains.find((d) => d.id === submission.domain_id) : null, [submission, domains]);
-  const isCycleClosed = !activeCycle || (submission ? submission.cycle !== activeCycle.name : false);
-  const employeeStatus = deriveStatus(submission, assessments, attempts, reviews, submission?.status === 'draft' ? isCycleClosed : false);
+  const domain = useMemo(() => registry ? domains.find((d) => d.id === registry.domain_id) : null, [registry, domains]);
 
-  // Enriched
-  const enriched = useMemo<EnrichedSubmission | null>(() => {
-    if (!submission) return null;
-    const selfAvg = avgRound(submission.ratings.map((r) => r.rating));
-    let assessmentAvg: number | null = null;
-    const assessment = assessments.find((a) => a.submission_id === submission.id);
-    if (assessment) {
-      const attempt = attempts.find((a) => a.assessment_id === assessment.id);
-      if (attempt && attempt.skill_scores.length > 0) {
-        assessmentAvg = avgRound(attempt.skill_scores.map((ss) => ss.calculated_level));
-      }
-    }
-    let finalAvg: number | null = null;
-    const officialForCycle = (officialEntries || []).filter(
-      (oe) => oe.employee_id === submission.employee_id && oe.cycle === submission.cycle
+  const domainSkillIds = useMemo(() => {
+    if (!domain) return [];
+    return mappings.filter((m) => m.domain_id === domain.id).map((m) => m.skill_id);
+  }, [domain, mappings]);
+
+  const domainSkills = useMemo(
+    () => skills.filter((s) => domainSkillIds.includes(s.id) && s.status === 'active'),
+    [skills, domainSkillIds]
+  );
+
+  const filteredSkills = useMemo(() => {
+    if (!search.trim()) return domainSkills;
+    const q = search.toLowerCase();
+    return domainSkills.filter((s) =>
+      s.skill_name.toLowerCase().includes(q) || (s.skill_category || '').toLowerCase().includes(q)
     );
-    if (officialForCycle.length > 0) {
-      finalAvg = avgRound(officialForCycle.map((oe) => oe.final_level));
-    }
-    let reviewer: EnrichedSubmission['reviewer'] = null;
-    if (assessment) {
-      const attempt = attempts.find((a) => a.assessment_id === assessment.id);
-      if (attempt) {
-        const review = reviews.find((r) => r.attempt_id === attempt.id);
-        if (review && reviewerMap[review.reviewer_id]) {
-          reviewer = { id: review.reviewer_id, ...reviewerMap[review.reviewer_id] };
-        }
-      }
-    }
-    return { submission, selfAvg, assessmentAvg, finalAvg, status: employeeStatus, reviewer, isActive: false };
-  }, [submission, assessments, attempts, reviews, officialEntries, reviewerMap, employeeStatus]);
+  }, [domainSkills, search]);
 
-  const assessment = useMemo(() => assessments.find((a) => a.submission_id === submission?.id), [assessments, submission]);
-  const attempt = useMemo(() => assessment ? attempts.find((a) => a.assessment_id === assessment.id) : null, [assessment, attempts]);
-  const review = useMemo(() => attempt ? reviews.find((r) => r.attempt_id === attempt.id) : null, [attempt, reviews]);
-
-  const assessmentScoreMap = useMemo<Record<string, number>>(() => {
-    if (!attempt) return {};
-    const map: Record<string, number> = {};
-    attempt.skill_scores.forEach((ss) => { map[ss.skill_id] = ss.calculated_level; });
+  const groupedSkills = useMemo(() => {
+    const map = new Map<string, typeof domainSkills>();
+    filteredSkills.forEach((s) => {
+      const cat = s.skill_category || 'Uncategorized';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(s);
+    });
     return map;
-  }, [attempt]);
+  }, [filteredSkills]);
 
-  const finalScoreMap = useMemo<Record<string, number>>(() => {
-    if (!submission) return {};
-    const entries = (officialEntries || []).filter(
-      (oe) => oe.employee_id === submission.employee_id && oe.cycle === submission.cycle
-    );
-    const map: Record<string, number> = {};
-    entries.forEach((oe) => { map[oe.skill_id] = oe.final_level; });
-    return map;
-  }, [officialEntries, submission]);
-
-  const ratingMap: Record<string, RatingLevel> = {};
-  submission?.ratings.forEach((r) => { ratingMap[r.skill_id] = r.rating; });
-
-  // Trend calculations (vs self score)
-  const assessmentTrend = enriched?.selfAvg && enriched?.assessmentAvg
-    ? Math.round((enriched.assessmentAvg - enriched.selfAvg) * 10) / 10
-    : null;
-  const finalTrend = enriched?.selfAvg && enriched?.finalAvg
-    ? Math.round((enriched.finalAvg - enriched.selfAvg) * 10) / 10
-    : null;
-
-  if (!submission) {
+  if (!registry) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/team-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground">
           <ArrowLeft size={14} /> Back to Team Registry
         </Button>
-        <div className="text-center py-16 text-sm text-muted-foreground">Submission not found.</div>
+        <div className="text-center py-16 text-sm text-muted-foreground">Registry not found.</div>
       </div>
     );
   }
 
   const pageDescription = [
     domain?.name ?? 'Unknown domain',
-    submission.cycle,
-    submission.submitted_at ? `Submitted ${new Date(submission.submitted_at).toLocaleDateString()}` : `Created ${new Date(submission.created_at).toLocaleDateString()}`,
+    `v${registry.version_number}`,
+    registry.submitted_at ? `Submitted ${new Date(registry.submitted_at).toLocaleDateString()}` : `Created ${new Date(registry.created_at).toLocaleDateString()}`,
   ].join(' · ');
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="space-y-1">
         <Button variant="ghost" size="sm" onClick={() => navigate('/team-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
           <ArrowLeft size={14} /> Back to Team Registry
         </Button>
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-semibold text-foreground">{employeeName || submission.employee_id}</h2>
-          <Badge className={`text-xs ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
+          <h2 className="text-2xl font-semibold text-foreground">{employeeName || registry.employee_id}</h2>
+          <Badge className={`text-xs ${registry.status === 'draft' ? 'bg-warning/15 text-warning border-warning/20' : 'bg-success/15 text-success border-success/20'}`}>
+            {registry.status === 'draft' ? 'Draft' : 'Submitted'}
+          </Badge>
         </div>
         <p className="text-sm text-muted-foreground">{pageDescription}</p>
       </div>
 
-      {/* Score tiles with icons + trends */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <ScoreCard
-          label="Self Score (avg)"
-          value={enriched?.selfAvg ?? null}
-          icon={<BarChart3 size={20} className="text-primary" />}
-        />
-        <ScoreCard
-          label="Assessment Score (avg)"
-          value={enriched?.assessmentAvg ?? null}
-          icon={<ClipboardCheck size={20} className="text-primary" />}
-          trend={assessmentTrend}
-        />
-        <ScoreCard
-          label="Final Score (avg)"
-          value={enriched?.finalAvg ?? null}
-          icon={<Award size={20} className="text-primary" />}
-          trend={finalTrend}
-        />
-        <ScoreCard
-          label="Manager"
-          value={null}
-          icon={<UserCheck size={20} className="text-primary" />}
-        >
-          {enriched?.reviewer ? (
-            <div className="flex flex-col items-center gap-1.5">
-              <ManagerAvatar reviewer={enriched.reviewer} />
-              <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
-              {review?.overall_comment && (
-                <p className="text-[10px] text-muted-foreground italic text-center line-clamp-2">"{review.overall_comment}"</p>
-              )}
-            </div>
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          )}
-        </ScoreCard>
-      </div>
+      {/* Search */}
+      {domainSkills.length > 4 && (
+        <div className="relative max-w-xs">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search skills..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+        </div>
+      )}
 
-      {/* Skill table */}
-      <RegistrySkillTable
-        skills={skills}
-        ratedSkillIds={submission.ratings.map((r) => r.skill_id)}
-        ratingMap={ratingMap}
-        assessmentScoreMap={assessmentScoreMap}
-        finalScoreMap={finalScoreMap}
-      />
+      {/* Skill breakdown */}
+      <Accordion type="multiple" defaultValue={Array.from(groupedSkills.keys())} className="space-y-3">
+        {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => (
+          <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
+            <AccordionTrigger className="px-5 py-3 hover:no-underline">
+              <div className="flex items-center gap-3 text-left flex-1">
+                <FolderOpen size={16} className="text-primary shrink-0" />
+                <span className="font-semibold text-card-foreground">{catName}</span>
+                <span className="text-xs text-muted-foreground">({catSkills.length})</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-0 pb-0">
+              <div className="divide-y divide-border">
+                {catSkills.map((skill) => (
+                  <div key={skill.id} className="px-5 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-card-foreground">{skill.skill_name}</p>
+                      {comments[skill.id] && (
+                        <p className="text-xs text-muted-foreground mt-0.5 italic">"{comments[skill.id]}"</p>
+                      )}
+                    </div>
+                    <Badge variant="secondary" className="text-xs shrink-0">
+                      {ratings[skill.id] != null ? `L${ratings[skill.id]} — ${getRatingLabels(useCompetencyLevelStore.getState().levels)[ratings[skill.id]] ?? `Level ${ratings[skill.id]}`}` : '—'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
     </div>
   );
 }
