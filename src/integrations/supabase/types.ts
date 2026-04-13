@@ -992,6 +992,86 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_registries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
+          domain_id: string
+          employee_id: string
+          id: string
+          modified_at: string | null
+          modified_by: string | null
+          status: string
+          submitted_at: string | null
+          tenant_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          domain_id: string
+          employee_id: string
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          tenant_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          domain_id?: string
+          employee_id?: string
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          tenant_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
+      skill_registry_items: {
+        Row: {
+          comment: string | null
+          id: string
+          registry_id: string
+          self_score: number
+          skill_id: string
+        }
+        Insert: {
+          comment?: string | null
+          id?: string
+          registry_id: string
+          self_score: number
+          skill_id: string
+        }
+        Update: {
+          comment?: string | null
+          id?: string
+          registry_id?: string
+          self_score?: number
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_registry_items_registry_id_fkey"
+            columns: ["registry_id"]
+            isOneToOne: false
+            referencedRelation: "skill_registries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       skill_registry_submissions: {
         Row: {
           created_at: string
