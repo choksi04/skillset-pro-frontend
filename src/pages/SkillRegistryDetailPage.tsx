@@ -1,23 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRegistryStore, RatingLevel, SkillSelfRating, SkillRegistrySubmission } from '@/stores/registryStore';
+import { useSkillRegistryStore, SkillRegistryItem } from '@/stores/skillRegistryStore';
 import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
-import { useAssessmentStore } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useReviewStore } from '@/stores/reviewStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore, Skill } from '@/stores/skillStore';
-import { useQuestionStore } from '@/stores/questionStore';
-import { useCycleStore } from '@/stores/cycleStore';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
-import { ScoreCard } from '@/components/registry/ScoreCard';
-import { ManagerAvatar } from '@/components/registry/ManagerAvatar';
-import { RegistrySkillTable } from '@/components/registry/RegistrySkillTable';
-import { deriveStatus, statusConfig, statusLabel, statusColor, avgRound, EnrichedSubmission } from '@/components/registry/registryHelpers';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
@@ -32,15 +23,11 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter,
-} from '@/components/ui/alert-dialog';
-import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
   CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
-  ClipboardCheck, Clock, Eye, MessageSquare, ArrowLeft, Loader2,
-  BarChart3, Award, UserCheck, AlertTriangle,
+  ArrowLeft, Loader2, MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,47 +36,32 @@ export default function SkillRegistryDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { submissions, getSubmission, createOrUpdateDraft, submitRegistry, markAssessmentGenerated, fetchRegistry, currentCycle } = useRegistryStore();
-  const { assessments, addAssessment, fetchAssessments } = useAssessmentStore();
-  const { attempts, fetchAttempts } = useAttemptStore();
-  const { reviews, officialEntries, fetchReviews } = useReviewStore();
+  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
-  const { questions, fetchQuestions } = useQuestionStore();
-  const { activeCycle, isSubmissionAllowed, fetchCycles } = useCycleStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
 
   useEffect(() => {
-    fetchAssessments(); fetchDomains(); fetchSkills(); fetchQuestions(); fetchRegistry(); fetchCycles(); fetchAttempts(); fetchReviews();
+    fetchRegistries(employeeId);
+    fetchDomains();
+    fetchSkills();
   }, []);
 
-  const submission = useMemo(
-    () => submissions.find((s) => s.id === submissionId),
-    [submissions, submissionId]
+  const registry = useMemo(
+    () => registries.find((r) => r.id === submissionId),
+    [registries, submissionId]
   );
 
-  // Closed cycle check
-  const isCycleClosed = useMemo(() => {
-    if (!submission) return false;
-    if (!activeCycle) return true; // no active cycle means it's closed
-    return submission.cycle !== activeCycle.name;
-  }, [submission, activeCycle]);
-
-  const isDraft = submission?.status === 'draft';
-  const isLocked = submission?.status === 'submitted' || submission?.status === 'assessment_generated';
-  const isIncomplete = isDraft && isCycleClosed;
-
-  const employeeStatus = useMemo(() => {
-    return deriveStatus(submission, assessments, attempts, reviews, isIncomplete);
-  }, [isIncomplete, submission, assessments, attempts, reviews]);
+  const isDraft = registry?.status === 'draft';
+  const isSubmitted = registry?.status === 'submitted';
 
   // Domain
   const assignedDomain = useMemo(() => {
-    if (!submission) return null;
-    return domains.find((d) => d.id === submission.domain_id) ?? null;
-  }, [submission, domains]);
+    if (!registry) return null;
+    return domains.find((d) => d.id === registry.domain_id) ?? null;
+  }, [registry, domains]);
 
   const domainSkillIds = useMemo(() => {
     if (!assignedDomain) return [];
@@ -101,79 +73,40 @@ export default function SkillRegistryDetailPage() {
     [skills, domainSkillIds]
   );
 
-  // Reviewer
-  const [reviewerMap, setReviewerMap] = useState<Record<string, { name: string; email: string; avatar_url: string }>>({});
-  useEffect(() => {
-    const reviewerIds = [...new Set(reviews.filter((r) => r.employee_id === employeeId).map((r) => r.reviewer_id))];
-    if (reviewerIds.length === 0) return;
-    supabase.from('users').select('id, full_name, email, avatar_url').in('id', reviewerIds).then(({ data }) => {
-      if (!data) return;
-      const map: Record<string, { name: string; email: string; avatar_url: string }> = {};
-      data.forEach((u: any) => { map[u.id] = { name: u.full_name, email: u.email, avatar_url: u.avatar_url || '' }; });
-      setReviewerMap(map);
-    });
-  }, [reviews, employeeId]);
-
-  // Enriched data
-  const enriched = useMemo<EnrichedSubmission | null>(() => {
-    if (!submission) return null;
-    const selfAvg = avgRound(submission.ratings.map((r) => r.rating));
-    let assessmentAvg: number | null = null;
-    const assessment = assessments.find((a) => a.submission_id === submission.id);
-    if (assessment) {
-      const attempt = attempts.find((a) => a.assessment_id === assessment.id);
-      if (attempt && attempt.skill_scores.length > 0) {
-        assessmentAvg = avgRound(attempt.skill_scores.map((ss) => ss.calculated_level));
-      }
-    }
-    let finalAvg: number | null = null;
-    const officialForCycle = (officialEntries || []).filter(
-      (oe) => oe.employee_id === submission.employee_id && oe.cycle === submission.cycle
-    );
-    if (officialForCycle.length > 0) {
-      finalAvg = avgRound(officialForCycle.map((oe) => oe.final_level));
-    }
-    let reviewer: EnrichedSubmission['reviewer'] = null;
-    if (assessment) {
-      const attempt = attempts.find((a) => a.assessment_id === assessment.id);
-      if (attempt) {
-        const review = reviews.find((r) => r.attempt_id === attempt.id);
-        if (review && reviewerMap[review.reviewer_id]) {
-          reviewer = { id: review.reviewer_id, ...reviewerMap[review.reviewer_id] };
-        }
-      }
-    }
-    const isActive = activeCycle ? submission.cycle === activeCycle.name : false;
-    return { submission, selfAvg, assessmentAvg, finalAvg, status: employeeStatus, reviewer, isActive };
-  }, [submission, assessments, attempts, reviews, officialEntries, reviewerMap, activeCycle, employeeStatus]);
-
-  // Previous cycle ratings
-  const previousRatings = useMemo<Record<string, RatingLevel>>(() => {
-    if (!submission) return {};
-    const pastSubs = submissions.filter((s) => s.employee_id === employeeId && s.cycle !== submission.cycle);
-    if (pastSubs.length === 0) return {};
-    const latest = pastSubs[0];
-    const map: Record<string, RatingLevel> = {};
-    latest.ratings.forEach((r) => { map[r.skill_id] = r.rating; });
-    return map;
-  }, [submissions, employeeId, submission]);
-
-  // Ratings state
+  // Load items for this registry
+  const [itemsLoaded, setItemsLoaded] = useState(false);
   const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (submission?.ratings) {
+    if (!submissionId) return;
+    fetchItems(submissionId).then((items) => {
       const rMap: Record<string, RatingLevel> = {};
       const cMap: Record<string, string> = {};
-      submission.ratings.forEach((r) => {
-        rMap[r.skill_id] = r.rating;
-        if (r.comment) cMap[r.skill_id] = r.comment;
+      items.forEach((i) => {
+        rMap[i.skill_id] = i.self_score as RatingLevel;
+        if (i.comment) cMap[i.skill_id] = i.comment;
       });
       setRatings(rMap);
       setComments(cMap);
-    }
-  }, [submission?.id]);
+      setItemsLoaded(true);
+    });
+  }, [submissionId]);
+
+  // Previous version ratings for reference
+  const previousRatings = useMemo<Record<string, RatingLevel>>(() => {
+    if (!registry) return {};
+    const prevVersions = registries.filter(
+      (r) => r.employee_id === employeeId && r.status === 'submitted' && r.version_number < registry.version_number
+    );
+    if (prevVersions.length === 0) return {};
+    // Items for previous version may not be loaded — return empty
+    const prevItems = useSkillRegistryStore.getState().items.get(prevVersions[0].id);
+    if (!prevItems) return {};
+    const map: Record<string, RatingLevel> = {};
+    prevItems.forEach((i) => { map[i.skill_id] = i.self_score as RatingLevel; });
+    return map;
+  }, [registries, registry, employeeId]);
 
   // Auto-save
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -181,31 +114,33 @@ export default function SkillRegistryDetailPage() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const triggerAutoSave = useCallback(() => {
-    if (isLocked || isIncomplete || !assignedDomain) return;
+    if (!isDraft || !submissionId) return;
     isDirtyRef.current = true;
     setSaveStatus('idle');
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       if (!isDirtyRef.current) return;
       setSaveStatus('saving');
-      const ratingsList: SkillSelfRating[] = Object.entries(ratings).map(([skill_id, rating]) => ({
-        skill_id, rating, comment: comments[skill_id] || undefined,
+      const itemsList = Object.entries(ratings).map(([skill_id, self_score]) => ({
+        skill_id,
+        self_score,
+        comment: comments[skill_id] || null,
       }));
-      await createOrUpdateDraft(employeeId, tenantId, assignedDomain!.id, ratingsList);
+      await saveDraft(submissionId, itemsList);
       isDirtyRef.current = false;
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     }, 2000);
-  }, [isLocked, isIncomplete, assignedDomain, ratings, comments, employeeId, tenantId, createOrUpdateDraft]);
+  }, [isDraft, submissionId, ratings, comments, saveDraft]);
 
   const handleRatingChange = useCallback((skillId: string, rating: RatingLevel) => {
-    if (isLocked || isIncomplete) return;
+    if (!isDraft) return;
     setRatings((prev) => {
       const next = { ...prev, [skillId]: rating };
       setTimeout(() => triggerAutoSave(), 0);
       return next;
     });
-  }, [isLocked, isIncomplete, triggerAutoSave]);
+  }, [isDraft, triggerAutoSave]);
 
   const handleCommentChange = useCallback((skillId: string, comment: string) => {
     setComments((prev) => {
@@ -217,7 +152,7 @@ export default function SkillRegistryDetailPage() {
 
   // Form state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
   const allRated = domainSkills.length > 0 && domainSkills.every((s) => ratings[s.id] != null);
@@ -249,68 +184,47 @@ export default function SkillRegistryDetailPage() {
   };
 
   const confirmSubmit = async () => {
-    if (!assignedDomain || !submission) return;
-    const ratingsList: SkillSelfRating[] = Object.entries(ratings).map(([skill_id, rating]) => ({
-      skill_id, rating, comment: comments[skill_id] || undefined,
-    }));
-    await createOrUpdateDraft(employeeId, tenantId, assignedDomain.id, ratingsList);
-    await submitRegistry(submission.id);
-    const skillIds = ratingsList.map((r) => r.skill_id);
-    const publishedQuestions = questions.filter(
-      (q) => skillIds.includes(q.skill_id) && q.status === 'published'
-    );
-    await addAssessment({
-      tenant_id: tenantId, employee_id: employeeId, submission_id: submission.id,
-      domain_id: assignedDomain.id, ratings: ratingsList, publishedQuestions,
-    });
-    await markAssessmentGenerated(submission.id);
-    setConfirmOpen(false);
-    setSuccessOpen(true);
+    if (!registry || !assignedDomain) return;
+    setSubmitting(true);
+    try {
+      // Save final state
+      const itemsList = Object.entries(ratings).map(([skill_id, self_score]) => ({
+        skill_id,
+        self_score,
+        comment: comments[skill_id] || null,
+      }));
+      await saveDraft(registry.id, itemsList);
+
+      // Get domain lead for notification
+      const domainLeadId = assignedDomain.domain_lead_id ?? null;
+      await submitRegistry(registry.id, user?.full_name ?? 'Employee', domainLeadId);
+
+      setConfirmOpen(false);
+      toast.success('Skill Registry submitted successfully!');
+      navigate('/skill-registry');
+    } catch (err) {
+      console.error('Failed to submit:', err);
+      toast.error('Failed to submit registry. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const submissionAllowed = isSubmissionAllowed();
-
-  // Score maps for read-only detail
-  const assessment = useMemo(() => assessments.find((a) => a.submission_id === submission?.id), [assessments, submission]);
-  const attempt = useMemo(() => assessment ? attempts.find((a) => a.assessment_id === assessment.id) : null, [assessment, attempts]);
-  const review = useMemo(() => attempt ? reviews.find((r) => r.attempt_id === attempt.id) : null, [attempt, reviews]);
-
-  const assessmentScoreMap = useMemo<Record<string, number>>(() => {
-    if (!attempt) return {};
-    const map: Record<string, number> = {};
-    attempt.skill_scores.forEach((ss) => { map[ss.skill_id] = ss.calculated_level; });
-    return map;
-  }, [attempt]);
-
-  const finalScoreMap = useMemo<Record<string, number>>(() => {
-    if (!submission) return {};
-    const entries = (officialEntries || []).filter(
-      (oe) => oe.employee_id === submission.employee_id && oe.cycle === submission.cycle
-    );
-    const map: Record<string, number> = {};
-    entries.forEach((oe) => { map[oe.skill_id] = oe.final_level; });
-    return map;
-  }, [officialEntries, submission]);
-
-  const ratingMap: Record<string, RatingLevel> = {};
-  submission?.ratings.forEach((r) => { ratingMap[r.skill_id] = r.rating; });
-
-  if (!submission) {
+  if (!registry) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground">
           <ArrowLeft size={14} /> Back to My Registry
         </Button>
-        <div className="text-center py-16 text-sm text-muted-foreground">Submission not found.</div>
+        <div className="text-center py-16 text-sm text-muted-foreground">Registry not found.</div>
       </div>
     );
   }
 
-  // ── Page header (consistent across draft & read-only) ──
-  const pageTitle = isDraft && !isIncomplete ? `Self Review — ${submission.cycle}` : submission.cycle;
+  const pageTitle = isDraft ? `Self Review — v${registry.version_number}` : `Registry v${registry.version_number}`;
   const pageDescription = [
     assignedDomain?.name ?? 'Unknown domain',
-    submission.submitted_at ? `Submitted ${new Date(submission.submitted_at).toLocaleDateString()}` : `Created ${new Date(submission.created_at).toLocaleDateString()}`,
+    registry.submitted_at ? `Submitted ${new Date(registry.submitted_at).toLocaleDateString()}` : `Created ${new Date(registry.created_at).toLocaleDateString()}`,
   ].join(' · ');
 
   const header = (
@@ -320,29 +234,19 @@ export default function SkillRegistryDetailPage() {
       </Button>
       <div className="flex items-center gap-3">
         <h2 className="text-2xl font-semibold text-foreground">{pageTitle}</h2>
-        <Badge className={`text-xs ${statusColor(employeeStatus)}`}>{statusLabel(employeeStatus)}</Badge>
+        <Badge className={`text-xs ${isDraft ? 'bg-warning/15 text-warning border-warning/20' : 'bg-success/15 text-success border-success/20'}`}>
+          {isDraft ? 'Draft' : 'Submitted'}
+        </Badge>
       </div>
       <p className="text-sm text-muted-foreground">{pageDescription}</p>
     </div>
   );
 
-  // ── DRAFT / IN PROGRESS → Show Self Review Form ──
+  // ── DRAFT → Show Self Review Form ──
   if (isDraft) {
     return (
       <div className="space-y-6">
         {header}
-
-        {/* Incomplete banner */}
-        {isIncomplete && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 flex items-start gap-3">
-            <AlertTriangle size={18} className="text-destructive mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Review cycle has closed</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Your draft was not submitted in time. This submission is now locked and no assessment will be generated.</p>
-            </div>
-          </div>
-        )}
-
         <SelfReviewForm
           domainSkills={domainSkills}
           filteredSkills={filteredSkills}
@@ -350,8 +254,6 @@ export default function SkillRegistryDetailPage() {
           ratings={ratings}
           comments={comments}
           previousRatings={previousRatings}
-          isLocked={isIncomplete}
-          submissionAllowed={submissionAllowed && !isIncomplete}
           ratedCount={ratedCount}
           allRated={allRated}
           search={search}
@@ -369,7 +271,7 @@ export default function SkillRegistryDetailPage() {
             <DialogHeader>
               <DialogTitle>Confirm Submission</DialogTitle>
               <DialogDescription>
-                Once submitted, your skill ratings will be locked for this cycle ({submission.cycle}) and an assessment will be automatically generated.
+                Once submitted, your skill ratings for v{registry.version_number} will be locked. You can always create a new version later.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 my-2 max-h-60 overflow-y-auto">
@@ -384,104 +286,68 @@ export default function SkillRegistryDetailPage() {
               })}
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-              <Button onClick={confirmSubmit} className="gap-1.5"><Lock size={14} /> Confirm & Lock</Button>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={submitting}>Cancel</Button>
+              <Button onClick={confirmSubmit} disabled={submitting} className="gap-1.5">
+                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                {submitting ? 'Submitting...' : 'Confirm & Submit'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Success Dialog */}
-        <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
-          <AlertDialogContent className="sm:max-w-md">
-            <AlertDialogHeader>
-              <div className="flex justify-center mb-3">
-                <div className="rounded-full bg-success/10 p-3">
-                  <ClipboardCheck size={28} className="text-success" />
-                </div>
-              </div>
-              <AlertDialogTitle className="text-center">Assessment Ready!</AlertDialogTitle>
-              <AlertDialogDescription className="text-center">
-                Your skill registry has been submitted and an assessment has been generated based on your self-ratings.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-              <Button onClick={() => { setSuccessOpen(false); navigate('/assessments'); }} className="w-full gap-1.5">
-                <ClipboardCheck size={14} /> Attempt Now
-              </Button>
-              <Button variant="ghost" onClick={() => { setSuccessOpen(false); navigate('/skill-registry'); }} className="w-full gap-1.5">
-                <Clock size={14} /> Later
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     );
   }
 
-  // ── SUBMITTED / LOCKED / COMPLETED → Read-only detail view ──
-  const showGoToAssessment = ['submitted', 'assessment_pending'].includes(employeeStatus);
-
+  // ── SUBMITTED → Read-only view ──
   return (
     <div className="space-y-6">
       {header}
 
-      {/* Go to Assessment CTA */}
-      {showGoToAssessment && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Assessment Generated</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Your self-assessment has been submitted. Proceed to take your skill assessment.</p>
+      {/* Read-only skill list */}
+      <div className="space-y-3">
+        {groupedSkills.size === 0 && domainSkills.length > 0 && (
+          <div className="relative max-w-xs">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search skills..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
           </div>
-          <Button onClick={() => navigate('/assessments')} className="gap-1.5 shrink-0">
-            <ClipboardCheck size={14} /> Go to Assessment
-          </Button>
-        </div>
-      )}
-
-      {/* Score tiles with icons */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <ScoreCard
-          label="Self Score (avg)"
-          value={enriched?.selfAvg ?? null}
-          icon={<BarChart3 size={20} className="text-primary" />}
-        />
-        <ScoreCard
-          label="Assessment Score (avg)"
-          value={enriched?.assessmentAvg ?? null}
-          icon={<ClipboardCheck size={20} className="text-primary" />}
-        />
-        <ScoreCard
-          label="Final Score (avg)"
-          value={enriched?.finalAvg ?? null}
-          icon={<Award size={20} className="text-primary" />}
-        />
-        <ScoreCard
-          label="Manager"
-          value={null}
-          icon={<UserCheck size={20} className="text-primary" />}
-        >
-          {enriched?.reviewer ? (
-            <div className="flex flex-col items-center gap-1.5">
-              <ManagerAvatar reviewer={enriched.reviewer} />
-              <span className="text-xs font-medium text-foreground">{enriched.reviewer.name}</span>
-              {review?.overall_comment && (
-                <p className="text-[10px] text-muted-foreground italic text-center line-clamp-2">"{review.overall_comment}"</p>
-              )}
-            </div>
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          )}
-        </ScoreCard>
+        )}
+        {domainSkills.length > 4 && (
+          <div className="relative max-w-xs">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search skills..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+          </div>
+        )}
+        <Accordion type="multiple" defaultValue={Array.from(groupedSkills.keys())} className="space-y-3">
+          {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => (
+            <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
+              <AccordionTrigger className="px-5 py-3 hover:no-underline">
+                <div className="flex items-center gap-3 text-left flex-1">
+                  <FolderOpen size={16} className="text-primary shrink-0" />
+                  <span className="font-semibold text-card-foreground">{catName}</span>
+                  <span className="text-xs text-muted-foreground">({catSkills.length})</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-0 pb-0">
+                <div className="divide-y divide-border">
+                  {catSkills.map((skill) => (
+                    <div key={skill.id} className="px-5 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">{skill.skill_name}</p>
+                        {comments[skill.id] && (
+                          <p className="text-xs text-muted-foreground mt-0.5 italic">"{comments[skill.id]}"</p>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {ratings[skill.id] != null ? `L${ratings[skill.id]} — ${getRatingLabels(useCompetencyLevelStore.getState().levels)[ratings[skill.id]] ?? `Level ${ratings[skill.id]}`}` : '—'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </div>
-
-      {/* Skill table */}
-      <RegistrySkillTable
-        skills={skills}
-        ratedSkillIds={submission.ratings.map((r) => r.skill_id)}
-        ratingMap={ratingMap}
-        assessmentScoreMap={assessmentScoreMap}
-        finalScoreMap={finalScoreMap}
-      />
     </div>
   );
 }
@@ -489,7 +355,7 @@ export default function SkillRegistryDetailPage() {
 // ── Self Review Form ──
 function SelfReviewForm({
   domainSkills, filteredSkills, groupedSkills, ratings, comments, previousRatings,
-  isLocked, submissionAllowed, ratedCount, allRated, search, saveStatus,
+  ratedCount, allRated, search, saveStatus,
   onSearchChange, onRatingChange, onCommentChange, onSubmit, skills,
 }: {
   domainSkills: Skill[];
@@ -498,8 +364,6 @@ function SelfReviewForm({
   ratings: Record<string, RatingLevel>;
   comments: Record<string, string>;
   previousRatings: Record<string, RatingLevel>;
-  isLocked: boolean;
-  submissionAllowed: boolean;
   ratedCount: number;
   allRated: boolean;
   search: string;
@@ -589,29 +453,24 @@ function SelfReviewForm({
                           <RatingSlider
                             value={ratings[skill.id] ?? null}
                             onChange={(rating) => onRatingChange(skill.id, rating)}
-                            disabled={isLocked}
+                            disabled={false}
                             previousRating={previousRatings[skill.id]}
                           />
-                          {!isLocked && (
-                            <Collapsible className="mt-2">
-                              <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                <MessageSquare size={12} />
-                                {comments[skill.id] ? 'Edit comment' : 'Add comment'}
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="mt-2">
-                                <Textarea
-                                  placeholder="Optional notes about your experience with this skill..."
-                                  value={comments[skill.id] || ''}
-                                  onChange={(e) => onCommentChange(skill.id, e.target.value)}
-                                  className="text-xs min-h-[60px]"
-                                  maxLength={500}
-                                />
-                              </CollapsibleContent>
-                            </Collapsible>
-                          )}
-                          {isLocked && comments[skill.id] && (
-                            <p className="text-xs text-muted-foreground mt-2 italic">"{comments[skill.id]}"</p>
-                          )}
+                          <Collapsible className="mt-2">
+                            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                              <MessageSquare size={12} />
+                              {comments[skill.id] ? 'Edit comment' : 'Add comment'}
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              <Textarea
+                                placeholder="Optional notes about your experience with this skill..."
+                                value={comments[skill.id] || ''}
+                                onChange={(e) => onCommentChange(skill.id, e.target.value)}
+                                className="text-xs min-h-[60px]"
+                                maxLength={500}
+                              />
+                            </CollapsibleContent>
+                          </Collapsible>
                         </div>
                       ))}
                     </div>
@@ -622,22 +481,12 @@ function SelfReviewForm({
           </Accordion>
         )}
 
-        {!isLocked && submissionAllowed && domainSkills.length > 0 && (
+        {domainSkills.length > 0 && (
           <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</p>
             <Button size="sm" onClick={onSubmit} disabled={!allRated} className="gap-1.5">
-              <Send size={14} /> Submit & Generate Assessment
+              <Send size={14} /> Submit Registry
             </Button>
-          </div>
-        )}
-
-        {isLocked && !submissionAllowed && (
-          <div className="rounded-xl border border-success/20 bg-success/5 p-4 flex items-start gap-3">
-            <CheckCircle size={18} className="text-success mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Submission Complete</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Your self-assessment has been locked. Navigate to Assessments to complete your skill validation.</p>
-            </div>
           </div>
         )}
       </div>

@@ -23,8 +23,8 @@ const platformOverview: GuideStep[] = [
     description: 'The Skill Intelligence & Assessment Platform (SIAP) transforms self-declared skills into validated, evidence-based capability profiles through structured assessments and manager reviews.',
     icon: <Sparkles size={16} />,
     steps: [
-      'Employees submit self-assessed skill ratings via the Skill Registry.',
-      'The system automatically generates tailored assessments based on self-ratings.',
+      'Employees submit self-assessed skill ratings via the Skill Registry — available anytime, with full version history.',
+      'The system automatically generates tailored assessments based on self-ratings (via Review Cycles).',
       'AI evaluates answers across multiple dimensions (concept understanding, technical correctness, practicality, clarity).',
       'Managers review AI evaluations, compare with self-ratings, and approve final skill levels.',
       'Official validated skill entries are recorded in the All Registries view.',
@@ -59,7 +59,8 @@ const setupFlowGuide: GuideStep[] = [
       'Step 2: Create Domains — Go to Domains and create functional areas (e.g. Frontend Engineering).',
       'Step 3: Map Skills to Domains — From Domain detail view, link relevant skills to each domain.',
       'Step 4: Add Questions — Go to Question Bank or use AI Generation to create assessment questions for each skill and level.',
-      'Step 5: Start Cycle — Employees can now submit their Skill Registry, triggering the assessment pipeline.',
+      'Step 5: Employees can now submit their Skill Registry at any time — no cycle required for self-assessment.',
+      'Step 6: Start a Review Cycle to trigger assessment generation for submitted registries.',
       'Track your progress via the Setup Progress indicator in the sidebar Settings section.',
     ],
   },
@@ -94,17 +95,17 @@ const adminGuide: GuideStep[] = [
   },
   {
     title: 'Question Bank',
-    description: 'Create and manage assessment questions linked to skills, topics, and competency levels. Supports manual creation and AI generation.',
+    description: 'Create and manage assessment questions linked to skills, topics, and competency levels.',
     icon: <HelpCircle size={16} />,
     steps: [
       'Navigate to Settings > Question Bank from the sidebar.',
-      'Click "Add Question" to open the creation form — select a question type (Scenario, MCQ, or Coding) and the form adapts dynamically.',
+      'Click "Add Question" to open the creation form.',
       'Optionally link questions to a Topic under the selected Skill for better targeting.',
-      'Expand "Generate Questions with AI" to auto-generate questions for any skill, topic, and level with organizational context.',
+      'Expand "Generate Questions with AI" to auto-generate questions.',
       'Review AI-generated questions, accept or reject each, then save accepted ones as drafts.',
-      'Monitor the "Question Coverage Gaps" indicator to identify skills lacking minimum questions per level.',
-      'Use quick actions (View, Edit, Duplicate, Publish, Disable, Delete) from the actions menu on each question row.',
-      'Publish questions to make them available for assessments. Only unused questions can be deleted.',
+      'Monitor the "Question Coverage Gaps" indicator.',
+      'Use quick actions (View, Edit, Duplicate, Publish, Disable, Delete) from the actions menu.',
+      'Publish questions to make them available for assessments.',
     ],
   },
   {
@@ -113,18 +114,18 @@ const adminGuide: GuideStep[] = [
     icon: <SlidersHorizontal size={16} />,
     steps: [
       'Navigate to Settings > Assessment Config.',
-      'View and edit the 5 competency levels (L1–L5) — click the pencil icon on any level card.',
-      'Configure score ranges (e.g. 0–39 for L1) and minimum questions per skill+level.',
-      'Understand the 3 question types and how they are evaluated.',
+      'View and edit the 5 competency levels (L1–L5).',
+      'Configure score ranges and minimum questions per skill+level.',
       'Review scoring rules that dynamically reflect your configured score ranges.',
     ],
   },
   {
     title: 'All Registries',
-    description: 'View organization-wide validated skill data and export for reporting.',
+    description: 'View organization-wide skill data from submitted registry versions.',
     icon: <Database size={16} />,
     steps: [
       'Navigate to Insights > All Registries.',
+      'Data is based on the latest submitted version per employee.',
       'Filter by domain or search by skill/employee.',
       'Export registry data as CSV for external reporting.',
     ],
@@ -132,6 +133,17 @@ const adminGuide: GuideStep[] = [
 ];
 
 const managerGuide: GuideStep[] = [
+  {
+    title: 'Team Registry',
+    description: 'View your team members\' skill registry submissions and version history.',
+    icon: <Users size={16} />,
+    steps: [
+      'Navigate to Operations > Team Registry from the sidebar.',
+      'See each team member\'s latest version and total version count.',
+      'Click an employee to view their skill self-scores for that version.',
+      'You will be notified when a team member submits a new registry version.',
+    ],
+  },
   {
     title: 'Review Cycles',
     description: 'After employees complete assessments and AI evaluation runs, reviews appear in Review Cycles.',
@@ -159,18 +171,19 @@ const managerGuide: GuideStep[] = [
 const employeeGuide: GuideStep[] = [
   {
     title: 'My Skill Registry',
-    description: 'Self-assess your skills during an active review cycle. Your ratings drive the assessment pipeline.',
+    description: 'Self-assess your skills at any time. Each submission creates a new version for historical tracking.',
     icon: <BarChart3 size={16} />,
     steps: [
       'Navigate to Operations > My Registry from the sidebar.',
-      'The Active Cycle Card shows your current status and a dynamic action button.',
-      'Click the CTA to start or continue your self-review.',
+      'The Skill Registry is always available — no need to wait for an active review cycle.',
+      'Click "Start Self Review" to create your first version, or "Create New Version" to update.',
       'Skills are grouped by category — rate each on a 1–5 scale (Basic Awareness to Expert).',
-      'Your previous cycle rating is shown inline for reference (e.g. "Last cycle: L3").',
+      'Your previous version ratings are shown inline for reference (e.g. "Last version: L3").',
       'Optionally add comments per skill to explain your experience.',
       'Drafts auto-save every 2 seconds — look for the "Saving..." / "Saved" indicator.',
-      'Submit when all skills are rated — this locks your ratings and generates an assessment.',
-      'Past registries are shown in a table below for historical reference.',
+      'Submit when all skills are rated — a confirmation dialog shows your ratings summary.',
+      'Submitted versions are locked and visible to your manager. You can always create a new version.',
+      'Version history is shown in a table below the current registry.',
     ],
   },
   {
@@ -232,7 +245,6 @@ export default function UserGuidePage() {
         </Button>
       </div>
 
-      {/* Platform flow */}
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
           <Sparkles size={14} className="text-primary" /> How the Platform Works
@@ -247,14 +259,12 @@ export default function UserGuidePage() {
         </div>
       </div>
 
-      {/* Overview + Navigation + Setup */}
       <div className="space-y-3">
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
         {navigationGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         {currentRole === 'admin' && setupFlowGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
       </div>
 
-      {/* Role-specific guides */}
       <Tabs defaultValue={currentRole === 'admin' ? 'admin' : currentRole === 'manager' ? 'manager' : 'employee'}>
         <TabsList className="bg-muted/50">
           <TabsTrigger value="admin" className="gap-1.5 text-xs"><Shield size={12} /> Admin / HR Guide</TabsTrigger>
@@ -266,11 +276,11 @@ export default function UserGuidePage() {
           {adminGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         </TabsContent>
         <TabsContent value="manager" className="space-y-3 mt-4">
-          <p className="text-xs text-muted-foreground">Review AI-evaluated assessments, compare ratings, and approve final skill levels.</p>
+          <p className="text-xs text-muted-foreground">Review team skill registries, evaluate AI assessments, and approve final skill levels.</p>
           {managerGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         </TabsContent>
         <TabsContent value="employee" className="space-y-3 mt-4">
-          <p className="text-xs text-muted-foreground">Submit your skill self-assessment, take generated assessments, and view feedback.</p>
+          <p className="text-xs text-muted-foreground">Submit your skill self-assessment anytime, take generated assessments, and view feedback.</p>
           {employeeGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         </TabsContent>
       </Tabs>
