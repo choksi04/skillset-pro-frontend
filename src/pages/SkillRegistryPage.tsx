@@ -14,11 +14,22 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+function formatDateTime(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function computeAvg(items: { self_score: number }[]): number | null {
+  if (!items || items.length === 0) return null;
+  const sum = items.reduce((acc, i) => acc + i.self_score, 0);
+  return Math.round((sum / items.length) * 10) / 10;
+}
+
 export default function SkillRegistryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { registries, fetchRegistries, createNewVersion, getDraft, getLatest, loading } = useSkillRegistryStore();
+  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
 
@@ -47,6 +58,13 @@ export default function SkillRegistryPage() {
     [registries, employeeId]
   );
 
+  // Batch fetch items for all displayed registries
+  useEffect(() => {
+    if (myRegistries.length > 0) {
+      fetchItemsForRegistries(myRegistries.map((r) => r.id));
+    }
+  }, [myRegistries]);
+
   const draft = getDraft(employeeId);
   const latest = getLatest(employeeId);
 
@@ -61,7 +79,7 @@ export default function SkillRegistryPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">My Skill Registry</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
           <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16">
@@ -80,7 +98,7 @@ export default function SkillRegistryPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">My Skill Registry</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
           <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16">
@@ -96,10 +114,21 @@ export default function SkillRegistryPage() {
 
   const submittedRegistries = myRegistries.filter((r) => r.status === 'submitted');
 
+  const AvgBadge = ({ registryId }: { registryId: string }) => {
+    const regItems = items.get(registryId);
+    const avg = computeAvg(regItems ?? []);
+    if (avg === null) return null;
+    return (
+      <Badge variant="outline" className="text-xs font-medium">
+        Avg Level: {avg}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-foreground">My Skill Registry</h2>
+        <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
         <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime. Each submission creates a new version.</p>
       </div>
 
@@ -113,11 +142,11 @@ export default function SkillRegistryPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">Version {draft.version_number}</p>
+                    <p className="text-sm font-medium text-foreground">Your Skillset Registry</p>
                     <Badge className="text-[10px] bg-warning/15 text-warning border-warning/20">Draft</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {assignedDomain.name} · Created {new Date(draft.created_at).toLocaleDateString()}
+                    v{draft.version_number} · {assignedDomain.name} · {formatDateTime(draft.created_at)}
                   </p>
                 </div>
                 <Button variant="default" size="sm" className="gap-1.5">
@@ -132,11 +161,12 @@ export default function SkillRegistryPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">Version {latest.version_number}</p>
+                    <p className="text-sm font-medium text-foreground">Your Skillset Registry</p>
                     <Badge className="text-[10px] bg-success/15 text-success border-success/20">Submitted</Badge>
+                    <AvgBadge registryId={latest.id} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {assignedDomain.name} · Submitted {latest.submitted_at ? new Date(latest.submitted_at).toLocaleDateString() : '—'}
+                    v{latest.version_number} · {assignedDomain.name} · {latest.submitted_at ? formatDateTime(latest.submitted_at) : '—'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -177,28 +207,34 @@ export default function SkillRegistryPage() {
                   <TableHead className="text-xs font-medium">Version</TableHead>
                   <TableHead className="text-xs font-medium">Date</TableHead>
                   <TableHead className="text-xs font-medium">Domain</TableHead>
+                  <TableHead className="text-xs font-medium">Avg Level</TableHead>
                   <TableHead className="text-xs font-medium">Status</TableHead>
                   <TableHead className="text-xs font-medium text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {submittedRegistries.map((reg) => (
-                  <TableRow key={reg.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/skill-registry/${reg.id}`)}>
-                    <TableCell className="text-sm font-medium">v{reg.version_number}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {reg.submitted_at ? new Date(reg.submitted_at).toLocaleDateString() : new Date(reg.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
-                    <TableCell>
-                      <Badge className="text-[10px] bg-success/15 text-success border-success/20">Submitted</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${reg.id}`); }}>
-                        <Eye size={13} /> View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {submittedRegistries.map((reg) => {
+                  const regItems = items.get(reg.id);
+                  const avg = computeAvg(regItems ?? []);
+                  return (
+                    <TableRow key={reg.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/skill-registry/${reg.id}`)}>
+                      <TableCell className="text-sm font-medium">v{reg.version_number}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {reg.submitted_at ? formatDateTime(reg.submitted_at) : formatDateTime(reg.created_at)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
+                      <TableCell className="text-sm font-medium">{avg !== null ? avg : '—'}</TableCell>
+                      <TableCell>
+                        <Badge className="text-[10px] bg-success/15 text-success border-success/20">Submitted</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${reg.id}`); }}>
+                          <Eye size={13} /> View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

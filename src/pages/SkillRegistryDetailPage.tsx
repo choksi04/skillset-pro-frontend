@@ -221,11 +221,50 @@ export default function SkillRegistryDetailPage() {
     );
   }
 
-  const pageTitle = isDraft ? `Self Review — v${registry.version_number}` : `Registry v${registry.version_number}`;
+  const formatDetailDateTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  };
+
   const pageDescription = [
     assignedDomain?.name ?? 'Unknown domain',
-    registry.submitted_at ? `Submitted ${new Date(registry.submitted_at).toLocaleDateString()}` : `Created ${new Date(registry.created_at).toLocaleDateString()}`,
+    registry.submitted_at ? `Submitted ${formatDetailDateTime(registry.submitted_at)}` : `Created ${formatDetailDateTime(registry.created_at)}`,
   ].join(' · ');
+
+  // Summary stats
+  const allItems = useSkillRegistryStore.getState().items.get(registry.id) ?? [];
+  const avgLevel = allItems.length > 0 ? Math.round((allItems.reduce((s, i) => s + i.self_score, 0) / allItems.length) * 10) / 10 : null;
+  const maxScore = allItems.length > 0 ? Math.max(...allItems.map((i) => i.self_score)) : 0;
+  const minScore = allItems.length > 0 ? Math.min(...allItems.map((i) => i.self_score)) : 0;
+  const topRatedItems = allItems.filter((i) => i.self_score === maxScore);
+  const lowestRatedItems = allItems.filter((i) => i.self_score === minScore);
+  const topRatedSkillNames = topRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
+  const lowestRatedSkillNames = lowestRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
+
+  const SkillListBadge = ({ names, score }: { names: string[]; score: number }) => {
+    if (names.length === 0) return <span className="text-muted-foreground">—</span>;
+    const first = names[0];
+    const rest = names.slice(1);
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-sm font-medium text-foreground">{first} (L{score})</span>
+        {rest.length > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="text-[10px] cursor-help">+{rest.length}</Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <div className="space-y-0.5">
+                  {rest.map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  };
 
   const header = (
     <div className="space-y-1">
@@ -233,14 +272,37 @@ export default function SkillRegistryDetailPage() {
         <ArrowLeft size={14} /> Back to My Registry
       </Button>
       <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-semibold text-foreground">{pageTitle}</h2>
+        <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
         <Badge className={`text-xs ${isDraft ? 'bg-warning/15 text-warning border-warning/20' : 'bg-success/15 text-success border-success/20'}`}>
           {isDraft ? 'Draft' : 'Submitted'}
         </Badge>
       </div>
-      <p className="text-sm text-muted-foreground">{pageDescription}</p>
+      <p className="text-xs text-muted-foreground">v{registry.version_number} · {pageDescription}</p>
     </div>
   );
+
+  const summarySection = isSubmitted && allItems.length > 0 ? (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground mb-1">Average Level</p>
+          <p className="text-2xl font-bold text-foreground">{avgLevel}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground mb-1">Top Rated</p>
+          <SkillListBadge names={topRatedSkillNames} score={maxScore} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground mb-1">Lowest Rated</p>
+          <SkillListBadge names={lowestRatedSkillNames} score={minScore} />
+        </CardContent>
+      </Card>
+    </div>
+  ) : null;
 
   // ── DRAFT → Show Self Review Form ──
   if (isDraft) {
