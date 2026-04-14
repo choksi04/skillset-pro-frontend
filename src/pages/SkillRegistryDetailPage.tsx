@@ -364,7 +364,7 @@ export default function SkillRegistryDetailPage() {
   return (
     <div className="space-y-6">
       {header}
-
+      {summarySection}
       {/* Read-only skill list */}
       <div className="space-y-3">
         {groupedSkills.size === 0 && domainSkills.length > 0 && (
