@@ -35,6 +35,7 @@ interface SkillRegistryStore {
   getLatest: (employeeId: string) => SkillRegistry | undefined;
   getDraft: (employeeId: string) => SkillRegistry | undefined;
   createNewVersion: (employeeId: string, tenantId: string, domainId: string) => Promise<SkillRegistry | null>;
+  fetchItemsForRegistries: (ids: string[]) => Promise<void>;
   saveDraft: (registryId: string, items: Omit<SkillRegistryItem, 'id' | 'registry_id'>[]) => Promise<void>;
   submitRegistry: (registryId: string, employeeName: string, domainLeadId: string | null) => Promise<void>;
 }
