@@ -35,6 +35,7 @@ interface SkillRegistryStore {
   getLatest: (employeeId: string) => SkillRegistry | undefined;
   getDraft: (employeeId: string) => SkillRegistry | undefined;
   createNewVersion: (employeeId: string, tenantId: string, domainId: string) => Promise<SkillRegistry | null>;
+  fetchItemsForRegistries: (ids: string[]) => Promise<void>;
   saveDraft: (registryId: string, items: Omit<SkillRegistryItem, 'id' | 'registry_id'>[]) => Promise<void>;
   submitRegistry: (registryId: string, employeeName: string, domainLeadId: string | null) => Promise<void>;
 }
@@ -220,6 +221,45 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
     set((state) => {
       const newMap = new Map(state.items);
       newMap.set(registryId, newItems);
+      return { items: newMap };
+    });
+  },
+
+  fetchItemsForRegistries: async (ids: string[]) => {
+    const uncached = ids.filter((id) => !get().items.has(id));
+    if (uncached.length === 0) return;
+
+    const { data, error } = await supabase
+      .from('skill_registry_items')
+      .select('*')
+      .in('registry_id', uncached);
+
+    if (error) {
+      console.error('Failed to batch fetch registry items:', error);
+      return;
+    }
+
+    const grouped = new Map<string, SkillRegistryItem[]>();
+    (data || []).forEach((i: any) => {
+      const item: SkillRegistryItem = {
+        id: i.id,
+        registry_id: i.registry_id,
+        skill_id: i.skill_id,
+        self_score: i.self_score,
+        comment: i.comment,
+      };
+      if (!grouped.has(i.registry_id)) grouped.set(i.registry_id, []);
+      grouped.get(i.registry_id)!.push(item);
+    });
+
+    // Also set empty arrays for registries with no items
+    uncached.forEach((id) => {
+      if (!grouped.has(id)) grouped.set(id, []);
+    });
+
+    set((state) => {
+      const newMap = new Map(state.items);
+      grouped.forEach((items, id) => newMap.set(id, items));
       return { items: newMap };
     });
   },
