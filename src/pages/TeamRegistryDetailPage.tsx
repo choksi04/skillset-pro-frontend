@@ -9,9 +9,13 @@ import { RatingLevel } from '@/stores/registryStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ArrowLeft, FolderOpen, Search } from 'lucide-react';
 
 export default function TeamRegistryDetailPage() {
@@ -97,11 +101,55 @@ export default function TeamRegistryDetailPage() {
     );
   }
 
+  const formatDetailDateTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) +
+      ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  };
+
   const pageDescription = [
     domain?.name ?? 'Unknown domain',
-    `v${registry.version_number}`,
-    registry.submitted_at ? `Submitted ${new Date(registry.submitted_at).toLocaleDateString()}` : `Created ${new Date(registry.created_at).toLocaleDateString()}`,
+    registry.submitted_at ? `Submitted ${formatDetailDateTime(registry.submitted_at)}` : `Created ${formatDetailDateTime(registry.created_at)}`,
   ].join(' · ');
+
+  // Summary stats — same as My Registry detail
+  const ratedItems = Object.entries(ratings).map(([skill_id, self_score]) => ({ skill_id, self_score: Number(self_score) }));
+  const avgLevel = ratedItems.length > 0
+    ? Math.round((ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedItems.length) * 10) / 10
+    : null;
+  const maxScore = ratedItems.length > 0 ? Math.max(...ratedItems.map((i) => i.self_score)) : 0;
+  const minScore = ratedItems.length > 0 ? Math.min(...ratedItems.map((i) => i.self_score)) : 0;
+  const topRatedItems = ratedItems.filter((i) => i.self_score === maxScore);
+  const lowestRatedItems = ratedItems.filter((i) => i.self_score === minScore);
+  const topRatedSkillNames = topRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
+  const lowestRatedSkillNames = lowestRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
+
+  const SkillListBadge = ({ names, score }: { names: string[]; score: number }) => {
+    if (names.length === 0) return <span className="text-muted-foreground">—</span>;
+    const first = names[0];
+    const rest = names.slice(1);
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-sm font-medium text-foreground">{first} (L{score})</span>
+        {rest.length > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="text-[10px] cursor-help">+{rest.length}</Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <div className="space-y-0.5">
+                  {rest.map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  };
+
+  const isSubmitted = registry.status === 'submitted';
 
   return (
     <div className="space-y-6">
@@ -115,8 +163,32 @@ export default function TeamRegistryDetailPage() {
             {registry.status === 'draft' ? 'Draft' : 'Submitted'}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{pageDescription}</p>
+        <p className="text-xs text-muted-foreground">v{registry.version_number} · {pageDescription}</p>
       </div>
+
+      {/* Summary section */}
+      {isSubmitted && ratedItems.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Average Level</p>
+              <p className="text-2xl font-bold text-foreground">{avgLevel}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Top Rated</p>
+              <SkillListBadge names={topRatedSkillNames} score={maxScore} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Lowest Rated</p>
+              <SkillListBadge names={lowestRatedSkillNames} score={minScore} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Search */}
       {domainSkills.length > 4 && (
