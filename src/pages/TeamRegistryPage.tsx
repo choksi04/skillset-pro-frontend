@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronRight, Users, User } from 'lucide-react';
+import { Users, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function TeamRegistryPage() {
@@ -95,6 +95,7 @@ export default function TeamRegistryPage() {
               ? formatDateTime(latest.submitted_at)
               : formatDateTime(latest.created_at);
 
+            const skillCount = items.get(latest.id)?.length ?? 0;
             return (
               <Card
                 key={empId}
@@ -102,7 +103,8 @@ export default function TeamRegistryPage() {
                 onClick={() => navigate(`/team-registry/${latest.id}`)}
               >
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Left: identity */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="rounded-full bg-muted p-2 shrink-0">
                         <User size={16} className="text-muted-foreground" />
@@ -111,22 +113,30 @@ export default function TeamRegistryPage() {
                         <p className="text-sm font-medium text-card-foreground truncate">
                           {userNames[empId] || empId}
                         </p>
-                        <p className="text-xs text-muted-foreground">{domain?.name ?? 'Unknown domain'}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {domain?.name ?? 'Unknown domain'}
+                        </p>
+                        {dateTime && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{dateTime}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {dateTime && (
-                        <span className="text-xs text-muted-foreground">{dateTime}</span>
-                      )}
-                      {avg !== null && (
-                        <Badge variant="outline" className="text-[10px] font-medium">
-                          Avg: {avg}
-                        </Badge>
-                      )}
+
+                    {/* Right: metrics */}
+                    <div className="flex items-center gap-6 shrink-0">
+                      <div className="text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Avg Level</p>
+                        <p className="text-2xl font-bold text-foreground leading-none">
+                          {avg !== null ? avg : '—'}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Skills Rated</p>
+                        <p className="text-2xl font-bold text-foreground leading-none">{skillCount}</p>
+                      </div>
                       <Badge className={`text-[10px] ${latest.status === 'draft' ? 'bg-warning/15 text-warning border-warning/20' : 'bg-success/15 text-success border-success/20'}`}>
                         {latest.status === 'draft' ? 'Draft' : 'Submitted'}
                       </Badge>
-                      <ChevronRight size={16} className="text-muted-foreground" />
                     </div>
                   </div>
                 </CardContent>
