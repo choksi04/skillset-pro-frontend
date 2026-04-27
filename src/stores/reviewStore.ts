@@ -315,6 +315,11 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       ),
       officialEntries: [...state.officialEntries, ...newEntries],
     }));
+
+    // Mark assignment as verified
+    import('./assignmentStore').then(({ syncAssignmentForReview }) =>
+      syncAssignmentForReview(review.assessment_id).catch(() => {}),
+    );
   },
 
   addNotification: async (notification) => {
