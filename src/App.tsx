@@ -18,7 +18,8 @@ import TeamAssessmentsPage from "@/pages/TeamAssessmentsPage";
 import AssessmentDetailPage from "@/pages/AssessmentDetailPage";
 import AssessmentExecPage from "@/pages/AssessmentExecPage";
 import ReviewsPage from "@/pages/ReviewsPage";
-import ReviewCyclesPage from "@/pages/ReviewCyclesPage";
+import AssessmentTemplatesPage from "@/pages/AssessmentTemplatesPage";
+import AssessmentTemplateEditPage from "@/pages/AssessmentTemplateEditPage";
 import SkillRegistryPage from "@/pages/SkillRegistryPage";
 import TeamRegistryPage from "@/pages/TeamRegistryPage";
 import SkillRegistryDetailPage from "@/pages/SkillRegistryDetailPage";
@@ -98,7 +99,8 @@ const App = () => (
               <Route path="/domains" element={<RoleGuard allowed={["admin", "manager"]}><DomainsPage /></RoleGuard>} />
               <Route path="/domains/:id" element={<RoleGuard allowed={["admin", "manager"]}><DomainDetailPage /></RoleGuard>} />
               <Route path="/questions" element={<RoleGuard allowed={["admin", "manager"]}><QuestionBankPage /></RoleGuard>} />
-              <Route path="/review-cycles" element={<RoleGuard allowed={["admin"]}><ReviewCyclesPage /></RoleGuard>} />
+              <Route path="/assessment-templates" element={<RoleGuard allowed={["admin", "manager"]}><AssessmentTemplatesPage /></RoleGuard>} />
+              <Route path="/assessment-templates/:templateId" element={<RoleGuard allowed={["admin", "manager"]}><AssessmentTemplateEditPage /></RoleGuard>} />
               <Route path="/manager-reviews" element={<RoleGuard allowed={["admin", "manager"]}><ReviewsPage /></RoleGuard>} />
 
               {/* Legacy redirects */}
@@ -106,6 +108,7 @@ const App = () => (
               <Route path="/skills" element={<Navigate to="/skill-library" replace />} />
               <Route path="/registry" element={<Navigate to="/skill-registry" replace />} />
               <Route path="/reviews" element={<Navigate to="/manager-reviews" replace />} />
+              <Route path="/review-cycles" element={<Navigate to="/assessment-templates" replace />} />
               <Route path="/guide" element={<Navigate to="/help" replace />} />
               <Route path="/skill-analytics" element={<Navigate to="/all-registries" replace />} />
               <Route path="/organization" element={<Navigate to="/" replace />} />

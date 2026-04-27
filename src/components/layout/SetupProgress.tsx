@@ -2,7 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useQuestionStore } from '@/stores/questionStore';
-import { useCycleStore } from '@/stores/cycleStore';
+import { useTemplateStore } from '@/stores/templateStore';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Circle } from 'lucide-react';
 
@@ -11,31 +11,31 @@ const setupSteps = [
   { label: 'Create Domains', key: 'domains' },
   { label: 'Map Skills to Domains', key: 'mappings' },
   { label: 'Add Questions', key: 'questions' },
-  { label: 'Start Cycle', key: 'cycle' },
+  { label: 'Create Template', key: 'template' },
 ] as const;
 
 export default function SetupProgress() {
   const { skills, initialized: skillsInit, fetchSkills } = useSkillStore();
   const { domains, mappings, initialized: domainsInit, fetchDomains } = useDomainStore();
   const { questions, initialized: questionsInit, fetchQuestions } = useQuestionStore();
-  const { cycles, initialized: cyclesInit, fetchCycles } = useCycleStore();
+  const { templates, initialized: templatesInit, fetchTemplates } = useTemplateStore();
 
   useEffect(() => {
     if (!skillsInit) fetchSkills();
     if (!domainsInit) fetchDomains();
     if (!questionsInit) fetchQuestions();
-    if (!cyclesInit) fetchCycles();
-  }, [skillsInit, domainsInit, questionsInit, cyclesInit, fetchSkills, fetchDomains, fetchQuestions, fetchCycles]);
+    if (!templatesInit) fetchTemplates();
+  }, [skillsInit, domainsInit, questionsInit, templatesInit, fetchSkills, fetchDomains, fetchQuestions, fetchTemplates]);
 
-  const allLoaded = skillsInit && domainsInit && questionsInit && cyclesInit;
+  const allLoaded = skillsInit && domainsInit && questionsInit && templatesInit;
 
   const completion = useMemo(() => ({
     skills: skills.length > 0,
     domains: domains.length > 0,
     mappings: mappings.length > 0,
     questions: questions.length > 0,
-    cycle: cycles.some(c => c.status === 'active' || c.status === 'closed'),
-  }), [skills, domains, mappings, questions, cycles]);
+    template: templates.some((t) => t.status === 'active'),
+  }), [skills, domains, mappings, questions, templates]);
 
   const done = Object.values(completion).filter(Boolean).length;
   const total = setupSteps.length;

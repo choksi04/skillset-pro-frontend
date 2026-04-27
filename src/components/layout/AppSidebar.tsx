@@ -19,7 +19,7 @@ import {
   Database,
   FileText,
   SlidersHorizontal,
-  RefreshCw,
+  LayoutTemplate,
 } from "lucide-react";
 
 interface SidebarItem {
@@ -78,7 +78,7 @@ const sidebarGroups: SidebarGroup[] = [
         icon: <SlidersHorizontal size={18} />,
         roles: ["admin"],
       },
-      { title: "Review Cycles", href: "/review-cycles", icon: <RefreshCw size={18} />, roles: ["admin"] },
+      { title: "Assessment Templates", href: "/assessment-templates", icon: <LayoutTemplate size={18} />, roles: ["admin", "manager"] },
       { title: "Users", href: "/users", icon: <Users size={18} />, roles: ["admin"] },
     ],
   },
