@@ -432,14 +432,16 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     const userId = getCurrentUserId();
     const now = new Date().toISOString();
+    // Increment attempt_count whenever transitioning *into* in_progress
+    // from any non-in_progress state (covers first start AND re-attempts).
+    const shouldIncrement = status === 'in_progress' && assignment.status !== 'in_progress';
     const updates = {
       status,
       modified_at: now,
       modified_by: userId,
-      attempt_count:
-        status === 'in_progress' && assignment.status === 'new'
-          ? assignment.attempt_count + 1
-          : assignment.attempt_count,
+      attempt_count: shouldIncrement
+        ? assignment.attempt_count + 1
+        : assignment.attempt_count,
     };
     const { error } = await supabase
       .from('assessment_assignments')
@@ -462,6 +464,28 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     }));
   },
 }));
+
+/**
+ * Returns true when the employee can start a new attempt for this assessment
+ * under its template assignment (attempt_count below max_attempts, or no assignment).
+ * Assessments not tied to an assignment are always allowed.
+ */
+export function canStartNewAttempt(assessmentId: string): { allowed: boolean; reason?: string } {
+  const assignment = useAssignmentStore.getState().getAssignmentByAssessmentId(assessmentId);
+  if (!assignment) return { allowed: true };
+  // If the prior attempt is still active (new/in_progress), this is a resume — allow.
+  if (assignment.status === 'new' || assignment.status === 'in_progress') {
+    return { allowed: true };
+  }
+  // Terminal status: only allow if attempts remain.
+  if (assignment.attempt_count >= assignment.max_attempts) {
+    return {
+      allowed: false,
+      reason: `You have reached the maximum number of attempts (${assignment.max_attempts}) for this assessment.`,
+    };
+  }
+  return { allowed: true };
+}
 
 // --- Hook assignment status updates into existing flows ---
 // We wrap attempt + review state changes by listening from the calling sites.
