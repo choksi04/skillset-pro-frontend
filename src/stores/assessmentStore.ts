@@ -202,6 +202,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
           id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
           submission_id: a.submission_id, domain_id: a.domain_id,
           template_id: a.template_id ?? null, is_reassessment: a.is_reassessment ?? false,
+          is_adaptive: a.is_adaptive ?? false,
           parent_assessment_id: a.parent_assessment_id ?? null,
           skill_ids: skillIds, assessment_questions: aqs,
           status: a.status, duration_minutes: a.duration_minutes,
@@ -272,7 +273,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
     const newAssessment: Assessment = {
       id: assessmentId, tenant_id, employee_id, submission_id, domain_id,
-      template_id: template_id ?? null, is_reassessment: false, parent_assessment_id: null,
+      template_id: template_id ?? null, is_reassessment: false, is_adaptive: false, parent_assessment_id: null,
       skill_ids: skillIds, assessment_questions: assessmentQuestions,
       status: 'pending', duration_minutes: durationMinutes,
       created_at: (row as any).created_at, updated_at: (row as any).updated_at,
