@@ -191,6 +191,10 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   },
 
   saveAnswer: async (attemptId, answer) => {
+    // Lock answers once submitted/evaluated/reviewed
+    const current = get().attempts.find((a) => a.id === attemptId);
+    if (current && current.status !== 'in_progress') return;
+
     const userId = getCurrentUserId();
     await supabase.from('attempt_answers').delete()
       .eq('attempt_id', attemptId).eq('question_id', answer.question_id);
