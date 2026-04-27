@@ -6,7 +6,7 @@ import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
-import { useCycleStore } from '@/stores/cycleStore';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +31,6 @@ export default function TeamAssessmentsPage() {
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
-  const { cycles, fetchCycles } = useCycleStore();
   const { currentRole, user } = useAuth();
   const navigate = useNavigate();
 
@@ -39,7 +38,7 @@ export default function TeamAssessmentsPage() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchCycles();
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews();
   }, []);
 
   useEffect(() => {
@@ -56,13 +55,6 @@ export default function TeamAssessmentsPage() {
 
   const getName = (id: string) => userNames[id] || id;
   const getDomain = (id: string) => domains.find((d) => d.id === id)?.name ?? 'Unknown Domain';
-  const getCycle = (a: Assessment) => {
-    if (a.cycle_id) {
-      const cycle = cycles.find((c) => c.id === a.cycle_id);
-      if (cycle) return cycle.name;
-    }
-    return '';
-  };
 
   const teamAssessments = useMemo(() => {
     if (currentRole === 'admin') return assessments.filter((a) => a.employee_id !== user?.id);
@@ -79,10 +71,9 @@ export default function TeamAssessmentsPage() {
     const q = search.toLowerCase();
     return teamAssessments.filter((a) =>
       getName(a.employee_id).toLowerCase().includes(q) ||
-      getDomain(a.domain_id).toLowerCase().includes(q) ||
-      getCycle(a).toLowerCase().includes(q)
+      getDomain(a.domain_id).toLowerCase().includes(q)
     );
-  }, [teamAssessments, search, userNames, domains, cycles]);
+  }, [teamAssessments, search, userNames, domains]);
 
   return (
     <div className="space-y-6">
@@ -131,7 +122,7 @@ export default function TeamAssessmentsPage() {
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {getCycle(a)} · {a.assessment_questions.length} questions · {a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
+                      {a.assessment_questions.length} questions · {a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

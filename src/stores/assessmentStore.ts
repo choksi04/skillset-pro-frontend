@@ -38,7 +38,7 @@ export interface Assessment {
   employee_id: string;
   submission_id: string;
   domain_id: string;
-  cycle_id: string | null;
+  template_id: string | null;
   is_reassessment: boolean;
   parent_assessment_id: string | null;
   skill_ids: string[];
@@ -54,7 +54,7 @@ export interface GenerateAssessmentParams {
   employee_id: string;
   submission_id: string;
   domain_id: string;
-  cycle_id?: string;
+  template_id?: string;
   ratings: SkillSelfRating[];
   publishedQuestions: Question[];
   maxQuestionsPerSkill?: number;
@@ -200,7 +200,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
         return {
           id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
           submission_id: a.submission_id, domain_id: a.domain_id,
-          cycle_id: a.cycle_id ?? null, is_reassessment: a.is_reassessment ?? false,
+          template_id: a.template_id ?? null, is_reassessment: a.is_reassessment ?? false,
           parent_assessment_id: a.parent_assessment_id ?? null,
           skill_ids: skillIds, assessment_questions: aqs,
           status: a.status, duration_minutes: a.duration_minutes,
@@ -216,7 +216,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
   },
 
   addAssessment: async (params) => {
-    const { tenant_id, employee_id, submission_id, domain_id, cycle_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
+    const { tenant_id, employee_id, submission_id, domain_id, template_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
     // Fetch competency levels and assessment configs for dynamic mapping
     const [{ data: levelsData }, { data: configsData }] = await Promise.all([
       supabase.from('competency_levels').select('*').order('level'),
@@ -241,7 +241,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       .from('assessments')
       .insert({
         tenant_id, employee_id, submission_id, domain_id,
-        cycle_id: cycle_id ?? null, status: 'pending',
+        template_id: template_id ?? null, status: 'pending',
         duration_minutes: durationMinutes, created_by: userId,
       })
       .select()
@@ -271,7 +271,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
     const newAssessment: Assessment = {
       id: assessmentId, tenant_id, employee_id, submission_id, domain_id,
-      cycle_id: cycle_id ?? null, is_reassessment: false, parent_assessment_id: null,
+      template_id: template_id ?? null, is_reassessment: false, parent_assessment_id: null,
       skill_ids: skillIds, assessment_questions: assessmentQuestions,
       status: 'pending', duration_minutes: durationMinutes,
       created_at: (row as any).created_at, updated_at: (row as any).updated_at,

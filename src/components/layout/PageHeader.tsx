@@ -21,7 +21,7 @@ const routeBreadcrumbs: Record<string, BreadcrumbEntry> = {
   '/users': { group: 'Settings', title: 'Users' },
   '/questions': { group: 'Settings', title: 'Question Bank' },
   '/assessment-config': { group: 'Settings', title: 'Assessment Configuration' },
-  '/review-cycles': { group: 'Settings', title: 'Review Cycles' },
+  '/assessment-templates': { group: 'Settings', title: 'Assessment Templates' },
   '/manager-reviews': { group: 'Operations', title: 'Manager Reviews' },
   '/ai-generate': { group: 'Settings', title: 'AI Question Generation' },
   '/help': { group: 'Support', title: 'Help & Tutorial' },

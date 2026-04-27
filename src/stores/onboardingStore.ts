@@ -107,7 +107,7 @@ export const checklistItems: ChecklistItem[] = [
   { id: 'add-skills', label: 'Add Skills', roles: ['admin'], checkFn: 'hasCustomSkills' },
   { id: 'map-skills', label: 'Map Skills to Domain', roles: ['admin'], checkFn: 'hasMappings' },
   { id: 'generate-questions', label: 'Generate Questions', roles: ['admin'], checkFn: 'hasQuestions' },
-  { id: 'open-cycle', label: 'Open Assessment Cycle', roles: ['admin'], checkFn: 'hasAssessments' },
+  { id: 'create-template', label: 'Create Assessment Template', roles: ['admin'], checkFn: 'hasAssessments' },
   { id: 'submit-registry', label: 'Submit Skill Registry', roles: ['employee'], checkFn: 'hasSubmission' },
   { id: 'attempt-assessment', label: 'Attempt Assessment', roles: ['employee'], checkFn: 'hasAttempt' },
   { id: 'view-feedback', label: 'View Feedback', roles: ['employee'], checkFn: 'hasFeedback' },

@@ -5,7 +5,7 @@ import { useAttemptStore, AssessmentAttempt } from '@/stores/attemptStore';
 import { useAssessmentStore, Assessment } from '@/stores/assessmentStore';
 import { useRegistryStore } from '@/stores/registryStore';
 import { useCompetencyLevelStore, getRatingLabels, getLevelColorClass, getFormattedLevelLabel } from '@/stores/competencyLevelStore';
-import { useCycleStore } from '@/stores/cycleStore';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -144,8 +144,7 @@ interface ManagerReviewPanelProps {
 export default function ManagerReviewPanel({ review, attempt, assessment }: ManagerReviewPanelProps) {
   const { skills } = useSkillStore();
   const { completeReview, reassignReviewer } = useReviewStore();
-  const { activeCycle } = useCycleStore();
-  const currentCycle = activeCycle?.name || useRegistryStore.getState().currentCycle;
+  const currentCycle = useRegistryStore.getState().currentCycle || '';
   const { currentRole, user } = useAuth();
 
   const [overallComment, setOverallComment] = useState(review.overall_comment);

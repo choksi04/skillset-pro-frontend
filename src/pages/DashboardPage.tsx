@@ -6,19 +6,19 @@ import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useRegistryStore } from '@/stores/registryStore';
 import { useReviewStore } from '@/stores/reviewStore';
-import { useCycleStore } from '@/stores/cycleStore';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import QuickStartChecklist from '@/components/onboarding/QuickStartChecklist';
 import {
   Users, Brain, ClipboardCheck, TrendingUp, AlertCircle, Network,
-  BarChart3, Clock, CheckCircle, FileText, Send, Eye, Play, Timer,
+  BarChart3, Clock, CheckCircle, FileText, Send,
 } from 'lucide-react';
 import { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { format, parseISO, differenceInDays } from 'date-fns';
+
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
@@ -43,38 +43,14 @@ function AdminDashboard() {
   const { assessments } = useAssessmentStore();
   const { attempts } = useAttemptStore();
   const { reviews, officialEntries } = useReviewStore();
-  const { activeCycle, getDaysRemaining } = useCycleStore();
   const navigate = useNavigate();
 
   const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
   const completedAssessments = attempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length;
   const activeAssessments = assessments.filter((a) => a.status === 'pending' || a.status === 'in_progress').length;
-  const daysRemaining = getDaysRemaining();
 
   return (
     <>
-      {/* Active Cycle Banner */}
-      {activeCycle && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-success/10 p-2"><Play size={16} className="text-success" /></div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">{activeCycle.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {format(parseISO(activeCycle.start_date), 'MMM d')} – {format(parseISO(activeCycle.end_date), 'MMM d, yyyy')}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {daysRemaining !== null && (
-              <span className={`text-sm font-semibold flex items-center gap-1 ${daysRemaining <= 3 ? 'text-destructive' : daysRemaining <= 7 ? 'text-warning' : 'text-foreground'}`}>
-                <Timer size={14} /> {daysRemaining > 0 ? `${daysRemaining}d left` : 'Ending'}
-              </span>
-            )}
-            <Button size="sm" variant="outline" onClick={() => navigate('/review-cycles')} className="text-xs">Manage</Button>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<Brain size={20} />} label="Skills Tracked" value={skills.length} sub={`${new Set(skills.map((s) => s.skill_category)).size} categories`} />
@@ -112,9 +88,8 @@ function AdminDashboard() {
                 {skills.length === 0 && <ActionItem text="Add skills to the Skill Library" priority="high" />}
                 {domains.length === 0 && <ActionItem text="Create functional domains" priority="high" />}
                 {questions.length === 0 && <ActionItem text="Generate or add questions" priority="medium" />}
-                {!activeCycle && <ActionItem text="Create and activate a review cycle" priority="high" />}
                 {pendingReviews > 0 && <ActionItem text={`Review ${pendingReviews} pending assessment(s)`} priority="high" />}
-                {skills.length > 0 && domains.length > 0 && questions.length > 0 && activeCycle && pendingReviews === 0 && (
+                {skills.length > 0 && domains.length > 0 && questions.length > 0 && pendingReviews === 0 && (
                   <p className="text-xs text-muted-foreground">All caught up! No pending actions.</p>
                 )}
               </div>
@@ -162,7 +137,7 @@ function ManagerDashboard() {
                       <AlertCircle size={14} className="text-destructive" />
                       <span className="text-sm text-foreground">{pendingReviews} assessment review(s) pending</span>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/review-cycles')} className="text-xs">
+                    <Button size="sm" variant="outline" onClick={() => navigate('/manager-reviews')} className="text-xs">
                       Review Now
                     </Button>
                   </div>
@@ -295,7 +270,6 @@ export default function DashboardPage() {
   const { fetchAttempts } = useAttemptStore();
   const { fetchRegistry } = useRegistryStore();
   const { fetchReviews } = useReviewStore();
-  const { fetchCycles } = useCycleStore();
 
   useEffect(() => {
     fetchSkills();
@@ -305,8 +279,7 @@ export default function DashboardPage() {
     fetchAttempts();
     fetchRegistry();
     fetchReviews();
-    fetchCycles();
-  }, [fetchSkills, fetchDomains, fetchQuestions, fetchAssessments, fetchAttempts, fetchRegistry, fetchReviews, fetchCycles]);
+  }, [fetchSkills, fetchDomains, fetchQuestions, fetchAssessments, fetchAttempts, fetchRegistry, fetchReviews]);
 
   return (
     <div className="space-y-6" data-tour="dashboard">

@@ -234,11 +234,146 @@ export type Database = {
           },
         ]
       }
+      assessment_template_questions: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          question_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          question_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          question_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_template_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_template_skills: {
+        Row: {
+          created_at: string
+          id: string
+          skill_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          skill_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          skill_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_template_skills_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
+          description: string | null
+          domain_id: string | null
+          duration_minutes: number
+          id: string
+          max_attempts: number
+          modified_at: string | null
+          modified_by: string | null
+          name: string
+          question_types: Json | null
+          questions_per_skill: number | null
+          reattempt_enabled: boolean
+          shuffle_options: boolean | null
+          shuffle_questions: boolean | null
+          skill_selection_mode: string | null
+          skills_per_assessment: number | null
+          status: string
+          tenant_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          description?: string | null
+          domain_id?: string | null
+          duration_minutes?: number
+          id?: string
+          max_attempts?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name: string
+          question_types?: Json | null
+          questions_per_skill?: number | null
+          reattempt_enabled?: boolean
+          shuffle_options?: boolean | null
+          shuffle_questions?: boolean | null
+          skill_selection_mode?: string | null
+          skills_per_assessment?: number | null
+          status?: string
+          tenant_id?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          description?: string | null
+          domain_id?: string | null
+          duration_minutes?: number
+          id?: string
+          max_attempts?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          name?: string
+          question_types?: Json | null
+          questions_per_skill?: number | null
+          reattempt_enabled?: boolean
+          shuffle_options?: boolean | null
+          shuffle_questions?: boolean | null
+          skill_selection_mode?: string | null
+          skills_per_assessment?: number | null
+          status?: string
+          tenant_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       assessments: {
         Row: {
           created_at: string
           created_by: string | null
-          cycle_id: string | null
           deleted_by: string | null
           deleted_on: string | null
           domain_id: string
@@ -251,13 +386,13 @@ export type Database = {
           parent_assessment_id: string | null
           status: string
           submission_id: string
+          template_id: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id: string
@@ -270,13 +405,13 @@ export type Database = {
           parent_assessment_id?: string | null
           status?: string
           submission_id: string
+          template_id?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          cycle_id?: string | null
           deleted_by?: string | null
           deleted_on?: string | null
           domain_id?: string
@@ -289,6 +424,7 @@ export type Database = {
           parent_assessment_id?: string | null
           status?: string
           submission_id?: string
+          template_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -447,33 +583,6 @@ export type Database = {
           score_range_max?: number
           score_range_min?: number
           status?: string
-          tenant_id?: string
-        }
-        Relationships: []
-      }
-      cycle_domain_selections: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          cycle_id: string
-          domain_id: string
-          id: string
-          tenant_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          cycle_id: string
-          domain_id: string
-          id?: string
-          tenant_id?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          cycle_id?: string
-          domain_id?: string
-          id?: string
           tenant_id?: string
         }
         Relationships: []
@@ -856,51 +965,6 @@ export type Database = {
           id?: string
           review_id?: string
           skill_ids?: Json
-          status?: string
-          tenant_id?: string
-        }
-        Relationships: []
-      }
-      review_cycles: {
-        Row: {
-          closed_at: string | null
-          created_at: string
-          created_by: string | null
-          end_date: string
-          grace_period_days: number
-          id: string
-          modified_at: string | null
-          modified_by: string | null
-          name: string
-          start_date: string
-          status: string
-          tenant_id: string
-        }
-        Insert: {
-          closed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          end_date: string
-          grace_period_days?: number
-          id: string
-          modified_at?: string | null
-          modified_by?: string | null
-          name: string
-          start_date: string
-          status?: string
-          tenant_id: string
-        }
-        Update: {
-          closed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          end_date?: string
-          grace_period_days?: number
-          id?: string
-          modified_at?: string | null
-          modified_by?: string | null
-          name?: string
-          start_date?: string
           status?: string
           tenant_id?: string
         }
