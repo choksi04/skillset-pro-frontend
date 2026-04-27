@@ -7,7 +7,7 @@ import { useSkillStore } from "@/stores/skillStore";
 import { useCompetencyLevelStore } from "@/stores/competencyLevelStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
-import { useCycleStore } from "@/stores/cycleStore";
+
 import { useRegistryStore } from "@/stores/registryStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,7 +69,6 @@ export default function AssessmentDetailPage() {
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { reviews, fetchReviews } = useReviewStore();
-  const { cycles, fetchCycles } = useCycleStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { user } = useAuth();
 
@@ -88,7 +87,6 @@ export default function AssessmentDetailPage() {
     fetchSkills();
     fetchDomains();
     fetchReviews();
-    fetchCycles();
     fetchRegistry();
     fetchLevels();
   }, []);
@@ -120,7 +118,6 @@ export default function AssessmentDetailPage() {
   const status = assessment ? getEffectiveStatus(assessment, attempt, review) : "pending";
   const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
   const domain = domains.find((d) => d.id === assessment?.domain_id);
-  const cycleName = assessment?.cycle_id ? cycles.find((c) => c.id === assessment.cycle_id)?.name : "";
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === "admin" || user?.role === "manager";
   const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
@@ -169,7 +166,7 @@ export default function AssessmentDetailPage() {
         employee_id: assessment.employee_id,
         submission_id: assessment.submission_id,
         domain_id: assessment.domain_id,
-        cycle_id: assessment.cycle_id ?? undefined,
+        template_id: assessment.template_id ?? undefined,
         ratings: sub.ratings,
         publishedQuestions,
         excludeQuestionIds: oldQuestionIds,
@@ -267,7 +264,6 @@ export default function AssessmentDetailPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           {[
-            cycleName,
             `${assessment.assessment_questions.length} questions`,
             `${assessment.duration_minutes} min`,
             new Date(assessment.created_at).toLocaleDateString(),
