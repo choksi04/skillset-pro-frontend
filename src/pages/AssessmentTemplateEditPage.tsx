@@ -256,7 +256,13 @@ export default function AssessmentTemplateEditPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setType('adaptive')}
+                  onClick={() => {
+                    setType('adaptive');
+                    setQuestionTypes(['mcq']);
+                    setQuestionsPerSkill((prev) =>
+                      Math.min(ADAPTIVE_QPS_MAX, Math.max(ADAPTIVE_QPS_MIN, prev || ADAPTIVE_QPS_MIN)),
+                    );
+                  }}
                   className={`rounded-lg border p-3 text-left transition-colors ${
                     type === 'adaptive' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                   }`}
@@ -266,7 +272,7 @@ export default function AssessmentTemplateEditPage() {
                     <span className="text-sm font-medium text-foreground">Adaptive</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Pulls questions automatically from a domain based on the employee's self-rated skill levels.
+                    Picks MCQs on the fly: starts at the self-rated level and walks up/down based on a 2-correct / 2-wrong streak.
                   </p>
                 </button>
                 <button
