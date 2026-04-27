@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/dialog';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useRegistryStore } from '@/stores/registryStore';
+import { canStartNewAttempt } from '@/stores/assignmentStore';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   Clock, ChevronLeft, ChevronRight, Send, Play, BarChart3, Pause,
