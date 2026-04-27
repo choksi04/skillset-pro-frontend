@@ -40,6 +40,7 @@ export interface Assessment {
   domain_id: string;
   template_id: string | null;
   is_reassessment: boolean;
+  is_adaptive: boolean;
   parent_assessment_id: string | null;
   skill_ids: string[];
   assessment_questions: AssessmentQuestion[];
