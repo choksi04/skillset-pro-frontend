@@ -70,6 +70,63 @@ export type Database = {
           },
         ]
       }
+      assessment_assignments: {
+        Row: {
+          assessment_id: string | null
+          assigned_at: string
+          assigned_by: string | null
+          attempt_count: number
+          created_at: string
+          deleted_by: string | null
+          deleted_on: string | null
+          domain_id: string | null
+          employee_id: string
+          id: string
+          max_attempts: number
+          modified_at: string | null
+          modified_by: string | null
+          status: string
+          template_id: string
+          tenant_id: string
+        }
+        Insert: {
+          assessment_id?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          attempt_count?: number
+          created_at?: string
+          deleted_by?: string | null
+          deleted_on?: string | null
+          domain_id?: string | null
+          employee_id: string
+          id?: string
+          max_attempts?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          status?: string
+          template_id: string
+          tenant_id?: string
+        }
+        Update: {
+          assessment_id?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          attempt_count?: number
+          created_at?: string
+          deleted_by?: string | null
+          deleted_on?: string | null
+          domain_id?: string | null
+          employee_id?: string
+          id?: string
+          max_attempts?: number
+          modified_at?: string | null
+          modified_by?: string | null
+          status?: string
+          template_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       assessment_attempts: {
         Row: {
           assessment_id: string
