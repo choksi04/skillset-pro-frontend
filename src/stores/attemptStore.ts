@@ -81,6 +81,7 @@ export interface AssessmentAttempt {
   evaluated_at?: string;
   paused_at?: string | null;
   remaining_seconds?: number | null;
+  evaluation_error?: string | null;
 }
 
 interface AttemptStore {
@@ -148,6 +149,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         total_ai_score: a.total_ai_score, status: a.status,
         started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
         paused_at: a.paused_at ?? null, remaining_seconds: a.remaining_seconds ?? null,
+        evaluation_error: a.evaluation_error ?? null,
       }));
 
       set({ attempts, loading: false, initialized: true });
