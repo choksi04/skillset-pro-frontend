@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { useTemplateStore, AssessmentTemplate } from './templateStore';
-import { useQuestionStore } from './questionStore';
-import { useRegistryStore } from './registryStore';
 
 export type AssignmentStatus =
   | 'new'
