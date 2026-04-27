@@ -129,6 +129,7 @@ export type Database = {
       }
       assessment_attempts: {
         Row: {
+          adaptive_state: Json
           assessment_id: string
           created_by: string | null
           deleted_by: string | null
@@ -147,6 +148,7 @@ export type Database = {
           total_ai_score: number | null
         }
         Insert: {
+          adaptive_state?: Json
           assessment_id: string
           created_by?: string | null
           deleted_by?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           total_ai_score?: number | null
         }
         Update: {
+          adaptive_state?: Json
           assessment_id?: string
           created_by?: string | null
           deleted_by?: string | null
@@ -437,6 +440,7 @@ export type Database = {
           duration_minutes: number
           employee_id: string
           id: string
+          is_adaptive: boolean
           is_reassessment: boolean
           modified_at: string | null
           modified_by: string | null
@@ -456,6 +460,7 @@ export type Database = {
           duration_minutes?: number
           employee_id: string
           id?: string
+          is_adaptive?: boolean
           is_reassessment?: boolean
           modified_at?: string | null
           modified_by?: string | null
@@ -475,6 +480,7 @@ export type Database = {
           duration_minutes?: number
           employee_id?: string
           id?: string
+          is_adaptive?: boolean
           is_reassessment?: boolean
           modified_at?: string | null
           modified_by?: string | null
