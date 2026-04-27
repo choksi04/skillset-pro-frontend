@@ -4,15 +4,12 @@ import { RatingLevel } from './registryStore';
 import { SkillScore } from './attemptStore';
 import { getCurrentUserId } from '@/lib/audit';
 
-export type ReviewAction = 'approve' | 'adjust' | 'reassess';
-
 export interface SkillReviewEntry {
   skill_id: string;
   self_rating: RatingLevel;
   ai_calculated_level: number;
   ai_score: number;
-  manager_action: ReviewAction | null;
-  manager_adjusted_level: number | null;
+  verified_level: number;
   manager_comment: string;
 }
 
@@ -81,10 +78,10 @@ interface ReviewStore {
     self_ratings: { skill_id: string; rating: RatingLevel }[];
   }) => Promise<string>;
 
-  setSkillAction: (reviewId: string, skillId: string, action: ReviewAction, adjustedLevel?: number) => Promise<void>;
+  setVerifiedLevel: (reviewId: string, skillId: string, level: number) => Promise<void>;
   setSkillComment: (reviewId: string, skillId: string, comment: string) => Promise<void>;
   setOverallComment: (reviewId: string, comment: string) => Promise<void>;
-  completeReview: (reviewId: string, cycle: string) => Promise<void>;
+  verifyReview: (reviewId: string, cycle: string) => Promise<void>;
 
   addNotification: (notification: Omit<Notification, 'id' | 'created_at' | 'read'>) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
@@ -126,10 +123,12 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         reviewer_id: r.reviewer_id, overall_comment: r.overall_comment || '',
         status: r.status as any, created_at: r.created_at, updated_at: r.updated_at, completed_at: r.completed_at,
         skill_reviews: skillEntries.filter((se: any) => se.review_id === r.id).map((se: any) => ({
-          skill_id: se.skill_id, self_rating: se.self_rating as RatingLevel,
-          ai_calculated_level: se.ai_calculated_level, ai_score: se.ai_score,
-          manager_action: se.manager_action as ReviewAction | null,
-          manager_adjusted_level: se.manager_adjusted_level, manager_comment: se.manager_comment || '',
+          skill_id: se.skill_id,
+          self_rating: se.self_rating as RatingLevel,
+          ai_calculated_level: se.ai_calculated_level,
+          ai_score: se.ai_score,
+          verified_level: (se as any).verified_level ?? se.ai_calculated_level,
+          manager_comment: se.manager_comment || '',
         })),
       }));
 
@@ -166,8 +165,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         self_rating: (selfRating?.rating ?? 3) as RatingLevel,
         ai_calculated_level: ss.calculated_level,
         ai_score: ss.avg_score,
-        manager_action: null,
-        manager_adjusted_level: null,
+        verified_level: ss.calculated_level,
         manager_comment: '',
       };
     });
@@ -192,7 +190,8 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         skillReviews.map((sr) => ({
           review_id: id, skill_id: sr.skill_id, self_rating: sr.self_rating,
           ai_calculated_level: sr.ai_calculated_level, ai_score: sr.ai_score,
-        }))
+          verified_level: sr.verified_level,
+        } as any))
       );
     }
 
@@ -216,12 +215,11 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
     return id;
   },
 
-  setSkillAction: async (reviewId, skillId, action, adjustedLevel) => {
+  setVerifiedLevel: async (reviewId, skillId, level) => {
     const userId = getCurrentUserId();
     await supabase.from('review_skill_entries').update({
-      manager_action: action,
-      manager_adjusted_level: action === 'adjust' ? (adjustedLevel ?? null) : null,
-    }).eq('review_id', reviewId).eq('skill_id', skillId);
+      verified_level: level,
+    } as any).eq('review_id', reviewId).eq('skill_id', skillId);
 
     await supabase.from('manager_reviews').update({
       status: 'in_progress', updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
@@ -230,11 +228,11 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
     set((state) => ({
       reviews: state.reviews.map((r) =>
         r.id === reviewId ? {
-          ...r, status: 'in_progress' as const, updated_at: new Date().toISOString(),
+          ...r,
+          status: r.status === 'completed' ? r.status : 'in_progress' as const,
+          updated_at: new Date().toISOString(),
           skill_reviews: r.skill_reviews.map((sr) =>
-            sr.skill_id === skillId
-              ? { ...sr, manager_action: action, manager_adjusted_level: action === 'adjust' ? (adjustedLevel ?? sr.ai_calculated_level) : null }
-              : sr
+            sr.skill_id === skillId ? { ...sr, verified_level: level } : sr
           ),
         } : r
       ),
@@ -270,23 +268,21 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
     }));
   },
 
-  completeReview: async (reviewId, cycle) => {
+  verifyReview: async (reviewId, cycle) => {
     const review = get().reviews.find((r) => r.id === reviewId);
     if (!review) return;
 
     const now = new Date().toISOString();
     const userId = getCurrentUserId();
 
-    const newEntries: OfficialSkillEntry[] = review.skill_reviews
-      .filter((sr) => sr.manager_action === 'approve' || sr.manager_action === 'adjust')
-      .map((sr) => ({
-        id: `entry-${Date.now()}-${sr.skill_id}`,
-        employee_id: review.employee_id, tenant_id: review.tenant_id, skill_id: sr.skill_id,
-        final_level: sr.manager_action === 'adjust' ? (sr.manager_adjusted_level ?? sr.ai_calculated_level) : sr.ai_calculated_level,
-        assessment_reference: review.assessment_id,
-        manager_comments: sr.manager_comment || review.overall_comment || '',
-        timestamp: now, cycle, self_rating: sr.self_rating, ai_level: sr.ai_calculated_level, review_id: reviewId,
-      }));
+    const newEntries: OfficialSkillEntry[] = review.skill_reviews.map((sr) => ({
+      id: `entry-${Date.now()}-${sr.skill_id}`,
+      employee_id: review.employee_id, tenant_id: review.tenant_id, skill_id: sr.skill_id,
+      final_level: sr.verified_level,
+      assessment_reference: review.assessment_id,
+      manager_comments: sr.manager_comment || review.overall_comment || '',
+      timestamp: now, cycle, self_rating: sr.self_rating, ai_level: sr.ai_calculated_level, review_id: reviewId,
+    }));
 
     await supabase.from('manager_reviews').update({
       status: 'completed', completed_at: now, updated_at: now, modified_by: userId, modified_at: now,
@@ -305,7 +301,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
 
     await get().addNotification({
       tenant_id: review.tenant_id, target_role: 'employee', target_user_id: review.employee_id,
-      message: 'Your skill assessment has been reviewed and approved.',
+      message: 'Your skill assessment has been verified by your manager.',
       type: 'review_completed', reference_id: reviewId,
     });
 
@@ -354,7 +350,6 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       reviewer_id: newReviewerId, modified_by: userId, modified_at: now,
     }).eq('id', reviewId);
 
-    // Notify new reviewer
     const notifId = `notif-reassign-${Date.now()}`;
     await supabase.from('notifications').insert({
       id: notifId, tenant_id: review.tenant_id, target_role: 'manager',
