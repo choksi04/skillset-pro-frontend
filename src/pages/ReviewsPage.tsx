@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useReviewStore, ManagerReview, ReviewAction, SkillReviewEntry } from '@/stores/reviewStore';
+import { useReviewStore, ManagerReview, SkillReviewEntry } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
-import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
+import { useRegistryStore } from '@/stores/registryStore';
 import { useCompetencyLevelStore, getRatingLabels, getLevelColorClass, getFormattedLevelLabel } from '@/stores/competencyLevelStore';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,16 +26,9 @@ import {
 import SearchableSelect from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
 import {
-  ClipboardCheck, CheckCircle, XCircle, RefreshCw, MessageSquare,
-  ChevronDown, ChevronUp, Bell, Eye, Send, Shield, AlertTriangle, UserCog,
+  ClipboardCheck, CheckCircle, MessageSquare,
+  ChevronDown, ChevronUp, Bell, Eye, ShieldCheck, Shield, UserCog,
 } from 'lucide-react';
-
-// levelLabels and levelColors now come from competencyLevelStore
-const actionLabels: Record<ReviewAction, { label: string; icon: React.ReactNode; color: string }> = {
-  approve: { label: 'Approve', icon: <CheckCircle size={14} />, color: 'bg-success/15 text-success border-success/20' },
-  adjust: { label: 'Adjust', icon: <RefreshCw size={14} />, color: 'bg-warning/15 text-warning border-warning/20' },
-  reassess: { label: 'Reassess', icon: <XCircle size={14} />, color: 'bg-destructive/15 text-destructive border-destructive/20' },
-};
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 75 ? 'bg-success' : score >= 50 ? 'bg-warning' : 'bg-destructive';
@@ -44,82 +37,6 @@ function ScoreBar({ score }: { score: number }) {
       <div className="h-2 w-20 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${color}`} style={{ width: `${score}%` }} /></div>
       <span className="text-xs font-medium text-foreground">{score}%</span>
     </div>
-  );
-}
-
-function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: SkillReviewEntry; skillName: string; reviewId: string; isCompleted: boolean }) {
-  const { setSkillAction, setSkillComment } = useReviewStore();
-  const { levels } = useCompetencyLevelStore();
-  const ratingLabels = getRatingLabels(levels);
-  const [commentOpen, setCommentOpen] = useState(false);
-  const [adjustLevel, setAdjustLevel] = useState<number>(entry.ai_calculated_level);
-  const [adjustOpen, setAdjustOpen] = useState(false);
-
-  const handleAction = (action: ReviewAction) => {
-    if (action === 'adjust') { setAdjustOpen(true); } else {
-      setSkillAction(reviewId, entry.skill_id, action);
-      toast.success(`${skillName}: ${action === 'approve' ? 'AI rating approved' : 'Marked for reassessment'}`);
-    }
-  };
-  const confirmAdjust = () => { setSkillAction(reviewId, entry.skill_id, 'adjust', adjustLevel); setAdjustOpen(false); toast.success(`${skillName}: Level adjusted to L${adjustLevel}`); };
-  const saveComment = (comment: string) => { setSkillComment(reviewId, entry.skill_id, comment); setCommentOpen(false); toast.success('Comment saved'); };
-
-  return (
-    <>
-      <tr className="border-b border-border hover:bg-muted/30 transition-colors">
-        <td className="py-3 px-4"><span className="text-sm font-medium text-foreground">{skillName}</span></td>
-         <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating] ?? `Level ${entry.self_rating}`}</Badge></td>
-        <td className="py-3 px-4">
-          <div className="flex flex-col items-center gap-1">
-            <Badge className={`text-xs ${getLevelColorClass(entry.ai_calculated_level)}`}>L{entry.ai_calculated_level}</Badge>
-            <ScoreBar score={entry.ai_score} />
-          </div>
-        </td>
-        <td className="py-3 px-4 text-center">
-          {entry.manager_action ? (
-            <div className="flex flex-col items-center gap-1">
-              <Badge className={`text-xs gap-1 ${actionLabels[entry.manager_action].color}`}>{actionLabels[entry.manager_action].icon}{actionLabels[entry.manager_action].label}</Badge>
-              {entry.manager_action === 'adjust' && entry.manager_adjusted_level && <span className="text-xs text-muted-foreground">→ L{entry.manager_adjusted_level}</span>}
-            </div>
-          ) : <span className="text-xs text-muted-foreground">—</span>}
-        </td>
-        <td className="py-3 px-4">
-          {!isCompleted && (
-            <div className="flex items-center gap-1 justify-end">
-              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => handleAction('approve')}><CheckCircle size={12} /> Approve</Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-warning hover:text-warning" onClick={() => handleAction('adjust')}><RefreshCw size={12} /> Adjust</Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => handleAction('reassess')}><XCircle size={12} /> Reassess</Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setCommentOpen(true)}><MessageSquare size={12} /></Button>
-            </div>
-          )}
-          {isCompleted && entry.manager_comment && <p className="text-xs text-muted-foreground italic">"{entry.manager_comment}"</p>}
-        </td>
-      </tr>
-
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Adjust Level — {skillName}</DialogTitle><DialogDescription>AI calculated Level {entry.ai_calculated_level}. Select the corrected level.</DialogDescription></DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label className="text-xs text-muted-foreground">New Level</Label>
-            <Select value={String(adjustLevel)} onValueChange={(v) => setAdjustLevel(Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{[1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={String(l)}>{getFormattedLevelLabel(levels, l)}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setAdjustOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={confirmAdjust}>Confirm</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={commentOpen} onOpenChange={setCommentOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Comment — {skillName}</DialogTitle><DialogDescription>Add your review notes for this skill.</DialogDescription></DialogHeader>
-          <CommentInput initial={entry.manager_comment} onSave={saveComment} onCancel={() => setCommentOpen(false)} />
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 
@@ -136,18 +53,95 @@ function CommentInput({ initial, onSave, onCancel }: { initial: string; onSave: 
   );
 }
 
+function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: SkillReviewEntry; skillName: string; reviewId: string; isCompleted: boolean }) {
+  const { setVerifiedLevel, setSkillComment } = useReviewStore();
+  const { levels } = useCompetencyLevelStore();
+  const ratingLabels = getRatingLabels(levels);
+  const [commentOpen, setCommentOpen] = useState(false);
+
+  const isAdjusted = entry.verified_level !== entry.ai_calculated_level;
+
+  const handleLevelChange = (val: string) => {
+    const level = Number(val);
+    setVerifiedLevel(reviewId, entry.skill_id, level);
+    if (level !== entry.ai_calculated_level) {
+      toast.success(`${skillName}: Level adjusted to L${level}`);
+    }
+  };
+
+  const saveComment = (comment: string) => {
+    setSkillComment(reviewId, entry.skill_id, comment);
+    setCommentOpen(false);
+    toast.success('Comment saved');
+  };
+
+  return (
+    <>
+      <tr className="border-b border-border hover:bg-muted/30 transition-colors">
+        <td className="py-3 px-4"><span className="text-sm font-medium text-foreground">{skillName}</span></td>
+        <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating] ?? `Level ${entry.self_rating}`}</Badge></td>
+        <td className="py-3 px-4">
+          <div className="flex flex-col items-center gap-1">
+            <Badge className={`text-xs ${getLevelColorClass(entry.ai_calculated_level)}`}>L{entry.ai_calculated_level}</Badge>
+            <ScoreBar score={entry.ai_score} />
+          </div>
+        </td>
+        <td className="py-3 px-4 text-center">
+          {isCompleted ? (
+            <div className="flex flex-col items-center gap-1">
+              <Badge className={`text-xs ${getLevelColorClass(entry.verified_level)}`}>L{entry.verified_level}</Badge>
+              {isAdjusted && <span className="text-[10px] text-muted-foreground">adjusted</span>}
+            </div>
+          ) : (
+            <Select value={String(entry.verified_level)} onValueChange={handleLevelChange}>
+              <SelectTrigger className="h-8 w-[140px] mx-auto text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5].map((l) => (
+                  <SelectItem key={l} value={String(l)} className="text-xs">{getFormattedLevelLabel(levels, l)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </td>
+        <td className="py-3 px-4">
+          {!isCompleted ? (
+            <div className="flex items-center gap-1 justify-end">
+              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setCommentOpen(true)}>
+                <MessageSquare size={12} /> {entry.manager_comment ? 'Edit Comment' : 'Add Comment'}
+              </Button>
+            </div>
+          ) : entry.manager_comment ? (
+            <p className="text-xs text-muted-foreground italic text-right">"{entry.manager_comment}"</p>
+          ) : (
+            <span className="text-xs text-muted-foreground flex justify-end">—</span>
+          )}
+        </td>
+      </tr>
+
+      <Dialog open={commentOpen} onOpenChange={setCommentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Comment — {skillName}</DialogTitle><DialogDescription>Add your review notes for this skill.</DialogDescription></DialogHeader>
+          <CommentInput initial={entry.manager_comment} onSave={saveComment} onCancel={() => setCommentOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ReviewCard({ review }: { review: ManagerReview }) {
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
-  const { completeReview, reassignReviewer } = useReviewStore();
-  const { currentRole, user } = useAuth();
+  const { verifyReview, reassignReviewer } = useReviewStore();
+  const { currentRole } = useAuth();
   const currentCycle = useRegistryStore.getState().currentCycle || '';
   const { getAttemptForAssessment } = useAttemptStore();
   const { assessments } = useAssessmentStore();
 
   const [expanded, setExpanded] = useState(review.status !== 'completed');
   const [overallComment, setOverallComment] = useState(review.overall_comment);
-  const [confirmFinalize, setConfirmFinalize] = useState(false);
+  const [confirmVerify, setConfirmVerify] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [tenantUsers, setTenantUsers] = useState<{ value: string; label: string }[]>([]);
@@ -160,11 +154,8 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   const assessment = assessments.find((a) => a.id === review.assessment_id);
 
   const isCompleted = review.status === 'completed';
-  const allActioned = review.skill_reviews.every((sr) => sr.manager_action !== null);
-  const hasReassess = review.skill_reviews.some((sr) => sr.manager_action === 'reassess');
   const isAdmin = currentRole === 'admin';
 
-  // Fetch reviewer name
   useEffect(() => {
     const loadReviewerName = async () => {
       const { data } = await supabase.from('users').select('full_name').eq('id', review.reviewer_id).single();
@@ -195,18 +186,18 @@ function ReviewCard({ review }: { review: ManagerReview }) {
     toast.success(`Reviewer reassigned to ${newName}`);
   };
 
-  const handleFinalize = () => {
+  const handleVerify = () => {
     const { setOverallComment: setComment } = useReviewStore.getState();
     setComment(review.id, overallComment);
-    completeReview(review.id, currentCycle);
-    setConfirmFinalize(false);
-    toast.success('Review completed. Official skill registry entries generated.');
+    verifyReview(review.id, currentCycle);
+    setConfirmVerify(false);
+    toast.success('Review verified. Official skill registry entries generated.');
   };
 
   const statusBadge = {
     pending: <Badge className="bg-warning/15 text-warning border-warning/20 text-xs gap-1"><Bell size={10} /> Pending Review</Badge>,
     in_progress: <Badge className="bg-info/15 text-info border-info/20 text-xs gap-1"><Eye size={10} /> In Progress</Badge>,
-    completed: <Badge className="bg-success/15 text-success border-success/20 text-xs gap-1"><Shield size={10} /> Completed</Badge>,
+    completed: <Badge className="bg-success/15 text-success border-success/20 text-xs gap-1"><Shield size={10} /> Verified</Badge>,
   };
 
   return (
@@ -221,7 +212,7 @@ function ReviewCard({ review }: { review: ManagerReview }) {
             <p className="text-xs text-muted-foreground">
               Reviewer: {reviewerName ?? '...'}{review.reviewer_id === review.employee_id && ' (Self-Review)'}
               {' · '}Submitted: {attempt?.submitted_at ? new Date(attempt.submitted_at).toLocaleString() : 'N/A'}
-              {review.completed_at && ` · Reviewed: ${new Date(review.completed_at).toLocaleString()}`}
+              {review.completed_at && ` · Verified: ${new Date(review.completed_at).toLocaleString()}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -244,8 +235,8 @@ function ReviewCard({ review }: { review: ManagerReview }) {
                     <th className="py-2.5 px-4 text-left font-medium">Skill</th>
                     <th className="py-2.5 px-4 text-center font-medium">Self Rating</th>
                     <th className="py-2.5 px-4 text-center font-medium">AI Assessment</th>
-                    <th className="py-2.5 px-4 text-center font-medium">Manager Decision</th>
-                    <th className="py-2.5 px-4 text-right font-medium">Actions</th>
+                    <th className="py-2.5 px-4 text-center font-medium">Verified Level</th>
+                    <th className="py-2.5 px-4 text-right font-medium">Comment</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -291,15 +282,9 @@ function ReviewCard({ review }: { review: ManagerReview }) {
                   <Label className="text-xs text-muted-foreground mb-1.5 block">Overall Comment</Label>
                   <Textarea value={overallComment} onChange={(e) => setOverallComment(e.target.value)} rows={3} placeholder="Add overall review notes..." className="text-sm" />
                 </div>
-                {hasReassess && (
-                  <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                    <AlertTriangle size={14} /> Skills marked for reassessment will not generate official registry entries.
-                  </div>
-                )}
                 <div className="flex justify-end">
-                  <Button size="sm" disabled={!allActioned} onClick={() => setConfirmFinalize(true)} className="gap-1.5"><Send size={14} /> Finalize Review</Button>
+                  <Button size="sm" onClick={() => setConfirmVerify(true)} className="gap-1.5"><ShieldCheck size={14} /> Mark Verified</Button>
                 </div>
-                {!allActioned && <p className="text-xs text-muted-foreground text-right">Action required on all skills before finalizing.</p>}
               </div>
             )}
 
@@ -311,22 +296,22 @@ function ReviewCard({ review }: { review: ManagerReview }) {
 
             {isCompleted && (
               <div className="px-5 py-3 border-t border-border bg-success/5">
-                <p className="text-xs text-success font-medium">✓ Review finalized · Official registry entries generated · Completed {review.completed_at ? new Date(review.completed_at).toLocaleDateString() : ''}</p>
+                <p className="text-xs text-success font-medium">✓ Review verified · Official registry entries generated · {review.completed_at ? new Date(review.completed_at).toLocaleDateString() : ''}</p>
               </div>
             )}
           </div>
         )}
       </div>
 
-      <AlertDialog open={confirmFinalize} onOpenChange={setConfirmFinalize}>
+      <AlertDialog open={confirmVerify} onOpenChange={setConfirmVerify}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Finalize Review?</AlertDialogTitle>
-            <AlertDialogDescription>This will generate official skill registry entries for {review.employee_name}. Approved and adjusted skills will be recorded. This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Mark Review as Verified?</AlertDialogTitle>
+            <AlertDialogDescription>This will record the verified levels for {review.employee_name} as official skill registry entries. The verified score becomes the final score for each skill. This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleFinalize}>Confirm & Finalize</AlertDialogAction>
+            <AlertDialogAction onClick={handleVerify}>Confirm & Verify</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -356,37 +341,6 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   );
 }
 
-function NotificationPanel() {
-  const { notifications, markNotificationRead } = useReviewStore();
-  const { currentRole } = useAuth();
-  const [open, setOpen] = useState(false);
-  const roleNotifications = notifications.filter((n) => n.target_role === currentRole);
-  const unread = roleNotifications.filter((n) => !n.read);
-  if (roleNotifications.length === 0) return null;
-
-  return (
-    <div className="relative">
-      <Button variant="outline" size="sm" onClick={() => setOpen(!open)} className="gap-1.5 relative">
-        <Bell size={14} /> Notifications
-        {unread.length > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-4 w-4 text-[10px] flex items-center justify-center">{unread.length}</span>}
-      </Button>
-      {open && (
-        <div className="absolute right-0 top-10 z-50 w-80 rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
-          <div className="px-3 py-2 border-b border-border"><span className="text-xs font-medium text-popover-foreground">Notifications</span></div>
-          <div className="max-h-60 overflow-y-auto">
-            {roleNotifications.length === 0 ? <p className="text-xs text-muted-foreground p-3">No notifications.</p> : roleNotifications.map((n) => (
-              <div key={n.id} className={`px-3 py-2.5 border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 ${!n.read ? 'bg-primary/5' : ''}`} onClick={() => markNotificationRead(n.id)}>
-                <p className="text-xs text-popover-foreground">{n.message}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ReviewsPage() {
   const { reviews, fetchReviews } = useReviewStore();
   const { currentRole, user } = useAuth();
@@ -402,7 +356,6 @@ export default function ReviewsPage() {
 
   const isManager = currentRole === 'manager' || currentRole === 'admin';
 
-  // Filter reviews: managers see only their domain's reviews, admins see all
   const filteredReviews = useMemo(() => {
     if (currentRole === 'admin') return reviews;
     if (currentRole === 'manager') {
@@ -417,7 +370,7 @@ export default function ReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Review AI-evaluated assessment results, adjust skill levels, and generate official registry entries.</p>
+        <p className="text-sm text-muted-foreground">Review AI-evaluated assessment results, adjust skill levels, and mark reviews as verified to record official registry entries.</p>
       </div>
 
       {!isManager && (
@@ -445,7 +398,7 @@ export default function ReviewsPage() {
 
       {isManager && completedReviews.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><CheckCircle size={14} className="text-success" /> Completed Reviews ({completedReviews.length})</h2>
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><CheckCircle size={14} className="text-success" /> Verified Reviews ({completedReviews.length})</h2>
           {completedReviews.map((r) => <ReviewCard key={r.id} review={r} />)}
         </div>
       )}
