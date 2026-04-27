@@ -27,12 +27,9 @@ export function deriveStatus(
   assessments: { submission_id: string; id: string }[],
   attempts: { assessment_id: string; id: string; status: string }[],
   reviews: { attempt_id: string; id: string; status: string }[],
-  isCycleClosed?: boolean,
 ): EmployeeStatus {
   if (!submission) return 'not_started';
-  if (submission.status === 'draft') {
-    return isCycleClosed ? 'incomplete' : 'in_progress';
-  }
+  if (submission.status === 'draft') return 'in_progress';
   const assessment = assessments.find((a) => a.submission_id === submission.id);
   if (!assessment) return 'submitted';
   const attempt = attempts.find((a) => a.assessment_id === assessment.id);
@@ -51,7 +48,7 @@ export const statusConfig: Record<EmployeeStatus, { label: string; color: string
   assessment_completed: { label: 'Assessment Completed', color: 'bg-success/15 text-success border-success/20', cta: 'View Assessment Results' },
   review_pending: { label: 'Manager Review Pending', color: 'bg-warning/15 text-warning border-warning/20', cta: 'Waiting for Review', ctaDisabled: true },
   approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20', cta: 'View Final Results' },
-  incomplete: { label: 'Incomplete — Cycle Closed', color: 'bg-destructive/15 text-destructive border-destructive/20', cta: 'View Draft' },
+  incomplete: { label: 'Incomplete', color: 'bg-destructive/15 text-destructive border-destructive/20', cta: 'View Draft' },
 };
 
 export const statusLabel = (status: EmployeeStatus) => statusConfig[status].label;
