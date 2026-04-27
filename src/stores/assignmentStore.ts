@@ -427,7 +427,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
           ? {
               ...a,
               status,
-              attempt_count: updates.attempt_count ?? a.attempt_count,
+              attempt_count: updates.attempt_count,
             }
           : a,
       ),
