@@ -81,6 +81,7 @@ export interface AssessmentAttempt {
   evaluated_at?: string;
   paused_at?: string | null;
   remaining_seconds?: number | null;
+  evaluation_error?: string | null;
 }
 
 interface AttemptStore {
@@ -148,6 +149,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         total_ai_score: a.total_ai_score, status: a.status,
         started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
         paused_at: a.paused_at ?? null, remaining_seconds: a.remaining_seconds ?? null,
+        evaluation_error: a.evaluation_error ?? null,
       }));
 
       set({ attempts, loading: false, initialized: true });
@@ -189,6 +191,10 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   },
 
   saveAnswer: async (attemptId, answer) => {
+    // Lock answers once submitted/evaluated/reviewed
+    const current = get().attempts.find((a) => a.id === attemptId);
+    if (current && current.status !== 'in_progress') return;
+
     const userId = getCurrentUserId();
     await supabase.from('attempt_answers').delete()
       .eq('attempt_id', attemptId).eq('question_id', answer.question_id);
@@ -243,12 +249,13 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
 
     await supabase.from('assessment_attempts').update({
       status: 'submitted', submitted_at: now, paused_at: null,
+      evaluation_error: null,
       modified_by: userId, modified_at: now,
     }).eq('id', attemptId);
 
     set((state) => ({
       attempts: state.attempts.map((a) =>
-        a.id === attemptId ? { ...a, status: 'submitted' as const, submitted_at: now, paused_at: null } : a
+        a.id === attemptId ? { ...a, status: 'submitted' as const, submitted_at: now, paused_at: null, evaluation_error: null } : a
       ),
     }));
     import('./assignmentStore').then(({ syncAssignmentForAttempt }) =>
@@ -333,6 +340,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       await Promise.all([
         supabase.from('assessment_attempts').update({
           status: 'evaluated', total_ai_score: totalScore, evaluated_at: evalNow,
+          evaluation_error: null,
           modified_by: userId, modified_at: evalNow,
         }).eq('id', attemptId),
 
@@ -363,7 +371,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
           return {
             ...a, ai_evaluations: evaluations, skill_scores: skillScores,
             total_ai_score: totalScore, status: 'evaluated' as const,
-            submitted_at: now, evaluated_at: evalNow,
+            submitted_at: now, evaluated_at: evalNow, evaluation_error: null,
           };
         }),
       }));
@@ -371,7 +379,24 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         syncAssignmentForAttempt(attempt.assessment_id, 'evaluated').catch(() => {}),
       );
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI evaluation failed. Please retry.';
       console.error('AI evaluation failed:', err);
+      // Persist the error reason on the attempt so the UI can surface it.
+      try {
+        await supabase.from('assessment_attempts').update({
+          evaluation_error: message,
+          modified_by: userId, modified_at: new Date().toISOString(),
+        }).eq('id', attemptId);
+      } catch (persistErr) {
+        console.error('Failed to persist evaluation_error:', persistErr);
+      }
+      set((state) => ({
+        attempts: state.attempts.map((a) =>
+          a.id === attemptId ? { ...a, evaluation_error: message } : a
+        ),
+      }));
+      // Re-throw so callers can toast the user.
+      throw err instanceof Error ? err : new Error(message);
     }
   },
 
@@ -381,12 +406,13 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
 
     const userId = getCurrentUserId();
     await supabase.from('assessment_attempts').update({
-      status: 'in_progress', modified_by: userId, modified_at: new Date().toISOString(),
+      status: 'in_progress', evaluation_error: null,
+      modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', attemptId);
 
     set((state) => ({
       attempts: state.attempts.map((a) =>
-        a.id === attemptId ? { ...a, status: 'in_progress' as const } : a
+        a.id === attemptId ? { ...a, status: 'in_progress' as const, evaluation_error: null } : a
       ),
     }));
 

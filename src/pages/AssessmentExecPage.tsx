@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/dialog';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useRegistryStore } from '@/stores/registryStore';
+import { canStartNewAttempt } from '@/stores/assignmentStore';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   Clock, ChevronLeft, ChevronRight, Send, Play, BarChart3, Pause,
@@ -183,6 +185,12 @@ export default function AssessmentExecPage() {
       toast.info('This assessment has already been submitted.');
       return;
     }
+    // Block when template assignment cap reached.
+    const gate = canStartNewAttempt(assessment.id);
+    if (!gate.allowed) {
+      toast.error(gate.reason ?? 'You cannot start a new attempt for this assessment.');
+      return;
+    }
     await startAttempt(assessment.id, tenantId, employeeId);
     await updateAssessmentStatus(assessment.id, 'in_progress');
 
@@ -275,10 +283,18 @@ export default function AssessmentExecPage() {
       const q = questionMap.get(aq.question_id);
       if (q) qMap.set(aq.question_id, q);
     }
-    await submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
+
+    let evalFailed = false;
+    let evalErrorMsg = '';
+    try {
+      await submitAttempt(attempt.id, qMap as Map<string, any>, activeAssessment.assessment_questions);
+    } catch (err) {
+      evalFailed = true;
+      evalErrorMsg = err instanceof Error ? err.message : 'AI evaluation failed.';
+    }
     await updateAssessmentStatus(activeAssessment.id, 'completed');
 
-    // Auto-create manager review
+    // Auto-create manager review (only when evaluation produced skill scores)
     const updatedAttempt = useAttemptStore.getState().getAttemptForAssessment(activeAssessment.id);
     if (updatedAttempt && updatedAttempt.skill_scores.length > 0) {
       const { submissions } = useRegistryStore.getState();
@@ -312,7 +328,11 @@ export default function AssessmentExecPage() {
     setConfirmSubmitOpen(false);
     setActiveAssessment(null);
     setIsSubmitting(false);
-    toast.success('Assessment submitted! AI evaluation in progress.');
+    if (evalFailed) {
+      toast.error(`Submitted, but evaluation failed: ${evalErrorMsg}. You can retry from the assessment list.`);
+    } else {
+      toast.success('Assessment submitted! AI evaluation complete.');
+    }
   };
 
   const handleTimeUp = useCallback(() => {
@@ -373,12 +393,31 @@ export default function AssessmentExecPage() {
                         <>
                           <Button size="sm" variant="outline" onClick={async () => {
                             const qMap = new Map<string, Question>(assessment.assessment_questions.map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question]).filter(([, q]) => q != null));
-                            await retryEvaluation(attempt!.id, qMap as Map<string, any>, assessment.assessment_questions);
-                            toast.info('Retrying AI evaluation...');
+                            try {
+                              toast.info('Retrying AI evaluation...');
+                              await retryEvaluation(attempt!.id, qMap as Map<string, any>, assessment.assessment_questions);
+                              toast.success('AI evaluation completed.');
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Retry failed.');
+                            }
                           }} className="gap-1.5">
                             <RotateCcw size={14} /> Retry Evaluation
                           </Button>
-                          <Badge className="bg-warning/15 text-warning border-warning/20 gap-1 text-xs"><Loader2 size={12} className="animate-spin" /> Pending Evaluation</Badge>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-warning/15 text-warning border-warning/20 gap-1 text-xs cursor-help">
+                                  <Loader2 size={12} className="animate-spin" /> Pending Evaluation
+                                </Badge>
+                              </TooltipTrigger>
+                              {attempt?.evaluation_error && (
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-xs font-medium mb-1">Last error:</p>
+                                  <p className="text-xs">{attempt.evaluation_error}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                         </>
                       ) : (
                         <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5">

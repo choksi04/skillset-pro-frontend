@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -334,9 +335,21 @@ export default function AssessmentDetailPage() {
         )}
         {isPendingEval && isOwner && (
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs text-warning border-warning/20 gap-1">
-              <Loader2 size={12} className="animate-spin" /> Pending Evaluation
-            </Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-xs text-warning border-warning/20 gap-1 cursor-help">
+                    <Loader2 size={12} className="animate-spin" /> Pending Evaluation
+                  </Badge>
+                </TooltipTrigger>
+                {attempt?.evaluation_error && (
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs font-medium mb-1">Last error:</p>
+                    <p className="text-xs">{attempt.evaluation_error}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             <Button
               size="sm"
               variant="outline"
@@ -347,8 +360,13 @@ export default function AssessmentDetailPage() {
                     .map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question])
                     .filter(([, q]) => q != null),
                 );
-                await retryEvaluation(attempt.id, qMap as Map<string, any>, assessment.assessment_questions);
-                toast.info("Retrying AI evaluation...");
+                try {
+                  toast.info("Retrying AI evaluation...");
+                  await retryEvaluation(attempt.id, qMap as Map<string, any>, assessment.assessment_questions);
+                  toast.success("AI evaluation completed.");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Retry failed.");
+                }
               }}
               className="gap-1.5"
             >

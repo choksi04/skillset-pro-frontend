@@ -136,6 +136,7 @@ export type Database = {
           deleted_on: string | null
           employee_id: string
           evaluated_at: string | null
+          evaluation_error: string | null
           id: string
           modified_at: string | null
           modified_by: string | null
@@ -155,6 +156,7 @@ export type Database = {
           deleted_on?: string | null
           employee_id: string
           evaluated_at?: string | null
+          evaluation_error?: string | null
           id?: string
           modified_at?: string | null
           modified_by?: string | null
@@ -174,6 +176,7 @@ export type Database = {
           deleted_on?: string | null
           employee_id?: string
           evaluated_at?: string | null
+          evaluation_error?: string | null
           id?: string
           modified_at?: string | null
           modified_by?: string | null
