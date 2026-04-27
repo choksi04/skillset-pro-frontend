@@ -25,6 +25,11 @@ const ALL_QUESTION_TYPES = [
   { value: 'coding', label: 'Coding' },
 ];
 
+// Adaptive engine grades correctness deterministically — only MCQ is supported.
+const ADAPTIVE_QUESTION_TYPES = new Set(['mcq']);
+const ADAPTIVE_QPS_MIN = 4;
+const ADAPTIVE_QPS_MAX = 5;
+
 export default function AssessmentTemplateEditPage() {
   const { templateId } = useParams<{ templateId: string }>();
   const isNew = !templateId || templateId === 'new';
@@ -119,9 +124,12 @@ export default function AssessmentTemplateEditPage() {
   if (type === 'adaptive') {
     if (!domainId) errors.push('Domain is required for adaptive templates');
     if (questionTypes.length === 0) errors.push('Select at least one question type');
+    if (questionTypes.some((qt) => !ADAPTIVE_QUESTION_TYPES.has(qt)))
+      errors.push('Adaptive templates currently support MCQ questions only');
     if (skillMode === 'custom' && pickedSkills.length === 0) errors.push('Pick at least one skill (custom mode)');
     if (skillsPerAssessment < 1) errors.push('Skills per assessment must be ≥ 1');
-    if (questionsPerSkill < 1) errors.push('Questions per skill must be ≥ 1');
+    if (questionsPerSkill < ADAPTIVE_QPS_MIN || questionsPerSkill > ADAPTIVE_QPS_MAX)
+      errors.push(`Questions per skill must be between ${ADAPTIVE_QPS_MIN} and ${ADAPTIVE_QPS_MAX}`);
   } else {
     if (pickedQuestions.length === 0) errors.push('Add at least one question');
   }
@@ -248,7 +256,13 @@ export default function AssessmentTemplateEditPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setType('adaptive')}
+                  onClick={() => {
+                    setType('adaptive');
+                    setQuestionTypes(['mcq']);
+                    setQuestionsPerSkill((prev) =>
+                      Math.min(ADAPTIVE_QPS_MAX, Math.max(ADAPTIVE_QPS_MIN, prev || ADAPTIVE_QPS_MIN)),
+                    );
+                  }}
                   className={`rounded-lg border p-3 text-left transition-colors ${
                     type === 'adaptive' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                   }`}
@@ -258,7 +272,7 @@ export default function AssessmentTemplateEditPage() {
                     <span className="text-sm font-medium text-foreground">Adaptive</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Pulls questions automatically from a domain based on the employee's self-rated skill levels.
+                    Picks MCQs on the fly: starts at the self-rated level and walks up/down based on a 2-correct / 2-wrong streak.
                   </p>
                 </button>
                 <button
@@ -313,20 +327,48 @@ export default function AssessmentTemplateEditPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Questions per Skill</Label>
-                    <Input type="number" min={1} max={20} value={questionsPerSkill} onChange={(e) => setQuestionsPerSkill(Number(e.target.value) || 1)} />
+                    <Input
+                      type="number"
+                      min={ADAPTIVE_QPS_MIN}
+                      max={ADAPTIVE_QPS_MAX}
+                      value={questionsPerSkill}
+                      onChange={(e) =>
+                        setQuestionsPerSkill(
+                          Math.min(
+                            ADAPTIVE_QPS_MAX,
+                            Math.max(ADAPTIVE_QPS_MIN, Number(e.target.value) || ADAPTIVE_QPS_MIN),
+                          ),
+                        )
+                      }
+                    />
+                    <p className="text-[11px] text-muted-foreground">Adaptive engine asks {ADAPTIVE_QPS_MIN}–{ADAPTIVE_QPS_MAX} questions per skill.</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-xs">Question Types</Label>
                   <div className="flex flex-wrap gap-2">
-                    {ALL_QUESTION_TYPES.map((qt) => (
-                      <label key={qt.value} className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 cursor-pointer hover:border-primary/30">
-                        <Checkbox checked={questionTypes.includes(qt.value)} onCheckedChange={() => toggleQuestionType(qt.value)} />
-                        <span className="text-xs text-foreground">{qt.label}</span>
-                      </label>
-                    ))}
+                    {ALL_QUESTION_TYPES.map((qt) => {
+                      const isAllowed = ADAPTIVE_QUESTION_TYPES.has(qt.value);
+                      return (
+                        <label
+                          key={qt.value}
+                          title={isAllowed ? '' : 'Adaptive currently supports MCQ only'}
+                          className={`flex items-center gap-2 rounded-md border px-3 py-1.5 ${
+                            isAllowed ? 'border-border cursor-pointer hover:border-primary/30' : 'border-border opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={questionTypes.includes(qt.value)}
+                            onCheckedChange={() => isAllowed && toggleQuestionType(qt.value)}
+                            disabled={!isAllowed}
+                          />
+                          <span className="text-xs text-foreground">{qt.label}</span>
+                        </label>
+                      );
+                    })}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">Adaptive grading needs a deterministic correct answer, so only MCQ is supported.</p>
                 </div>
 
                 {skillMode === 'custom' && domainId && (

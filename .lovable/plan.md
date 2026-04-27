@@ -1,158 +1,99 @@
-# Assessment Templates: UI Cleanup + Assignment Engine
+## Adaptive Assessment Engine
 
-## Part 1 — Template form cleanup
+Today, "adaptive" templates pre-generate a fixed list of questions up front (round-robin by skill), then the employee answers them all. We will replace this for **adaptive templates only** with a true adaptive engine that picks the next question after each answer, walks levels up/down based on a streak, and computes the final skill level from the in-session evidence.
 
-`**src/pages/AssessmentTemplateEditPage.tsx**`
-
-- Remove the "Allow re-attempts" `Switch` block and `reattemptEnabled` state.
-- Derive re-attempt behavior from `max_attempts > 1` (no UI toggle).
-- Update the "Max Attempts" helper text: "Set to 1 for single attempt, or higher to allow re-attempts."
-
-`**src/stores/templateStore.ts**`
-
-- Drop `reattempt_enabled` from `AssessmentTemplate`, `SaveTemplateInput`, and the save payload.
-- When reading, ignore the column (still in DB but unused).
-
-We'll keep the column in the DB (harmless, no migration needed) so we don't disturb existing rows.
+Fixed templates remain unchanged.
 
 ---
 
-## Part 2 — Assignment Engine
+### Engine Behavior (per attempt)
 
-### 2.1 Database (new migration)
+1. **Skill selection** — pick N skills (round-robin) from the template's domain, scoped by `skill_selection_mode` (`top_n` from registry ratings, or `custom` from `assessment_template_skills`). N = `template.skills_per_assessment`.
+2. **Initial level per skill** — start at the employee's self-rated level for that skill if available, else **L3**.
+3. **Question loop** — for each skill, pick one published MCQ at the current level (correctness from `correctIndex` in MCQ JSON). Track per-skill `correctStreak` / `wrongStreak`.
+4. **Level movement**:
+   - 2 consecutive correct → level up (cap at L5)
+   - 2 consecutive wrong → level down (floor at L1)
+   - Streak resets when level changes or pattern breaks.
+5. **Stop conditions** (per skill):
+   - Reached `template.questions_per_skill` (clamped 4–5), OR
+   - No more questions available at the current level and no fallback available.
+6. **Final level (per skill)** — highest level at which the candidate answered ≥ 2 questions correctly. If none qualify, use `max(1, lastAttemptedLevel - 1)`.
+7. **Edge cases / fallback** — if no question exists at the target level, try level − 1, then level + 1, then nearest available; mark that question as "fallback" so it doesn't aggressively shift the streak.
 
-New table `assessment_assignments`:
-
-
-| column          | type                                               | notes                                                                          |
-| --------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `id`            | uuid PK                                            | `gen_random_uuid()`                                                            |
-| `tenant_id`     | text                                               | default `'tenant-001'`                                                         |
-| `template_id`   | uuid                                               | FK target template                                                             |
-| `employee_id`   | text                                               | the assignee                                                                   |
-| `domain_id`     | text NULL                                          | populated when assignment originated from a domain bulk-assign (audit only)    |
-| `status`        | text                                               | `new` | `in_progress` | `submitted` | `evaluated` | `verified` (default `new`) |
-| `attempt_count` | int                                                | default `0`                                                                    |
-| `max_attempts`  | int                                                | snapshotted from template at assign time                                       |
-| `assigned_at`   | timestamptz                                        | `now()`                                                                        |
-| `assessment_id` | uuid NULL                                          | the auto-generated assessment row                                              |
-| `assigned_by`   | text NULL                                          | user id                                                                        |
-| audit cols      | created_at / modified_at / deleted_on / deleted_by | standard pattern                                                               |
-
-
-Index: `(employee_id, template_id) WHERE deleted_on IS NULL` for duplicate detection.
-
-RLS: `Allow all for assessment_assignments` (consistent with project's current MVP RLS policy — see memory `architecture/security/rls-policy`).
-
-### 2.2 Store — `src/stores/assignmentStore.ts` (new)
-
-```
-fetchAssignments()
-getAssignmentsForEmployee(employeeId)
-getAssignmentsForTemplate(templateId)
-createAssignments({ template_id, employee_ids[], domain_id? })
-  → for each employee:
-    1. Skip if active assignment (status in [new, in_progress]) already exists for same template+employee → return as "skipped"
-    2. Insert assessment_assignments row
-    3. Generate the underlying assessment via existing assessmentStore.addAssessment (adaptive) OR fixed-template path (see 2.3)
-    4. Update assignment.assessment_id
-    5. Insert notification (target_role: 'employee', target_user_id: employee_id, type: 'assessment_assigned', action_link: `/assessments/{assessmentId}`)
-  → returns { created, skipped, failed } summary
-deleteAssignment(id) – soft delete
-```
-
-### 2.3 Assessment generation from template
-
-Extend `assessmentStore.addAssessment` flow with a thin helper `generateFromTemplate(template, employee_id)`:
-
-- **Adaptive**: load employee's latest submitted registry for `template.domain_id`; pull self-ratings; call existing `generateAssessmentQuestions` honoring `template.skills_per_assessment`, `questions_per_skill`, `question_types`, and `skill_selection_mode` (top_n vs custom skill list).
-- **Fixed**: insert assessment + insert `assessment_questions` straight from `assessment_template_questions` (target_level looked up from the question itself).
-
-If the employee has no submitted registry for an adaptive template's domain, return a "registry_missing" failure for that employee (surfaced in the summary).
-
-### 2.4 Notification
-
-Reuse existing `notifications` table. Add a new `type` value `'assessment_assigned'`. Insert one row per successful assignment. `NotificationDropdown` already renders any row matching `target_user_id = me`, so it will surface automatically.
-
-### 2.5 Status transitions
-
-`assessment_assignments.status` is derived/updated as:
-
-- `new` → on creation
-- `in_progress` → when first attempt starts (hook in `attemptStore.startAttempt`)
-- `submitted` → when attempt is submitted
-- `evaluated` → when AI evaluation completes
-- `verified` → when manager review completes
-
-We update this in the same places that already update the underlying `assessments.status`/attempt status, looking up the assignment by `assessment_id`.
-
-### 2.6 UI — Assign Template dialog
-
-`**src/components/templates/AssignTemplateDialog.tsx**` (new)
-
-Triggered from:
-
-- `AssessmentTemplatesPage` → new "Assign" button on each active template card
-- `TeamAssessmentsPage` → header CTA "Assign from Template" (opens dialog with template picker first)
-
-Dialog contents:
-
-- Template summary header (name, type, duration, domain).
-- Mode tabs: **By Domain** | **Specific Users**
-  - **By Domain**: domain Select (defaults to template.domain_id for adaptive). Shows preview list of users in that domain with checkboxes (pre-checked, can deselect). 
-  - **Specific Users**: searchable multi-select of users (filtered to manager's domain when role=manager).
-- Validation banners:
-  - If template not active → block with "Template must be activated before assigning."
-  - For each selected employee already having an active assignment for this template → show inline warning row "Already assigned · last assigned {date}" with checkbox unchecked by default (admin can override).
-- Footer summary: "X new assignments will be created. Y skipped (duplicates)."
-- Confirm → calls `assignmentStore.createAssignments`, toasts result, closes.
-
-### 2.7 Listing — Assignments panel
-
-`**src/pages/AssessmentTemplatesPage.tsx**`
-
-- Add an "Assignments" count badge on each card (`{n} active`).
-- Add an "Assignments" link on each card → opens a side `Sheet` listing assignments for that template with: employee name, status badge, attempt_count/max_attempts, assigned_at, link to the underlying assessment, and a "Revoke" action (soft delete) when status is not `submitted, evaluated, verified`.
-
-### 2.8 Sidebar / nav
-
-No new top-level entry needed. Assignment is reached through:
-
-- Template card → Assign / View Assignments
-- Team Assessments page → Assign CTA
-
-This keeps the nav unchanged (per project knowledge: "avoid duplicate pages").
+Final skill scores are stored using the existing `attempt_skill_scores` table. `avg_score` is derived from per-question correctness (correct = 100, wrong = 0) so existing dashboards keep working; `calculated_level` holds the adaptive final level; `target_level` holds the starting level.
 
 ---
 
-## Files changed
+### What changes
 
+**Template editor (no schema change)** — for adaptive templates, restrict question types to **MCQ only** (the engine needs a deterministic correct answer). Keep the type chip but disable Scenario/Coding with a tooltip.
 
-| File                                                    | Change                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| `src/pages/AssessmentTemplateEditPage.tsx`              | Remove re-attempt toggle                                |
-| `src/stores/templateStore.ts`                           | Drop `reattempt_enabled` from interface/save            |
-| `supabase/migrations/<new>.sql`                         | Create `assessment_assignments`                         |
-| `src/stores/assignmentStore.ts`                         | New store + create/list/status logic                    |
-| `src/stores/assessmentStore.ts`                         | Add `generateFromTemplate` helper                       |
-| `src/stores/attemptStore.ts`                            | Bump assignment status on start/submit/evaluate         |
-| `src/stores/reviewStore.ts`                             | Bump assignment status to `verified` on review complete |
-| `src/components/templates/AssignTemplateDialog.tsx`     | New dialog (domain / users modes)                       |
-| `src/components/templates/TemplateAssignmentsSheet.tsx` | New side sheet listing assignments                      |
-| `src/pages/AssessmentTemplatesPage.tsx`                 | Assign + View Assignments buttons + counts              |
-| `src/pages/TeamAssessmentsPage.tsx`                     | "Assign from Template" CTA                              |
-| `src/integrations/supabase/types.ts`                    | Auto-regenerated                                        |
+**Removed for adaptive**: pre-generation of `assessment_questions` at assignment time. Adaptive assignments create the `assessment` row with an empty question list and `is_adaptive = true`. Questions are added one-by-one as the engine selects them.
 
+**Database migration**:
+- `assessments`: add `is_adaptive boolean default false`.
+- `assessment_attempts`: add `adaptive_state jsonb default '{}'::jsonb` (tracks per-skill: currentLevel, correctStreak, wrongStreak, history, finalLevel, attemptedCount).
+- Backfill existing assessments with `is_adaptive = false`.
 
-## Validation rules enforced
+**New store: `src/stores/adaptiveEngineStore.ts`**
+- `initAdaptiveAttempt(assessmentId)` — picks initial skills + levels, persists to `adaptive_state`.
+- `getNextQuestion(attemptId)` — selects next question (skill round-robin + level + fallback), inserts into `assessment_questions`, returns it.
+- `recordAnswer(attemptId, questionId, isCorrect)` — updates streak, moves level, persists state, marks per-skill stop.
+- `finalizeAdaptiveAttempt(attemptId)` — computes final level per skill (rule: highest level with ≥ 2 correct, else lastLevel − 1), writes `attempt_skill_scores`, marks attempt `evaluated`, syncs assignment status.
 
-- Template `status === 'active'` required to open assign dialog.
-- `max_attempts >= 1` (already enforced).
-- Duplicate active assignment → warning + opt-in only (no silent duplicates).
-- Adaptive without employee registry → reported as failure, no assessment created.
+**Assignment flow (`src/stores/assignmentStore.ts`)**:
+- For adaptive templates, skip `addAssessment` and instead create the empty `assessments` row with `is_adaptive = true`. Fixed flow unchanged.
 
-## Out of scope (not building now)
+**Exam UI (`src/pages/AssessmentExecPage.tsx`)**:
+- When `assessment.is_adaptive`, switch to an adaptive runtime:
+  - On start: call `initAdaptiveAttempt`, then `getNextQuestion`.
+  - On submit-answer: grade locally (compare selected MCQ index to `correctIndex`), call `recordAnswer`, then `getNextQuestion` until engine returns `null` (done).
+  - Hide the "navigate by question index" sidebar; show a "Question X — Skill: Y, Level: Z" header and a single Next button.
+  - On engine-done: call `finalizeAdaptiveAttempt`, no AI evaluation needed (MCQ correctness is deterministic). Skip the existing `submitAttempt` AI path for adaptive; still create the manager review row using the computed `skill_scores`.
 
-- Email notifications (in-app notification only).
-- Assignment scheduling / due dates.
-- Bulk CSV upload of assignees.
+**Manager review** — works as today; `skill_scores` already feed into `useReviewStore.createReview`.
+
+---
+
+### Validation & Constraints
+
+- Adaptive templates require `domain_id` and `question_types` ⊆ `['mcq']` (UI enforces; saveTemplate validates).
+- `questions_per_skill` is clamped to 4–5 for adaptive at save-time.
+- If a skill has zero MCQs across all 5 levels, the engine drops the skill at init and surfaces a toast: "Skipped {skill} — no MCQs available".
+- If all selected skills are dropped, assignment fails with `reason: 'No MCQs available for any selected skill'`.
+
+---
+
+### Files to add/change
+
+- **Migration**: `assessments.is_adaptive`, `assessment_attempts.adaptive_state`.
+- **New**: `src/stores/adaptiveEngineStore.ts`.
+- **Edit**: `src/stores/assignmentStore.ts` — branch on `template.type === 'adaptive'`; create empty assessment.
+- **Edit**: `src/stores/assessmentStore.ts` — extend `Assessment` with `is_adaptive`; small typing only.
+- **Edit**: `src/pages/AssessmentExecPage.tsx` — adaptive runtime branch (new `<AdaptiveRunner />` sub-component to keep diff focused).
+- **Edit**: `src/pages/AssessmentTemplateEditPage.tsx` — restrict adaptive `question_types` to MCQ only; clamp questions_per_skill to 4–5.
+
+No removal of fixed-template behavior. No AI evaluator changes.
+
+---
+
+### ASCII flow
+
+```text
+start attempt
+  └─ pick N skills (round-robin)
+  └─ per skill: level = self_rating || 3
+loop:
+  pick skill (round-robin) not yet done
+    pick question at currentLevel (fallback ±1)
+    employee answers
+      correct? streak.correct++   wrong? streak.wrong++
+      if streak.correct == 2 → level = min(5, level+1); reset
+      if streak.wrong   == 2 → level = max(1, level-1); reset
+    skill.attempted++
+    if skill.attempted >= questions_per_skill → mark skill done
+all skills done → finalize
+  per skill: final = max level with ≥ 2 correct, else lastLevel-1
+  write attempt_skill_scores; status = evaluated; create review
+```

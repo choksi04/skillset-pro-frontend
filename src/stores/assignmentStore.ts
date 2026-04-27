@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { useTemplateStore, AssessmentTemplate } from './templateStore';
-import { useQuestionStore } from './questionStore';
-import { useRegistryStore } from './registryStore';
 
 export type AssignmentStatus =
   | 'new'
@@ -172,6 +170,7 @@ async function generateAssessmentForTemplate(
           domain_id: template.domain_id ?? 'fixed',
           template_id: template.id,
           is_reassessment: false,
+          is_adaptive: false,
           parent_assessment_id: null,
           skill_ids: skillIds,
           assessment_questions: orderedQuestions,
@@ -187,73 +186,102 @@ async function generateAssessmentForTemplate(
     return { assessmentId };
   }
 
-  // ADAPTIVE: requires a registry submission for this employee + domain.
+  // ADAPTIVE: create an empty assessment row with is_adaptive=true.
+  // Questions are picked one-by-one by the adaptive engine during the attempt.
   if (!template.domain_id) {
     return { assessmentId: null, reason: 'Adaptive template missing domain' };
   }
 
-  // Find latest submitted registry submission for this employee + domain
+  // Verify the employee has a submitted registry for this domain (engine needs self-ratings).
   const { data: subs } = await supabase
     .from('skill_registry_submissions')
-    .select('*')
+    .select('id')
     .eq('employee_id', employeeId)
     .eq('domain_id', template.domain_id)
     .eq('status', 'submitted')
     .is('deleted_on', null)
     .order('submitted_at', { ascending: false })
     .limit(1);
-
   const submission = subs?.[0];
   if (!submission) {
     return { assessmentId: null, reason: 'Employee has not submitted a registry for this domain yet' };
   }
 
-  // Load self-ratings
-  const { data: ratingsData } = await supabase
-    .from('skill_self_ratings')
-    .select('skill_id, rating')
-    .eq('submission_id', submission.id);
-
-  let ratings = (ratingsData || []).map((r: any) => ({
-    skill_id: r.skill_id,
-    rating: r.rating as 1 | 2 | 3 | 4 | 5,
-  }));
-
-  // Apply skill_selection_mode filtering
+  // Pre-flight: make sure we can resolve at least one usable skill with MCQs.
+  let candidateSkills: string[] = [];
   if (template.skill_selection_mode === 'custom') {
     const { data: tplSkills } = await supabase
       .from('assessment_template_skills')
       .select('skill_id')
       .eq('template_id', template.id);
-    const allowed = new Set((tplSkills || []).map((s: any) => s.skill_id));
-    ratings = ratings.filter((r) => allowed.has(r.skill_id));
+    candidateSkills = (tplSkills || []).map((s: any) => s.skill_id);
   } else {
-    // top_n: pick the highest-rated N skills
-    ratings = [...ratings]
-      .sort((a, b) => b.rating - a.rating)
-      .slice(0, template.skills_per_assessment);
+    const { data: ratingsData } = await supabase
+      .from('skill_self_ratings')
+      .select('skill_id, rating')
+      .eq('submission_id', submission.id);
+    candidateSkills = [...(ratingsData || [])]
+      .sort((a: any, b: any) => b.rating - a.rating)
+      .slice(0, template.skills_per_assessment)
+      .map((r: any) => r.skill_id);
   }
-
-  if (ratings.length === 0) {
+  if (candidateSkills.length === 0) {
     return { assessmentId: null, reason: 'No matching skills in employee registry' };
   }
+  const { data: mcqRows } = await supabase
+    .from('questions')
+    .select('skill_id')
+    .in('skill_id', candidateSkills)
+    .eq('question_type', 'mcq')
+    .eq('status', 'published')
+    .is('deleted_on', null);
+  if (!mcqRows || mcqRows.length === 0) {
+    return { assessmentId: null, reason: 'No published MCQs available for the selected skills' };
+  }
 
-  // Load published questions for these skills
-  await useQuestionStore.getState().fetchQuestions();
-  const publishedQuestions = useQuestionStore.getState().questions.filter((q) => q.status === 'published');
+  const durationMinutes = template.duration_minutes ?? 45;
+  const { data: aRow, error: aErr } = await supabase
+    .from('assessments')
+    .insert({
+      tenant_id: tenantId,
+      employee_id: employeeId,
+      submission_id: submission.id,
+      domain_id: template.domain_id,
+      template_id: template.id,
+      is_adaptive: true,
+      status: 'pending',
+      duration_minutes: durationMinutes,
+      created_by: userId,
+    })
+    .select()
+    .single();
+  if (aErr || !aRow) return { assessmentId: null, reason: aErr?.message ?? 'Failed to create assessment' };
 
-  const assessmentId = await useAssessmentStore.getState().addAssessment({
-    tenant_id: tenantId,
-    employee_id: employeeId,
-    submission_id: submission.id,
-    domain_id: template.domain_id,
-    template_id: template.id,
-    ratings,
-    publishedQuestions,
-    maxQuestionsPerSkill: template.questions_per_skill,
-  });
+  const assessmentId = (aRow as any).id;
+  // Mirror into in-memory assessmentStore (no questions yet — engine adds them on the fly)
+  useAssessmentStore.setState((s) => ({
+    assessments: [
+      {
+        id: assessmentId,
+        tenant_id: tenantId,
+        employee_id: employeeId,
+        submission_id: submission.id,
+        domain_id: template.domain_id!,
+        template_id: template.id,
+        is_reassessment: false,
+        is_adaptive: true,
+        parent_assessment_id: null,
+        skill_ids: [],
+        assessment_questions: [],
+        status: 'pending',
+        duration_minutes: durationMinutes,
+        created_at: (aRow as any).created_at ?? now,
+        updated_at: (aRow as any).updated_at ?? now,
+      },
+      ...s.assessments,
+    ],
+  }));
 
-  if (!assessmentId) return { assessmentId: null, reason: 'Assessment generation failed' };
   return { assessmentId };
 }
 

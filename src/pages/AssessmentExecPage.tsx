@@ -9,6 +9,7 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import EvalResults from '@/components/assessment/EvalResults';
+import AdaptiveRunner from '@/components/assessment/AdaptiveRunner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -401,6 +402,33 @@ export default function AssessmentExecPage() {
           </div>
         )}
       </div>
+    );
+  }
+
+  // ── Active adaptive assessment: dynamic engine UI ──
+  if (activeAssessment.is_adaptive) {
+    const attempt = getAttemptForAssessment(activeAssessment.id);
+    if (!attempt) {
+      return (
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          <Loader2 size={14} className="animate-spin mr-2" /> Starting adaptive assessment…
+        </div>
+      );
+    }
+    return (
+      <AdaptiveRunner
+        assessment={activeAssessment}
+        attemptId={attempt.id}
+        employeeId={employeeId}
+        tenantId={tenantId}
+        employeeName={user?.full_name ?? 'Employee'}
+        onComplete={async () => {
+          await updateAssessmentStatus(activeAssessment.id, 'completed');
+          await fetchAssessments();
+          await fetchAttempts();
+          setActiveAssessment(null);
+        }}
+      />
     );
   }
 
