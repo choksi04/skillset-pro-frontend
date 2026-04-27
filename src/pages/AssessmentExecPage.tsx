@@ -185,6 +185,12 @@ export default function AssessmentExecPage() {
       toast.info('This assessment has already been submitted.');
       return;
     }
+    // Block when template assignment cap reached.
+    const gate = canStartNewAttempt(assessment.id);
+    if (!gate.allowed) {
+      toast.error(gate.reason ?? 'You cannot start a new attempt for this assessment.');
+      return;
+    }
     await startAttempt(assessment.id, tenantId, employeeId);
     await updateAssessmentStatus(assessment.id, 'in_progress');
 
