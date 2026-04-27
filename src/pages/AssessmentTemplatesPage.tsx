@@ -10,19 +10,26 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { LayoutTemplate, Plus, Search, Pencil, Trash2, Power, PowerOff, Layers, ListChecks } from 'lucide-react';
+import { LayoutTemplate, Plus, Search, Pencil, Trash2, Power, PowerOff, Layers, ListChecks, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
+import TemplateAssignmentsSheet from '@/components/templates/TemplateAssignmentsSheet';
+import { useAssignmentStore } from '@/stores/assignmentStore';
 
 export default function AssessmentTemplatesPage() {
   const navigate = useNavigate();
   const { templates, fetchTemplates, deleteTemplate, setTemplateStatus, loading } = useTemplateStore();
   const { domains, fetchDomains } = useDomainStore();
+  const { assignments, fetchAssignments, getAssignmentsForTemplate } = useAssignmentStore();
   const [search, setSearch] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<AssessmentTemplate | null>(null);
+  const [assignFor, setAssignFor] = useState<AssessmentTemplate | null>(null);
+  const [viewAssignmentsFor, setViewAssignmentsFor] = useState<AssessmentTemplate | null>(null);
 
   useEffect(() => {
     fetchTemplates();
     fetchDomains();
+    fetchAssignments();
   }, []);
 
   const filtered = useMemo(() => {
@@ -132,6 +139,24 @@ export default function AssessmentTemplatesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {t.status === 'active' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 gap-1.5 text-xs text-primary hover:text-primary"
+                        onClick={() => setAssignFor(t)}
+                      >
+                        <UserCheck size={13} /> Assign
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => setViewAssignmentsFor(t)}
+                    >
+                      <Users size={13} /> {getAssignmentsForTemplate(t.id).length}
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -181,6 +206,18 @@ export default function AssessmentTemplatesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AssignTemplateDialog
+        open={!!assignFor}
+        onOpenChange={(o) => !o && setAssignFor(null)}
+        template={assignFor}
+      />
+
+      <TemplateAssignmentsSheet
+        open={!!viewAssignmentsFor}
+        onOpenChange={(o) => !o && setViewAssignmentsFor(null)}
+        template={viewAssignmentsFor}
+      />
     </div>
   );
 }
