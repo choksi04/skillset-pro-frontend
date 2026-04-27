@@ -1047,6 +1047,7 @@ export type Database = {
           review_id: string
           self_rating: number
           skill_id: string
+          verified_level: number | null
         }
         Insert: {
           ai_calculated_level: number
@@ -1058,6 +1059,7 @@ export type Database = {
           review_id: string
           self_rating: number
           skill_id: string
+          verified_level?: number | null
         }
         Update: {
           ai_calculated_level?: number
@@ -1069,6 +1071,7 @@ export type Database = {
           review_id?: string
           self_rating?: number
           skill_id?: string
+          verified_level?: number | null
         }
         Relationships: [
           {

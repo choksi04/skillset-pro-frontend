@@ -1,75 +1,86 @@
-# Attempt & Evaluation Flow — Hardening Plan
+## Manager Review — Rebuild to Literal Spec
 
-## Current State (already implemented)
+Collapse the existing 3-action model (Approve / Adjust / Reassess) into the simpler flow defined in the spec:
 
-The four-step flow you described is largely in place. Quick audit:
+- **STEP 1 — View**: answers + AI evaluation
+- **STEP 2 — Actions**: adjust score, add comments, mark verified
+- **STEP 3 — Rule**: final score = verified score (manager's value)
 
-| Step | Status | Where |
-|---|---|---|
-| **1. Attempt** — start, auto-save on navigation, pause/resume | ✅ Done | `attemptStore.startAttempt`, `saveAnswer`, `pauseAttempt`, `resumeAttempt`; `AssessmentExecPage` saves on every `goTo` |
-| **2. Submission** — lock answers, increment count | ✅ / ⚠️ Partial | `submitAttempt` blocks re-submit; `assignmentStore.updateStatusForAssessment` increments `attempt_count` on first transition only |
-| **3. Evaluation** — MCQ auto, AI for coding/scenario | ✅ Done | `supabase/functions/evaluate-assessment` splits MCQ (local `evaluateMCQ`) vs AI batch |
-| **4. Failure → pending evaluation** | ⚠️ Weak | On error attempt stays `submitted` (UI labels it "Pending Evaluation") but no error reason, no user toast, no failure flag |
+"Reassess" disappears as a per-skill action. Reassessment remains a separate, existing flow (`reassessment_requests` table, triggered elsewhere) and is unaffected. Reassess is out of scope completely.
 
-## Gaps to Fix
+---
 
-### 1. Failure handling is silent
-Today, if `supabase.functions.invoke('evaluate-assessment')` fails or returns 429/402, `submitAttempt` swallows the error in a `console.error` and the user sees a generic "Pending Evaluation" badge with no idea what went wrong.
+### Behavior changes
 
-**Fix:**
-- In `attemptStore.submitAttempt`, surface the error: throw it from the function (or return an error object) so `AssessmentExecPage.doSubmit` can show a `toast.error` with the actual reason ("AI credits exhausted", "Rate limit", "Network error", etc.).
-- Store the last evaluation error on the attempt row (new column `evaluation_error TEXT NULL`) so the "Pending Evaluation" badge can show a tooltip with the reason and the user/admin knows whether to retry now or later.
-- Update the badge in `AssessmentExecPage` and `AssessmentDetailPage` to expose the error message (tooltip or inline).
+**Per-skill row (new model)**
 
-### 2. Retry path needs resilience
-`retryEvaluation` already exists. We'll:
-- Clear `evaluation_error` when retry starts.
-- Keep the same submit pipeline (no duplicate code path).
-- Toast success/failure on completion.
+- Always shows: Skill · Self Rating · AI Level + Score · Verified Level · Comment.
+- "Verified Level" defaults to the AI-calculated level. Manager can edit it inline (Select L1–L5) — editing it is the "adjust score" action.
+- Inline comment icon opens a small popover/dialog to edit per-skill comment.
+- A row is considered "actioned" once the manager has touched it (changed the level OR explicitly clicked Verify on the row, OR the panel-level Verify-All is used).
 
-### 3. Attempt count on re-attempt (template flow)
-`updateStatusForAssessment` only increments when transitioning `new → in_progress`. For template assignments with `max_attempts > 1`, when an employee re-attempts after a previous evaluated/verified attempt, the counter doesn't move.
+**Panel actions**
 
-**Fix:**
-- In `assignmentStore.updateStatusForAssessment`, increment `attempt_count` whenever transitioning *into* `in_progress` from any terminal state (`evaluated`, `verified`) as well as from `new`.
-- Guard against incrementing past `max_attempts` — if the assignment is already at the cap, surface a toast and block the new attempt before `startAttempt` runs.
+- Per-skill: edit Verified Level + edit Comment (auto-saved).
+- Overall: Overall Comment textarea + single primary button **"Mark Verified"** (replaces "Finalize Review").
+- "Mark Verified" requires every row to have a Verified Level set (defaults to AI level on load, so this is satisfied unless explicitly cleared).
 
-### 4. Confirm lock semantics
-`submitAttempt` already early-returns when status is `submitted` or `evaluated`. We'll add the same guard to `saveAnswer` so any in-flight auto-save after submit can't sneak through and mutate a locked attempt.
+**Final score rule**
 
-## Technical Changes
+- On Mark Verified: every skill produces an `official_skill_entries` row with `final_level = verified_level` (the manager's value, which is AI level by default or the adjusted value).
+- No skill is dropped (today's "reassess" filter is removed).
+- Assignment status transitions to `verified` (already wired via `syncAssignmentForReview`).
 
-**Migration** (`supabase/migrations/...add_evaluation_error.sql`):
-```sql
-ALTER TABLE public.assessment_attempts
-  ADD COLUMN evaluation_error TEXT NULL;
-```
+---
 
-**`src/stores/attemptStore.ts`:**
-- `saveAnswer`: early-return if attempt status ≠ `in_progress`.
-- `submitAttempt`: on AI failure, persist `evaluation_error`, leave status as `submitted`, and re-throw so the caller can toast. On success, clear `evaluation_error`.
-- `retryEvaluation`: clear `evaluation_error` before retrying; let errors propagate.
-- Extend `AssessmentAttempt` type with `evaluation_error?: string | null`.
+### Files to change
 
-**`src/stores/assignmentStore.ts`:**
-- `updateStatusForAssessment`: increment `attempt_count` on `* → in_progress` from any non-`in_progress` state (so re-attempts count).
-- Add a `canStartNewAttempt(assignmentId)` helper that returns false when `attempt_count >= max_attempts` and the prior attempt is terminal.
+**Data model (migration)**
 
-**`src/pages/AssessmentExecPage.tsx`:**
-- `doSubmit`: wrap `submitAttempt` in try/catch, show `toast.error(err.message)` on failure, `toast.success` on success.
-- "Pending Evaluation" badge: show a tooltip with `attempt.evaluation_error` when present.
-- Before `startAttempt`, call `canStartNewAttempt`; if false, toast and return.
+- `supabase/migrations/<ts>_review_verified_score.sql`
+  - `ALTER TABLE review_skill_entries ADD COLUMN verified_level integer`.
+  - Backfill: `verified_level = COALESCE(manager_adjusted_level, ai_calculated_level)` for existing rows where `manager_action` is not 'reassess'.
+  - Keep `manager_action` and `manager_adjusted_level` columns (don't drop — historical data + reduces blast radius). New code stops writing to them.
 
-**`src/pages/AssessmentDetailPage.tsx`** (manager view): mirror the same pending-evaluation tooltip so admins/managers can see *why* a result is stuck.
+**Store (`src/stores/reviewStore.ts`)**
 
-## Out of Scope
-- No changes to the `evaluate-assessment` edge function (already handles MCQ vs AI split correctly and returns proper 429/402 codes).
-- No changes to the adaptive runner (grades MCQs locally; not affected).
-- No changes to scoring or skill-level math.
+- Remove `ReviewAction` type. Replace `SkillReviewEntry` fields:
+  - drop `manager_action`, `manager_adjusted_level`
+  - add `verified_level: number`, initialized to `ai_calculated_level`
+- Replace `setSkillAction(...)` with `setVerifiedLevel(reviewId, skillId, level)`.
+- Keep `setSkillComment`, `setOverallComment`.
+- Rename `completeReview` → `verifyReview`. New logic: insert one `official_skill_entries` row per skill using `verified_level` as `final_level`. No filtering.
+- `fetchReviews`: read `verified_level` (fallback to `ai_calculated_level`).
+- `createReview`: insert with `verified_level = ai_calculated_level`.
 
-## Files Touched
-- `supabase/migrations/<timestamp>_add_evaluation_error.sql` (new)
-- `src/stores/attemptStore.ts`
-- `src/stores/assignmentStore.ts`
-- `src/pages/AssessmentExecPage.tsx`
-- `src/pages/AssessmentDetailPage.tsx`
+**UI**
+
+- `src/components/assessment/ManagerReviewPanel.tsx` — rewrite skill row + footer:
+  - Replace Approve/Adjust/Reassess buttons with an inline Verified-Level Select + comment icon.
+  - Replace "Finalize Review" with "Mark Verified" (confirmation dialog updated copy).
+  - Drop the "skills marked for reassessment will not generate entries" warning.
+- `src/pages/ReviewsPage.tsx` — same row/footer rebuild as the panel above.
+- `src/pages/AssessmentDetailPage.tsx` — `getEffectiveStatus`: rename `"approved"` label/key path if needed (it currently maps `review.status === 'completed'` → `"approved"`; keep the key, just ensure the badge reads "Verified").
+- `src/stores/onboardingStore.ts` — update Manager step copy from "Approve, adjust, or request reassessment for each skill." to "Adjust scores and mark each review as verified.".
+
+**Untouched**
+
+- `reassessment_requests` table and the existing reassessment workflow (separate feature). - Remove this as this is out of scope now
+- Notifications, reviewer reassignment, AI feedback details panel.
+- Assignment status machine — `verified` already wired.
+
+---
+
+### Edge cases
+
+- Existing in-flight reviews with `manager_action = 'reassess'` and no `verified_level` after migration: backfill leaves `verified_level` NULL for those rows; UI defaults the Select to `ai_calculated_level` so manager can still finish them under the new model. They will produce an official entry on Mark Verified (no longer skipped).
+- Self-review (reviewer == employee) flow unchanged.
+- Admin reviewer reassignment unchanged.
+
+---
+
+### Out of scope
+
+- No changes to the assessment generation, AI evaluation, attempt, or registry submission flows.
+- No new permissions or RBAC changes.
+- Reassess

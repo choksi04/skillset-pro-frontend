@@ -78,7 +78,7 @@ const adminExtraSteps: TourStep[] = [
 
 const managerExtraSteps: TourStep[] = [
   { id: 'mgr-review', title: 'Review Assessments', description: 'Compare employee self-ratings against AI assessment scores.', targetSelector: '[data-tour="reviews"]', roles: ['manager'], position: 'right' },
-  { id: 'mgr-approve', title: 'Approve Skill Registry', description: 'Approve, adjust, or request reassessment for each skill.', targetSelector: '[data-tour="reviews"]', roles: ['manager'], position: 'right' },
+  { id: 'mgr-approve', title: 'Verify Skill Registry', description: 'Adjust scores where needed and mark each review as verified.', targetSelector: '[data-tour="reviews"]', roles: ['manager'], position: 'right' },
 ];
 
 const employeeExtraSteps: TourStep[] = [

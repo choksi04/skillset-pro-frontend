@@ -14,7 +14,7 @@ export const assessmentStatusConfig: Record<string, { label: string; color: stri
   completed: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' },
   evaluated: { label: 'Evaluated', color: 'bg-success/15 text-success border-success/20' },
   review_pending: { label: 'Under Review', color: 'bg-warning/15 text-warning border-warning/20' },
-  approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' },
+  approved: { label: 'Verified', color: 'bg-success/15 text-success border-success/20' },
 };
 
 /**
