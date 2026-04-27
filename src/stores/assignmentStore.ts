@@ -404,14 +404,15 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     const userId = getCurrentUserId();
     const now = new Date().toISOString();
-    const updates: Record<string, any> = {
+    const updates = {
       status,
       modified_at: now,
       modified_by: userId,
+      attempt_count:
+        status === 'in_progress' && assignment.status === 'new'
+          ? assignment.attempt_count + 1
+          : assignment.attempt_count,
     };
-    if (status === 'in_progress' && assignment.status === 'new') {
-      updates.attempt_count = assignment.attempt_count + 1;
-    }
     const { error } = await supabase
       .from('assessment_assignments')
       .update(updates)
