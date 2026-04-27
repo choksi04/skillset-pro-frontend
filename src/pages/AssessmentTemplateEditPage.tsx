@@ -25,6 +25,11 @@ const ALL_QUESTION_TYPES = [
   { value: 'coding', label: 'Coding' },
 ];
 
+// Adaptive engine grades correctness deterministically — only MCQ is supported.
+const ADAPTIVE_QUESTION_TYPES = new Set(['mcq']);
+const ADAPTIVE_QPS_MIN = 4;
+const ADAPTIVE_QPS_MAX = 5;
+
 export default function AssessmentTemplateEditPage() {
   const { templateId } = useParams<{ templateId: string }>();
   const isNew = !templateId || templateId === 'new';
@@ -119,9 +124,12 @@ export default function AssessmentTemplateEditPage() {
   if (type === 'adaptive') {
     if (!domainId) errors.push('Domain is required for adaptive templates');
     if (questionTypes.length === 0) errors.push('Select at least one question type');
+    if (questionTypes.some((qt) => !ADAPTIVE_QUESTION_TYPES.has(qt)))
+      errors.push('Adaptive templates currently support MCQ questions only');
     if (skillMode === 'custom' && pickedSkills.length === 0) errors.push('Pick at least one skill (custom mode)');
     if (skillsPerAssessment < 1) errors.push('Skills per assessment must be ≥ 1');
-    if (questionsPerSkill < 1) errors.push('Questions per skill must be ≥ 1');
+    if (questionsPerSkill < ADAPTIVE_QPS_MIN || questionsPerSkill > ADAPTIVE_QPS_MAX)
+      errors.push(`Questions per skill must be between ${ADAPTIVE_QPS_MIN} and ${ADAPTIVE_QPS_MAX}`);
   } else {
     if (pickedQuestions.length === 0) errors.push('Add at least one question');
   }
