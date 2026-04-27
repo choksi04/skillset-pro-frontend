@@ -393,12 +393,31 @@ export default function AssessmentExecPage() {
                         <>
                           <Button size="sm" variant="outline" onClick={async () => {
                             const qMap = new Map<string, Question>(assessment.assessment_questions.map((aq) => [aq.question_id, questionMap.get(aq.question_id)!] as [string, Question]).filter(([, q]) => q != null));
-                            await retryEvaluation(attempt!.id, qMap as Map<string, any>, assessment.assessment_questions);
-                            toast.info('Retrying AI evaluation...');
+                            try {
+                              toast.info('Retrying AI evaluation...');
+                              await retryEvaluation(attempt!.id, qMap as Map<string, any>, assessment.assessment_questions);
+                              toast.success('AI evaluation completed.');
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Retry failed.');
+                            }
                           }} className="gap-1.5">
                             <RotateCcw size={14} /> Retry Evaluation
                           </Button>
-                          <Badge className="bg-warning/15 text-warning border-warning/20 gap-1 text-xs"><Loader2 size={12} className="animate-spin" /> Pending Evaluation</Badge>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-warning/15 text-warning border-warning/20 gap-1 text-xs cursor-help">
+                                  <Loader2 size={12} className="animate-spin" /> Pending Evaluation
+                                </Badge>
+                              </TooltipTrigger>
+                              {attempt?.evaluation_error && (
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-xs font-medium mb-1">Last error:</p>
+                                  <p className="text-xs">{attempt.evaluation_error}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                         </>
                       ) : (
                         <Button size="sm" onClick={() => handleStartAssessment(assessment)} className="gap-1.5">
