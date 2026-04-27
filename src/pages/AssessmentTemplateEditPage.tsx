@@ -45,7 +45,6 @@ export default function AssessmentTemplateEditPage() {
   const [status, setStatus] = useState<'draft' | 'active'>('draft');
   const [duration, setDuration] = useState(45);
   const [maxAttempts, setMaxAttempts] = useState(1);
-  const [reattemptEnabled, setReattemptEnabled] = useState(false);
 
   // Adaptive
   const [domainId, setDomainId] = useState<string>('');
@@ -82,7 +81,6 @@ export default function AssessmentTemplateEditPage() {
         setStatus(t.status);
         setDuration(t.duration_minutes);
         setMaxAttempts(t.max_attempts);
-        setReattemptEnabled(t.reattempt_enabled);
         setDomainId(t.domain_id ?? '');
         setSkillMode((t.skill_selection_mode as SkillSelectionMode) ?? 'top_n');
         setSkillsPerAssessment(t.skills_per_assessment);
@@ -153,7 +151,7 @@ export default function AssessmentTemplateEditPage() {
       status: saveAs,
       duration_minutes: duration,
       max_attempts: maxAttempts,
-      reattempt_enabled: reattemptEnabled,
+      reattempt_enabled: maxAttempts > 1,
       domain_id: type === 'adaptive' ? domainId || null : null,
       skill_selection_mode: type === 'adaptive' ? skillMode : null,
       skills_per_assessment: skillsPerAssessment,
@@ -235,14 +233,10 @@ export default function AssessmentTemplateEditPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs">Max Attempts</Label>
                   <Input type="number" min={1} max={10} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value) || 1)} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Set to 1 for a single attempt, or higher to allow re-attempts.
+                  </p>
                 </div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                <div>
-                  <p className="text-xs font-medium text-foreground">Allow re-attempts</p>
-                  <p className="text-[11px] text-muted-foreground">Let employees retake within max attempts.</p>
-                </div>
-                <Switch checked={reattemptEnabled} onCheckedChange={setReattemptEnabled} />
               </div>
             </CardContent>
           </Card>

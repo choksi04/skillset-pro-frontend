@@ -181,6 +181,10 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     };
 
     set((state) => ({ attempts: [...state.attempts, attempt] }));
+    // Sync assignment status (best-effort, non-blocking)
+    import('./assignmentStore').then(({ syncAssignmentForAttempt }) =>
+      syncAssignmentForAttempt(assessmentId, 'in_progress').catch(() => {}),
+    );
     return (row as any).id;
   },
 
@@ -247,6 +251,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
         a.id === attemptId ? { ...a, status: 'submitted' as const, submitted_at: now, paused_at: null } : a
       ),
     }));
+    import('./assignmentStore').then(({ syncAssignmentForAttempt }) =>
+      syncAssignmentForAttempt(attempt.assessment_id, 'submitted').catch(() => {}),
+    );
 
     try {
       const answersPayload = attempt.answers.map((ans) => {
@@ -360,6 +367,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
           };
         }),
       }));
+      import('./assignmentStore').then(({ syncAssignmentForAttempt }) =>
+        syncAssignmentForAttempt(attempt.assessment_id, 'evaluated').catch(() => {}),
+      );
     } catch (err) {
       console.error('AI evaluation failed:', err);
     }

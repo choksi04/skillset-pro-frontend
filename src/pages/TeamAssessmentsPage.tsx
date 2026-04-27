@@ -12,8 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
-  ClipboardCheck, Search, ArrowRight,
+  ClipboardCheck, Search, ArrowRight, UserCheck,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
   if (review?.status === 'completed') return 'approved';
@@ -36,6 +38,7 @@ export default function TeamAssessmentsPage() {
 
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
+  const [assignOpen, setAssignOpen] = useState(false);
 
   useEffect(() => {
     fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews();
@@ -77,11 +80,16 @@ export default function TeamAssessmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-foreground">Team Assessments</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          View and manage your team's assessment progress and results.
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">Team Assessments</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            View and manage your team's assessment progress and results.
+          </p>
+        </div>
+        <Button className="gap-1.5" onClick={() => setAssignOpen(true)}>
+          <UserCheck size={14} /> Assign from Template
+        </Button>
       </div>
 
       <div className="relative max-w-sm">
@@ -140,6 +148,13 @@ export default function TeamAssessmentsPage() {
           })}
         </div>
       )}
+
+      <AssignTemplateDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        template={null}
+        showTemplatePicker
+      />
     </div>
   );
 }

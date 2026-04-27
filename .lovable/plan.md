@@ -1,193 +1,158 @@
-## Goal
+# Assessment Templates: UI Cleanup + Assignment Engine
 
-Two coordinated changes:
+## Part 1 — Template form cleanup
 
-1. **Remove the Review Cycle feature** end-to-end — UI, store, navigation, dependencies, and assessments tied to a cycle.
-2. **Introduce an Assessment Templates module** (Adaptive | Fixed) that becomes the single way to create assessments going forward.
+`**src/pages/AssessmentTemplateEditPage.tsx**`
 
-Per your decisions:
+- Remove the "Allow re-attempts" `Switch` block and `reattemptEnabled` state.
+- Derive re-attempt behavior from `max_attempts > 1` (no UI toggle).
+- Update the "Max Attempts" helper text: "Set to 1 for single attempt, or higher to allow re-attempts."
 
-- Cycle-linked assessments are **hard-deleted** (not in production yet).
-- Templates **replace** the auto-generation flow on registry submit.
-- Templates live in **Settings**, replacing the "Review Cycles" slot.
-- Adaptive default question types: **MCQ pre-selected only**.
+`**src/stores/templateStore.ts**`
+
+- Drop `reattempt_enabled` from `AssessmentTemplate`, `SaveTemplateInput`, and the save payload.
+- When reading, ignore the column (still in DB but unused).
+
+We'll keep the column in the DB (harmless, no migration needed) so we don't disturb existing rows.
 
 ---
 
-## Part 1 — Remove Review Cycles
+## Part 2 — Assignment Engine
 
-### Database (migration)
+### 2.1 Database (new migration)
 
-```sql
--- Hard-delete cycle-linked assessments and their dependents
-DELETE FROM attempt_answers WHERE attempt_id IN
-  (SELECT id FROM assessment_attempts WHERE assessment_id IN
-    (SELECT id FROM assessments WHERE cycle_id IS NOT NULL));
-DELETE FROM ai_evaluations WHERE attempt_id IN
-  (SELECT id FROM assessment_attempts WHERE assessment_id IN
-    (SELECT id FROM assessments WHERE cycle_id IS NOT NULL));
-DELETE FROM attempt_skill_scores WHERE attempt_id IN
-  (SELECT id FROM assessment_attempts WHERE assessment_id IN
-    (SELECT id FROM assessments WHERE cycle_id IS NOT NULL));
-DELETE FROM assessment_attempts WHERE assessment_id IN
-  (SELECT id FROM assessments WHERE cycle_id IS NOT NULL);
-DELETE FROM assessment_questions WHERE assessment_id IN
-  (SELECT id FROM assessments WHERE cycle_id IS NOT NULL);
-DELETE FROM manager_reviews WHERE assessment_id IN
-  (SELECT id FROM assessments WHERE cycle_id IS NOT NULL);
-DELETE FROM reassessment_requests WHERE assessment_id IN
-  (SELECT id FROM assessments WHERE cycle_id IS NOT NULL);
-DELETE FROM assessments WHERE cycle_id IS NOT NULL;
+New table `assessment_assignments`:
 
--- Drop cycle column + cycle tables
-ALTER TABLE assessments DROP COLUMN cycle_id;
-DROP TRIGGER IF EXISTS check_single_active_cycle_trigger ON review_cycles;
-DROP FUNCTION IF EXISTS public.check_single_active_cycle();
-DROP TABLE IF EXISTS cycle_domain_selections;
-DROP TABLE IF EXISTS review_cycles;
+
+| column          | type                                               | notes                                                                          |
+| --------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `id`            | uuid PK                                            | `gen_random_uuid()`                                                            |
+| `tenant_id`     | text                                               | default `'tenant-001'`                                                         |
+| `template_id`   | uuid                                               | FK target template                                                             |
+| `employee_id`   | text                                               | the assignee                                                                   |
+| `domain_id`     | text NULL                                          | populated when assignment originated from a domain bulk-assign (audit only)    |
+| `status`        | text                                               | `new` | `in_progress` | `submitted` | `evaluated` | `verified` (default `new`) |
+| `attempt_count` | int                                                | default `0`                                                                    |
+| `max_attempts`  | int                                                | snapshotted from template at assign time                                       |
+| `assigned_at`   | timestamptz                                        | `now()`                                                                        |
+| `assessment_id` | uuid NULL                                          | the auto-generated assessment row                                              |
+| `assigned_by`   | text NULL                                          | user id                                                                        |
+| audit cols      | created_at / modified_at / deleted_on / deleted_by | standard pattern                                                               |
+
+
+Index: `(employee_id, template_id) WHERE deleted_on IS NULL` for duplicate detection.
+
+RLS: `Allow all for assessment_assignments` (consistent with project's current MVP RLS policy — see memory `architecture/security/rls-policy`).
+
+### 2.2 Store — `src/stores/assignmentStore.ts` (new)
+
+```
+fetchAssignments()
+getAssignmentsForEmployee(employeeId)
+getAssignmentsForTemplate(templateId)
+createAssignments({ template_id, employee_ids[], domain_id? })
+  → for each employee:
+    1. Skip if active assignment (status in [new, in_progress]) already exists for same template+employee → return as "skipped"
+    2. Insert assessment_assignments row
+    3. Generate the underlying assessment via existing assessmentStore.addAssessment (adaptive) OR fixed-template path (see 2.3)
+    4. Update assignment.assessment_id
+    5. Insert notification (target_role: 'employee', target_user_id: employee_id, type: 'assessment_assigned', action_link: `/assessments/{assessmentId}`)
+  → returns { created, skipped, failed } summary
+deleteAssignment(id) – soft delete
 ```
 
-### Code removals
+### 2.3 Assessment generation from template
 
+Extend `assessmentStore.addAssessment` flow with a thin helper `generateFromTemplate(template, employee_id)`:
 
-| File                                                                            | Action                                                                                                                                    |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/pages/ReviewCyclesPage.tsx`                                                | Delete                                                                                                                                    |
-| `src/stores/cycleStore.ts`                                                      | Delete                                                                                                                                    |
-| `src/App.tsx`                                                                   | Remove `/review-cycles` route                                                                                                             |
-| `src/components/layout/AppSidebar.tsx`                                          | Remove "Review Cycles" nav item (slot reused for Templates)                                                                               |
-| `src/components/layout/PageHeader.tsx`                                          | Remove `/review-cycles` title entry                                                                                                       |
-| `src/components/layout/SetupProgress.tsx`                                       | Drop "Start Cycle" step; setup becomes Skills → Domains → Mappings → Questions → **Create Template**                                      |
-| `src/stores/onboardingStore.ts`                                                 | Replace `'open-cycle'` step with `'create-template'`                                                                                      |
-| `src/pages/DashboardPage.tsx`                                                   | Remove active-cycle banner, "Manage" CTA, "create cycle" action item, Manager review nav to `/review-cycles` (route → `/manager-reviews`) |
-| `src/pages/AssessmentsPage.tsx` / `TeamAssessmentsPage.tsx`                     | Drop cycle column/filter; show template name instead                                                                                      |
-| `src/pages/AssessmentDetailPage.tsx`                                            | Remove cycle name, drop `cycle_id` from `addAssessment` regenerate call                                                                   |
-| `src/components/assessment/ManagerReviewPanel.tsx`, `src/pages/ReviewsPage.tsx` | Replace `activeCycle?.name` with a static "—" or template name; keep `completeReview` API but pass `''`                                   |
-| `src/stores/assessmentStore.ts`                                                 | Remove `cycle_id` field from `Assessment`, `GenerateAssessmentParams`, inserts, and selects                                               |
-| `src/stores/registryStore.ts`                                                   | Already decoupled; just clean unused `currentCycle` references                                                                            |
-| `src/components/registry/registryHelpers.ts`                                    | Drop `isCycleClosed` param + `incomplete` status                                                                                          |
-| `src/components/registry/RatingSlider.tsx`                                      | Change "Last cycle:" copy → "Previous version:"                                                                                           |
-| `src/pages/UserGuidePage.tsx`                                                   | Rewrite cycle/registry sections; add Templates section                                                                                    |
-| `src/pages/HRDashboardPage.tsx`                                                 | Remove "Cycle" column from official entries table/CSV                                                                                     |
+- **Adaptive**: load employee's latest submitted registry for `template.domain_id`; pull self-ratings; call existing `generateAssessmentQuestions` honoring `template.skills_per_assessment`, `questions_per_skill`, `question_types`, and `skill_selection_mode` (top_n vs custom skill list).
+- **Fixed**: insert assessment + insert `assessment_questions` straight from `assessment_template_questions` (target_level looked up from the question itself).
 
+If the employee has no submitted registry for an adaptive template's domain, return a "registry_missing" failure for that employee (surfaced in the summary).
 
-`reviewStore.ts` keeps its `cycle` text field on `official_skill_entries` for now (saved as `''`); column stays in the DB to avoid touching the manager-review pipeline.
+### 2.4 Notification
 
----
+Reuse existing `notifications` table. Add a new `type` value `'assessment_assigned'`. Insert one row per successful assignment. `NotificationDropdown` already renders any row matching `target_user_id = me`, so it will surface automatically.
 
-## Part 2 — Assessment Templates module (Multi Step flow)
+### 2.5 Status transitions
 
-### Database (migration)
+`assessment_assignments.status` is derived/updated as:
 
-```sql
-CREATE TABLE assessment_templates (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id text NOT NULL DEFAULT 'tenant-001',
-  name text NOT NULL,
-  description text DEFAULT '',
-  type text NOT NULL CHECK (type IN ('adaptive','fixed')),
-  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active')),
-  duration_minutes integer NOT NULL DEFAULT 45,
-  max_attempts integer NOT NULL DEFAULT 1 CHECK (max_attempts >= 1),
-  reattempt_enabled boolean NOT NULL DEFAULT false,
+- `new` → on creation
+- `in_progress` → when first attempt starts (hook in `attemptStore.startAttempt`)
+- `submitted` → when attempt is submitted
+- `evaluated` → when AI evaluation completes
+- `verified` → when manager review completes
 
-  -- adaptive config
-  domain_id text,
-  skill_selection_mode text CHECK (skill_selection_mode IN ('top_n','custom')),
-  skills_per_assessment integer DEFAULT 5,
-  questions_per_skill integer DEFAULT 4,
-  question_types jsonb DEFAULT '["mcq"]'::jsonb,
+We update this in the same places that already update the underlying `assessments.status`/attempt status, looking up the assignment by `assessment_id`.
 
-  -- fixed config
-  shuffle_questions boolean DEFAULT false,
-  shuffle_options boolean DEFAULT false,
+### 2.6 UI — Assign Template dialog
 
-  created_at timestamptz NOT NULL DEFAULT now(),
-  modified_at timestamptz,
-  created_by text, modified_by text,
-  deleted_on timestamptz, deleted_by text
-);
+`**src/components/templates/AssignTemplateDialog.tsx**` (new)
 
--- Skill picks for adaptive 'custom' mode
-CREATE TABLE assessment_template_skills (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_id uuid NOT NULL REFERENCES assessment_templates(id) ON DELETE CASCADE,
-  skill_id text NOT NULL
-);
+Triggered from:
 
--- Question list for fixed templates (ordered)
-CREATE TABLE assessment_template_questions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_id uuid NOT NULL REFERENCES assessment_templates(id) ON DELETE CASCADE,
-  question_id text NOT NULL,
-  position integer NOT NULL DEFAULT 0
-);
+- `AssessmentTemplatesPage` → new "Assign" button on each active template card
+- `TeamAssessmentsPage` → header CTA "Assign from Template" (opens dialog with template picker first)
 
--- Link assessments to the template that produced them
-ALTER TABLE assessments ADD COLUMN template_id uuid;
+Dialog contents:
 
--- RLS: allow-all for MVP (matches existing project policy)
-ALTER TABLE assessment_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE assessment_template_skills ENABLE ROW LEVEL SECURITY;
-ALTER TABLE assessment_template_questions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all" ON assessment_templates FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all" ON assessment_template_skills FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all" ON assessment_template_questions FOR ALL USING (true) WITH CHECK (true);
-```
+- Template summary header (name, type, duration, domain).
+- Mode tabs: **By Domain** | **Specific Users**
+  - **By Domain**: domain Select (defaults to template.domain_id for adaptive). Shows preview list of users in that domain with checkboxes (pre-checked, can deselect). 
+  - **Specific Users**: searchable multi-select of users (filtered to manager's domain when role=manager).
+- Validation banners:
+  - If template not active → block with "Template must be activated before assigning."
+  - For each selected employee already having an active assignment for this template → show inline warning row "Already assigned · last assigned {date}" with checkbox unchecked by default (admin can override).
+- Footer summary: "X new assignments will be created. Y skipped (duplicates)."
+- Confirm → calls `assignmentStore.createAssignments`, toasts result, closes.
 
-### New files
+### 2.7 Listing — Assignments panel
 
+`**src/pages/AssessmentTemplatesPage.tsx**`
 
-| File                                              | Purpose                                                                                                                  |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `src/stores/templateStore.ts`                     | CRUD for templates, skills, questions; activate/draft toggling; `generateAssessmentFromTemplate(templateId, employeeId)` |
-| `src/pages/AssessmentTemplatesPage.tsx`           | List view: name · type badge · status · skill/question count · CTA "New Template"                                        |
-| `src/pages/AssessmentTemplateEditPage.tsx`        | Create/edit form with type toggle, type-specific config blocks, summary preview, Save Draft / Activate buttons           |
-| `src/components/templates/TemplateTypeToggle.tsx` | Segmented control (Adaptive                                                                                              |
-| `src/components/templates/AdaptiveConfig.tsx`     | Domain select, skill mode (top_n/custom), counts, question-type checkboxes (MCQ pre-checked)                             |
-| `src/components/templates/FixedConfig.tsx`        | Searchable question picker + ordered selected list, shuffle toggles                                                      |
-| `src/components/templates/TemplateSummary.tsx`    | Right-rail preview of expected questions/duration                                                                        |
+- Add an "Assignments" count badge on each card (`{n} active`).
+- Add an "Assignments" link on each card → opens a side `Sheet` listing assignments for that template with: employee name, status badge, attempt_count/max_attempts, assigned_at, link to the underlying assessment, and a "Revoke" action (soft delete) when status is not `submitted, evaluated, verified`.
 
+### 2.8 Sidebar / nav
 
-### Routing & nav
+No new top-level entry needed. Assignment is reached through:
 
-- `App.tsx`: add `/assessment-templates` (list) and `/assessment-templates/:id` (editor), both `RoleGuard allowed=["admin","manager"]`.
-- `AppSidebar.tsx`: replace "Review Cycles" with **"Assessment Templates"** in the Settings group (icon: `LayoutTemplate`).
-- `PageHeader.tsx`: register both routes.
+- Template card → Assign / View Assignments
+- Team Assessments page → Assign CTA
 
-### Validation rules
-
-- `name`: required, ≤100 chars
-- `duration_minutes`: 5–240
-- `max_attempts`: ≥1
-- Adaptive: `domain_id` required; `question_types` length ≥1; if mode = `custom`, ≥1 skill picked
-- Fixed: ≥1 question selected
-- Activation only allowed when validation passes
-
-### Replacing auto-generation on registry submit
-
-- `src/pages/SkillRegistryPage.tsx` (or wherever submit fires): remove the call that generates an assessment automatically.
-- After registry submit, show toast: *"Registry submitted."*
-- New "Generate Assessment" action lives on **Team Assessments** page (manager): pick employee + active template → calls `generateAssessmentFromTemplate`.
-
-### Generation logic (`generateAssessmentFromTemplate`)
-
-- **Adaptive**: read employee's latest submitted skill registry → take top N skills by self-score (or template's custom skill list) → for each skill, pick `questions_per_skill` published questions matching the rated competency level, filtered by the template's `question_types`. Reuses existing `generateAssessmentQuestions` helper with the template's parameters instead of `assessment_config` defaults.
-- **Fixed**: insert exactly the template's question list (no skill/level filtering); shuffle if enabled.
-- Insert into `assessments` with `template_id`, `duration_minutes` from template, `status='pending'`.
-
-### UI behavior
-
-- Type toggle re-renders config block; switching types preserves common fields (name, duration, etc.).
-- Summary card on the right updates live: "≈ X questions, Y min, Z skills".
-- Status pill: Draft (gray) / Active (green). Only one Save button: text changes from "Save Draft" → "Save & Activate" based on status select.
+This keeps the nav unchanged (per project knowledge: "avoid duplicate pages").
 
 ---
 
-## User Guide updates
+## Files changed
 
-- Remove all "Review Cycle" instructions.
-- Add new section: **Creating Assessment Templates** with adaptive vs. fixed walkthroughs and the new manager flow (assign template → generate assessment).
-- Update the lifecycle flow diagram in the Help page.
 
----
+| File                                                    | Change                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| `src/pages/AssessmentTemplateEditPage.tsx`              | Remove re-attempt toggle                                |
+| `src/stores/templateStore.ts`                           | Drop `reattempt_enabled` from interface/save            |
+| `supabase/migrations/<new>.sql`                         | Create `assessment_assignments`                         |
+| `src/stores/assignmentStore.ts`                         | New store + create/list/status logic                    |
+| `src/stores/assessmentStore.ts`                         | Add `generateFromTemplate` helper                       |
+| `src/stores/attemptStore.ts`                            | Bump assignment status on start/submit/evaluate         |
+| `src/stores/reviewStore.ts`                             | Bump assignment status to `verified` on review complete |
+| `src/components/templates/AssignTemplateDialog.tsx`     | New dialog (domain / users modes)                       |
+| `src/components/templates/TemplateAssignmentsSheet.tsx` | New side sheet listing assignments                      |
+| `src/pages/AssessmentTemplatesPage.tsx`                 | Assign + View Assignments buttons + counts              |
+| `src/pages/TeamAssessmentsPage.tsx`                     | "Assign from Template" CTA                              |
+| `src/integrations/supabase/types.ts`                    | Auto-regenerated                                        |
+
+
+## Validation rules enforced
+
+- Template `status === 'active'` required to open assign dialog.
+- `max_attempts >= 1` (already enforced).
+- Duplicate active assignment → warning + opt-in only (no silent duplicates).
+- Adaptive without employee registry → reported as failure, no assessment created.
+
+## Out of scope (not building now)
+
+- Email notifications (in-app notification only).
+- Assignment scheduling / due dates.
+- Bulk CSV upload of assignees.
