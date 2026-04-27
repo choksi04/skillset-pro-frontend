@@ -6,7 +6,7 @@ import { useAttemptStore } from '@/stores/attemptStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
 import { useCompetencyLevelStore, getRatingLabels, getLevelColorClass, getFormattedLevelLabel } from '@/stores/competencyLevelStore';
-import { useCycleStore } from '@/stores/cycleStore';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -140,9 +140,8 @@ function ReviewCard({ review }: { review: ManagerReview }) {
   const { skills } = useSkillStore();
   const { domains } = useDomainStore();
   const { completeReview, reassignReviewer } = useReviewStore();
-  const { activeCycle } = useCycleStore();
   const { currentRole, user } = useAuth();
-  const currentCycle = activeCycle?.name || useRegistryStore.getState().currentCycle;
+  const currentCycle = useRegistryStore.getState().currentCycle || '';
   const { getAttemptForAssessment } = useAttemptStore();
   const { assessments } = useAssessmentStore();
 
