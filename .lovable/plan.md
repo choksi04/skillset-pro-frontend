@@ -1,99 +1,75 @@
-## Adaptive Assessment Engine
+# Attempt & Evaluation Flow — Hardening Plan
 
-Today, "adaptive" templates pre-generate a fixed list of questions up front (round-robin by skill), then the employee answers them all. We will replace this for **adaptive templates only** with a true adaptive engine that picks the next question after each answer, walks levels up/down based on a streak, and computes the final skill level from the in-session evidence.
+## Current State (already implemented)
 
-Fixed templates remain unchanged.
+The four-step flow you described is largely in place. Quick audit:
 
----
+| Step | Status | Where |
+|---|---|---|
+| **1. Attempt** — start, auto-save on navigation, pause/resume | ✅ Done | `attemptStore.startAttempt`, `saveAnswer`, `pauseAttempt`, `resumeAttempt`; `AssessmentExecPage` saves on every `goTo` |
+| **2. Submission** — lock answers, increment count | ✅ / ⚠️ Partial | `submitAttempt` blocks re-submit; `assignmentStore.updateStatusForAssessment` increments `attempt_count` on first transition only |
+| **3. Evaluation** — MCQ auto, AI for coding/scenario | ✅ Done | `supabase/functions/evaluate-assessment` splits MCQ (local `evaluateMCQ`) vs AI batch |
+| **4. Failure → pending evaluation** | ⚠️ Weak | On error attempt stays `submitted` (UI labels it "Pending Evaluation") but no error reason, no user toast, no failure flag |
 
-### Engine Behavior (per attempt)
+## Gaps to Fix
 
-1. **Skill selection** — pick N skills (round-robin) from the template's domain, scoped by `skill_selection_mode` (`top_n` from registry ratings, or `custom` from `assessment_template_skills`). N = `template.skills_per_assessment`.
-2. **Initial level per skill** — start at the employee's self-rated level for that skill if available, else **L3**.
-3. **Question loop** — for each skill, pick one published MCQ at the current level (correctness from `correctIndex` in MCQ JSON). Track per-skill `correctStreak` / `wrongStreak`.
-4. **Level movement**:
-   - 2 consecutive correct → level up (cap at L5)
-   - 2 consecutive wrong → level down (floor at L1)
-   - Streak resets when level changes or pattern breaks.
-5. **Stop conditions** (per skill):
-   - Reached `template.questions_per_skill` (clamped 4–5), OR
-   - No more questions available at the current level and no fallback available.
-6. **Final level (per skill)** — highest level at which the candidate answered ≥ 2 questions correctly. If none qualify, use `max(1, lastAttemptedLevel - 1)`.
-7. **Edge cases / fallback** — if no question exists at the target level, try level − 1, then level + 1, then nearest available; mark that question as "fallback" so it doesn't aggressively shift the streak.
+### 1. Failure handling is silent
+Today, if `supabase.functions.invoke('evaluate-assessment')` fails or returns 429/402, `submitAttempt` swallows the error in a `console.error` and the user sees a generic "Pending Evaluation" badge with no idea what went wrong.
 
-Final skill scores are stored using the existing `attempt_skill_scores` table. `avg_score` is derived from per-question correctness (correct = 100, wrong = 0) so existing dashboards keep working; `calculated_level` holds the adaptive final level; `target_level` holds the starting level.
+**Fix:**
+- In `attemptStore.submitAttempt`, surface the error: throw it from the function (or return an error object) so `AssessmentExecPage.doSubmit` can show a `toast.error` with the actual reason ("AI credits exhausted", "Rate limit", "Network error", etc.).
+- Store the last evaluation error on the attempt row (new column `evaluation_error TEXT NULL`) so the "Pending Evaluation" badge can show a tooltip with the reason and the user/admin knows whether to retry now or later.
+- Update the badge in `AssessmentExecPage` and `AssessmentDetailPage` to expose the error message (tooltip or inline).
 
----
+### 2. Retry path needs resilience
+`retryEvaluation` already exists. We'll:
+- Clear `evaluation_error` when retry starts.
+- Keep the same submit pipeline (no duplicate code path).
+- Toast success/failure on completion.
 
-### What changes
+### 3. Attempt count on re-attempt (template flow)
+`updateStatusForAssessment` only increments when transitioning `new → in_progress`. For template assignments with `max_attempts > 1`, when an employee re-attempts after a previous evaluated/verified attempt, the counter doesn't move.
 
-**Template editor (no schema change)** — for adaptive templates, restrict question types to **MCQ only** (the engine needs a deterministic correct answer). Keep the type chip but disable Scenario/Coding with a tooltip.
+**Fix:**
+- In `assignmentStore.updateStatusForAssessment`, increment `attempt_count` whenever transitioning *into* `in_progress` from any terminal state (`evaluated`, `verified`) as well as from `new`.
+- Guard against incrementing past `max_attempts` — if the assignment is already at the cap, surface a toast and block the new attempt before `startAttempt` runs.
 
-**Removed for adaptive**: pre-generation of `assessment_questions` at assignment time. Adaptive assignments create the `assessment` row with an empty question list and `is_adaptive = true`. Questions are added one-by-one as the engine selects them.
+### 4. Confirm lock semantics
+`submitAttempt` already early-returns when status is `submitted` or `evaluated`. We'll add the same guard to `saveAnswer` so any in-flight auto-save after submit can't sneak through and mutate a locked attempt.
 
-**Database migration**:
-- `assessments`: add `is_adaptive boolean default false`.
-- `assessment_attempts`: add `adaptive_state jsonb default '{}'::jsonb` (tracks per-skill: currentLevel, correctStreak, wrongStreak, history, finalLevel, attemptedCount).
-- Backfill existing assessments with `is_adaptive = false`.
+## Technical Changes
 
-**New store: `src/stores/adaptiveEngineStore.ts`**
-- `initAdaptiveAttempt(assessmentId)` — picks initial skills + levels, persists to `adaptive_state`.
-- `getNextQuestion(attemptId)` — selects next question (skill round-robin + level + fallback), inserts into `assessment_questions`, returns it.
-- `recordAnswer(attemptId, questionId, isCorrect)` — updates streak, moves level, persists state, marks per-skill stop.
-- `finalizeAdaptiveAttempt(attemptId)` — computes final level per skill (rule: highest level with ≥ 2 correct, else lastLevel − 1), writes `attempt_skill_scores`, marks attempt `evaluated`, syncs assignment status.
-
-**Assignment flow (`src/stores/assignmentStore.ts`)**:
-- For adaptive templates, skip `addAssessment` and instead create the empty `assessments` row with `is_adaptive = true`. Fixed flow unchanged.
-
-**Exam UI (`src/pages/AssessmentExecPage.tsx`)**:
-- When `assessment.is_adaptive`, switch to an adaptive runtime:
-  - On start: call `initAdaptiveAttempt`, then `getNextQuestion`.
-  - On submit-answer: grade locally (compare selected MCQ index to `correctIndex`), call `recordAnswer`, then `getNextQuestion` until engine returns `null` (done).
-  - Hide the "navigate by question index" sidebar; show a "Question X — Skill: Y, Level: Z" header and a single Next button.
-  - On engine-done: call `finalizeAdaptiveAttempt`, no AI evaluation needed (MCQ correctness is deterministic). Skip the existing `submitAttempt` AI path for adaptive; still create the manager review row using the computed `skill_scores`.
-
-**Manager review** — works as today; `skill_scores` already feed into `useReviewStore.createReview`.
-
----
-
-### Validation & Constraints
-
-- Adaptive templates require `domain_id` and `question_types` ⊆ `['mcq']` (UI enforces; saveTemplate validates).
-- `questions_per_skill` is clamped to 4–5 for adaptive at save-time.
-- If a skill has zero MCQs across all 5 levels, the engine drops the skill at init and surfaces a toast: "Skipped {skill} — no MCQs available".
-- If all selected skills are dropped, assignment fails with `reason: 'No MCQs available for any selected skill'`.
-
----
-
-### Files to add/change
-
-- **Migration**: `assessments.is_adaptive`, `assessment_attempts.adaptive_state`.
-- **New**: `src/stores/adaptiveEngineStore.ts`.
-- **Edit**: `src/stores/assignmentStore.ts` — branch on `template.type === 'adaptive'`; create empty assessment.
-- **Edit**: `src/stores/assessmentStore.ts` — extend `Assessment` with `is_adaptive`; small typing only.
-- **Edit**: `src/pages/AssessmentExecPage.tsx` — adaptive runtime branch (new `<AdaptiveRunner />` sub-component to keep diff focused).
-- **Edit**: `src/pages/AssessmentTemplateEditPage.tsx` — restrict adaptive `question_types` to MCQ only; clamp questions_per_skill to 4–5.
-
-No removal of fixed-template behavior. No AI evaluator changes.
-
----
-
-### ASCII flow
-
-```text
-start attempt
-  └─ pick N skills (round-robin)
-  └─ per skill: level = self_rating || 3
-loop:
-  pick skill (round-robin) not yet done
-    pick question at currentLevel (fallback ±1)
-    employee answers
-      correct? streak.correct++   wrong? streak.wrong++
-      if streak.correct == 2 → level = min(5, level+1); reset
-      if streak.wrong   == 2 → level = max(1, level-1); reset
-    skill.attempted++
-    if skill.attempted >= questions_per_skill → mark skill done
-all skills done → finalize
-  per skill: final = max level with ≥ 2 correct, else lastLevel-1
-  write attempt_skill_scores; status = evaluated; create review
+**Migration** (`supabase/migrations/...add_evaluation_error.sql`):
+```sql
+ALTER TABLE public.assessment_attempts
+  ADD COLUMN evaluation_error TEXT NULL;
 ```
+
+**`src/stores/attemptStore.ts`:**
+- `saveAnswer`: early-return if attempt status ≠ `in_progress`.
+- `submitAttempt`: on AI failure, persist `evaluation_error`, leave status as `submitted`, and re-throw so the caller can toast. On success, clear `evaluation_error`.
+- `retryEvaluation`: clear `evaluation_error` before retrying; let errors propagate.
+- Extend `AssessmentAttempt` type with `evaluation_error?: string | null`.
+
+**`src/stores/assignmentStore.ts`:**
+- `updateStatusForAssessment`: increment `attempt_count` on `* → in_progress` from any non-`in_progress` state (so re-attempts count).
+- Add a `canStartNewAttempt(assignmentId)` helper that returns false when `attempt_count >= max_attempts` and the prior attempt is terminal.
+
+**`src/pages/AssessmentExecPage.tsx`:**
+- `doSubmit`: wrap `submitAttempt` in try/catch, show `toast.error(err.message)` on failure, `toast.success` on success.
+- "Pending Evaluation" badge: show a tooltip with `attempt.evaluation_error` when present.
+- Before `startAttempt`, call `canStartNewAttempt`; if false, toast and return.
+
+**`src/pages/AssessmentDetailPage.tsx`** (manager view): mirror the same pending-evaluation tooltip so admins/managers can see *why* a result is stuck.
+
+## Out of Scope
+- No changes to the `evaluate-assessment` edge function (already handles MCQ vs AI split correctly and returns proper 429/402 codes).
+- No changes to the adaptive runner (grades MCQs locally; not affected).
+- No changes to scoring or skill-level math.
+
+## Files Touched
+- `supabase/migrations/<timestamp>_add_evaluation_error.sql` (new)
+- `src/stores/attemptStore.ts`
+- `src/stores/assignmentStore.ts`
+- `src/pages/AssessmentExecPage.tsx`
+- `src/pages/AssessmentDetailPage.tsx`
