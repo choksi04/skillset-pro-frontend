@@ -15,7 +15,7 @@ export interface AssessmentTemplate {
   status: TemplateStatus;
   duration_minutes: number;
   max_attempts: number;
-  reattempt_enabled: boolean;
+  reattempt_enabled: boolean; // derived: max_attempts > 1
   // adaptive
   domain_id: string | null;
   skill_selection_mode: SkillSelectionMode | null;
