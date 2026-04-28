@@ -25,8 +25,9 @@ import {
 import SearchableSelect from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
 import {
-  MessageSquare, Eye, ShieldCheck, Shield, Bell, UserCog,
+  MessageSquare, Eye, ShieldCheck, Shield, Bell, UserCog, ChevronDown,
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 75 ? 'bg-success' : score >= 50 ? 'bg-warning' : 'bg-destructive';
@@ -142,7 +143,6 @@ export default function ManagerReviewPanel({ review, attempt, assessment }: Mana
 
   const [overallComment, setOverallComment] = useState(review.overall_comment);
   const [confirmVerify, setConfirmVerify] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [tenantUsers, setTenantUsers] = useState<{ value: string; label: string }[]>([]);
   const [selectedReviewer, setSelectedReviewer] = useState('');
@@ -215,73 +215,67 @@ export default function ManagerReviewPanel({ review, attempt, assessment }: Mana
           </div>
         </div>
 
-        {/* Skill Review Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/30 text-xs text-muted-foreground">
-                <th className="py-2.5 px-4 text-left font-medium">Skill</th>
-                <th className="py-2.5 px-4 text-center font-medium">Self Rating</th>
-                <th className="py-2.5 px-4 text-center font-medium">AI Assessment</th>
-                <th className="py-2.5 px-4 text-center font-medium">Verified Level</th>
-                <th className="py-2.5 px-4 text-right font-medium">Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {review.skill_reviews.map((sr) => (
-                <SkillReviewRow key={sr.skill_id} entry={sr} skillName={skillMap.get(sr.skill_id)?.skill_name ?? 'Unknown'} reviewId={review.id} isCompleted={isCompleted} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Skill Review Table — collapsible, default open */}
+        <Collapsible defaultOpen>
+          <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group border-b border-border">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Skill Review</h4>
+            <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/30 text-xs text-muted-foreground">
+                    <th className="py-2.5 px-4 text-left font-medium">Skill</th>
+                    <th className="py-2.5 px-4 text-center font-medium">Self Rating</th>
+                    <th className="py-2.5 px-4 text-center font-medium">AI Assessment</th>
+                    <th className="py-2.5 px-4 text-center font-medium">Verified Level</th>
+                    <th className="py-2.5 px-4 text-right font-medium">Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {review.skill_reviews.map((sr) => (
+                    <SkillReviewRow key={sr.skill_id} entry={sr} skillName={skillMap.get(sr.skill_id)?.skill_name ?? 'Unknown'} reviewId={review.id} isCompleted={isCompleted} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
-        {/* AI Feedback Details Toggle */}
-        {attempt && assessment && (
-          <div className="px-5 py-3 border-t border-border">
-            <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setDetailsOpen(!detailsOpen)}>
-              <Eye size={12} /> {detailsOpen ? 'Hide' : 'View'} AI Feedback Details
-            </Button>
-            {detailsOpen && (
-              <div className="mt-3 space-y-3">
-                {attempt.ai_evaluations.map((ev) => {
-                  const q = assessment.assessment_questions.find((aq) => aq.question_id === ev.question_id);
-                  return (
-                    <div key={ev.question_id} className="rounded-lg border border-border p-3 bg-muted/20">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Badge variant="secondary" className="text-xs">{skillMap.get(q?.skill_id ?? '')?.skill_name ?? 'Skill'}</Badge>
-                        <span className="text-xs text-muted-foreground">Score: {ev.score}%</span>
-                      </div>
-                      <p className="text-xs text-foreground">{ev.feedback}</p>
-                      {ev.dimensions.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {ev.dimensions.map((d) => <span key={d.dimension} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{d.dimension}: {d.score}%</span>)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Verify Section */}
+        {/* Verify Section — collapsible, default open while pending */}
         {!isCompleted && (
-          <div className="px-5 py-4 border-t border-border space-y-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Overall Comment</Label>
-              <Textarea value={overallComment} onChange={(e) => setOverallComment(e.target.value)} rows={3} placeholder="Add overall review notes..." className="text-sm" />
-            </div>
-            <div className="flex justify-end">
-              <Button size="sm" onClick={() => setConfirmVerify(true)} className="gap-1.5"><ShieldCheck size={14} /> Mark Verified</Button>
-            </div>
-          </div>
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group border-t border-border">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verify & Submit</h4>
+              <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-5 py-4 space-y-3 border-t border-border">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Overall Comment</Label>
+                  <Textarea value={overallComment} onChange={(e) => setOverallComment(e.target.value)} rows={3} placeholder="Add overall review notes..." className="text-sm" />
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={() => setConfirmVerify(true)} className="gap-1.5"><ShieldCheck size={14} /> Mark Verified</Button>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {isCompleted && review.overall_comment && (
-          <div className="px-5 py-3 border-t border-border">
-            <p className="text-xs text-muted-foreground"><span className="font-medium">Manager Notes:</span> "{review.overall_comment}"</p>
-          </div>
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group border-t border-border">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Manager Notes</h4>
+              <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-5 py-3 border-t border-border">
+                <p className="text-xs text-muted-foreground italic">"{review.overall_comment}"</p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {isCompleted && (

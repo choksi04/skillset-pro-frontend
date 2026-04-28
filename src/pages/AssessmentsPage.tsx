@@ -105,7 +105,12 @@ export default function AssessmentsPage() {
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {a.assessment_questions.length} questions · {a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
+                      {a.is_adaptive
+                        ? 'Adaptive · questions chosen as you go'
+                        : a.assessment_questions.length === 0
+                          ? 'Questions pending generation'
+                          : `${a.assessment_questions.length} questions`}
+                      {' · '}{a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
