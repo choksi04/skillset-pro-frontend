@@ -345,7 +345,7 @@ export default function AssessmentDetailPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           {[
-            `${assessment.assessment_questions.length} questions`,
+            questionCountLabel,
             `${assessment.duration_minutes} min`,
             new Date(assessment.created_at).toLocaleDateString(),
           ]
@@ -359,7 +359,14 @@ export default function AssessmentDetailPage() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Questions</p>
-            <p className="text-2xl font-bold text-foreground">{assessment.assessment_questions.length}</p>
+            {assessment.is_adaptive ? (
+              <>
+                <p className="text-2xl font-bold text-foreground">{adaptiveCap ?? "—"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">max (adaptive)</p>
+              </>
+            ) : (
+              <p className="text-2xl font-bold text-foreground">{assessment.assessment_questions.length}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
