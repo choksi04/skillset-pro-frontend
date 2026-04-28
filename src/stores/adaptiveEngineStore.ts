@@ -65,6 +65,13 @@ interface AdaptiveEngineStore {
   ) => Promise<void>;
   /** Compute final per-skill levels and write attempt_skill_scores. Returns the scores. */
   finalizeAdaptiveAttempt: (attemptId: string, assessmentId: string) => Promise<SkillScore[]>;
+  /**
+   * Backfill `ai_evaluations` + `attempt_skill_scores` + `total_ai_score` for an
+   * adaptive attempt that was finalized before per-question evaluation rows were
+   * being written. Idempotent: no-op when ai_evaluations already exist for the
+   * attempt or when the adaptive history is empty.
+   */
+  reconstructEvaluationsFromHistory: (attemptId: string) => Promise<boolean>;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
