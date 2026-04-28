@@ -1,74 +1,55 @@
-## Goals
+## Goal
 
-Fix the post-submission assessment view so employees and managers can see meaningful per-question results, enable re-attempts, and clean up the manager review UI.
+On the **My Assessment** detail page (employee viewing their own submitted assessment), show the list of attempted questions with **correct / wrong** results inline.
 
-Remove the confidence level from the system, we don't need this as of MVP.
+## Current behavior (verified)
 
-When Assessment questions are not generated yet, it is showing zero questions on the assessment card when user is opening the "My Assessment" page. It is showing wrong details as questions are not yet finalized.
+- `EvalResults` already renders per-question results with right/wrong badges and AI feedback. It is rendered for both owner and manager when `attempt.status` is `evaluated` / `reviewed`.
+- The user's current attempt (`61141411…`) has:
+  - status = `evaluated`, `total_ai_score` = 13
+  - **16 `attempt_answers` rows but 0 `ai_evaluations` rows**
+- Reason: this adaptive attempt was finalized **before** the recent fix that writes `ai_evaluations` rows during `finalizeAdaptiveAttempt`. So `EvalResults` shows "Overall AI Score 13" but the per-question section is empty.
+- The Assessment Questions table is currently gated `!isOwner` — owners never see the question list, only managers do.
 
----
+## Plan
 
-## Root cause analysis
+### 1. Backfill `ai_evaluations` for adaptive attempts missing them
+Add a one-time, on-demand reconstruction helper invoked from `AssessmentDetailPage` when:
+- `attempt.status` is `submitted` / `evaluated` / `reviewed`, AND
+- `attempt.ai_evaluations.length === 0`, AND
+- `attempt.adaptive_state` contains a `skills[].history` array with `{question_id, correct}` entries.
 
-**Why "0 questions evaluated" / empty Per-Question Results:**
+Behavior:
+- For each history entry, insert an `ai_evaluations` row: `score = correct ? 100 : 0`, `feedback = "Correct answer." | "Incorrect — review the correct option."`, `confidence = 100`, `dimensions = []`.
+- Recompute `attempt_skill_scores` (avg + level) and `assessment_attempts.total_ai_score` from those rows so the cards reflect reality (the current `13` is stale).
+- Idempotent: skip if rows already exist.
+- Triggered automatically once on detail-page load when the gap is detected; also exposed as a "Recompute results" button in the existing pending-evaluation strip for safety.
 
-The assessment in question is **adaptive**. Adaptive MCQs are graded locally inside `adaptiveEngineStore.recordAnswer` / `finalizeAdaptiveAttempt` and the attempt is marked `evaluated` directly — but **no rows are ever written to `ai_evaluations**`. `EvalResults.tsx` iterates `attempt.ai_evaluations` to render the overall AI score, dimension averages, and the Per-Question Results section, so all three appear empty.
+### 2. Show the question list to the owner on submitted assessments
+Currently the **Assessment Questions** collapsible is `!isOwner && isAdmin`. Extend it so it also renders for the owner once the attempt is terminal (`submitted` / `evaluated` / `reviewed`). For owners:
+- Hide the admin-only Action column and the "Add Question" button (no editing).
+- Default `Collapsible` open so the user immediately sees the list of attempted questions.
+- Keep the same columns: `#`, Question, Skill, Level, Type.
 
-The fixed (non-adaptive) flow uses `evaluate-assessment` Edge Function, which DOES write `ai_evaluations`, so it works there.
+### 3. Per-question Result column for owners
+Inside this owner-visible question list, add a **Result** column showing:
+- `✓ Correct` (success) / `✗ Incorrect` (destructive) badge derived from the matching `ai_evaluations` row (`score >= 50` ⇒ correct for non-MCQ, MCQ uses score === 100).
+- `—` if there is still no evaluation for that question.
 
-**Why no Re-attempt button:** `AssessmentDetailPage` only shows Start (when `pending`) or Resume (when `in_progress`). It never renders a Re-attempt CTA when the attempt is `evaluated` or `submitted`, even though `canStartNewAttempt()` and `assignment.max_attempts` already support multiple attempts.
+This gives a quick scannable list. The full per-question breakdown (employee answer, correct option, AI feedback) remains available below in the existing `EvalResults` "Per-Question Results" section, which the backfill in step 1 will now populate.
 
----
-
-## Changes
-
-### A. Adaptive engine — write per-question evaluations
-
-`src/stores/adaptiveEngineStore.ts` › `finalizeAdaptiveAttempt`:
-
-- For each entry in `skill.history`, insert an `ai_evaluations` row with:
-  - `question_id`, `attempt_id`
-  - `score`: 100 if `correct`, else 0
-  - `feedback`: "Correct answer." / "Incorrect — selected option did not match the correct answer."
-  - `dimensions`: `[]` (MCQ — no rubric dimensions, matches existing EvalResults handling that hides dimensions for MCQ)
-- Update `useAttemptStore` local state with these evaluations so the UI reflects them without a full refetch.
-- Recompute `total_ai_score` from these evaluations (currently it's an average of skill avg_scores — keep behaviour but also expose the per-question detail).
-
-This makes adaptive results render identically to fixed results in `EvalResults` (Overall AI Score, Per-Question Results grouped by skill, with right/wrong badges via the existing MCQ correctness rendering).
-
-### B. Re-attempt button on the detail page
-
-`src/pages/AssessmentDetailPage.tsx`:
-
-- After the attempt is `evaluated`/`submitted`/`reviewed`, if `canStartNewAttempt(assessment.id).allowed === true` AND `isOwner`, render a **"Re-attempt"** button (`RotateCcw` icon) alongside the existing CTAs.
-- Clicking it calls the existing `handleStartRunner()` (which already handles assignment increment + status reset).
-- Show a small helper line: `Attempt {attempt_count}/{max_attempts}` from the assignment.
-
-### C. Manager review UI cleanup
-
-`src/components/assessment/ManagerReviewPanel.tsx`:
-
-- **Remove** the "View AI Feedback Details" toggle block (lines 238–266). The Per-Question Results from `EvalResults` already provides this information and is now shared between owner and manager views.
-- Wrap the **Skill Review Table**, **Verify Section**, and **Manager Notes** in shadcn `Accordion` items so each section is collapsible. Default open: Skill Review Table.
-
-`src/pages/AssessmentDetailPage.tsx`:
-
-- Wrap the **Assessment Questions admin table** (lines 480–547) in a `Collapsible`, default **closed** when the assessment status is `completed`/`evaluated`/`approved` (manager viewing a submitted assessment). Default open when `pending`/`in_progress`.
-- Wrap the **Skills list** line (lines 404–409) and **EvalResults** block in `Collapsible`s with sensible defaults (EvalResults open by default).
-
-### D. Shared EvalResults usage (managers see same per-question results)
-
-`EvalResults` is already rendered for both owner and manager (line 550 of AssessmentDetailPage gates only on `isEvaluated`). After change A, managers automatically get the same Per-Question Results with right/wrong badges and feedback. No changes needed there beyond what A delivers.
-
----
+### 4. Surface the question list section regardless of `isEvaluated`
+The "Evaluation Results" `Collapsible` is already gated by `isEvaluated`. After the backfill runs, the existing attempt becomes properly populated and this section will work as designed for both owner and manager — no further change needed there.
 
 ## Files to touch
 
-- `src/stores/adaptiveEngineStore.ts` — write `ai_evaluations` rows in `finalizeAdaptiveAttempt`; update local attempt cache.
-- `src/pages/AssessmentDetailPage.tsx` — add Re-attempt button; wrap admin question table and EvalResults in collapsibles.
-- `src/components/assessment/ManagerReviewPanel.tsx` — remove "View AI Feedback Details" block; wrap sections in Accordion.
+- `src/stores/adaptiveEngineStore.ts` — add `reconstructEvaluationsFromHistory(attemptId)` helper that performs the backfill described in step 1 (also recomputes `attempt_skill_scores` + `total_ai_score`).
+- `src/pages/AssessmentDetailPage.tsx`
+  - On mount / when attempt is loaded, detect the gap and call the helper, then `fetchAttempts()`.
+  - Loosen the Assessment Questions gate so owners see it on terminal attempts (read-only) with a new `Result` column.
+- No DB migration required (uses existing tables/columns).
 
 ## Out of scope
 
-- Routing the results into a separate URL/page — the detail page already IS a dedicated route (`/assessments/:id`, `/team-assessments/:id`). Per-question results stay on this page in the now-richer EvalResults section. (If a fully separate `/assessments/:id/results` route is desired, please confirm — current scope keeps results on the dedicated detail page.)
-- Re-running AI evaluation on existing already-finalized adaptive attempts retroactively. The fix applies to new submissions; existing ones can be backfilled with a one-shot script if needed.
+- Changing the AI evaluation pipeline for fixed (non-adaptive) assessments — that path already writes `ai_evaluations` correctly.
+- Reworking the manager view (already updated in the previous turn).
