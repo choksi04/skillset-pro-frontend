@@ -5,9 +5,8 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useAssignmentStore } from '@/stores/assignmentStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -58,7 +57,7 @@ export default function AssignTemplateDialog({
     return templates.find((t) => t.id === templateId) ?? null;
   }, [initialTemplate, showTemplatePicker, templates, templateId]);
 
-  // Init when dialog opens
+  // Init when sheet opens
   useEffect(() => {
     if (!open) return;
     fetchTemplates();
@@ -76,7 +75,7 @@ export default function AssignTemplateDialog({
       setPickedDomain('');
       setMode('domain');
     }
-    // Fetch users (managers only see their domain)
+    // Fetch users (managers only see their domain). Self IS included.
     (async () => {
       const q = supabase.from('users').select('id, full_name, email, domain_id, role').eq('status', 'active');
       const { data } = await q;
@@ -84,8 +83,6 @@ export default function AssignTemplateDialog({
       if (currentRole === 'manager' && user?.domain_id) {
         rows = rows.filter((u) => u.domain_id === user.domain_id);
       }
-      // Exclude self
-      rows = rows.filter((u) => u.id !== user?.id);
       setUsers(rows);
     })();
   }, [open, initialTemplate?.id]);
@@ -103,18 +100,25 @@ export default function AssignTemplateDialog({
     return list;
   }, [users, mode, pickedDomain, search]);
 
-  // Auto-pre-select all when domain mode loads candidates
-  useEffect(() => {
-    if (mode === 'domain' && pickedDomain) {
-      setPickedUsers(new Set(candidateUsers.map((u) => u.id)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, pickedDomain]);
-
   const toggleUser = (id: string) => {
     setPickedUsers((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const visibleIds = useMemo(() => candidateUsers.map((u) => u.id), [candidateUsers]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => pickedUsers.has(id));
+
+  const toggleSelectAll = () => {
+    setPickedUsers((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
       return next;
     });
   };
@@ -160,24 +164,29 @@ export default function AssignTemplateDialog({
 
     if (result.failed.length > 0) {
       console.warn('Failed assignments:', result.failed);
+      const reasons = [...new Set(result.failed.map((f) => f.reason))];
+      reasons.slice(0, 2).forEach((r) => toast.error(r));
     }
 
     if (result.created.length > 0) onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[560px] p-0 flex flex-col h-full"
+      >
+        <SheetHeader className="px-6 py-4 border-b shrink-0">
+          <SheetTitle className="flex items-center gap-2 text-base">
             <UserCheck size={16} className="text-primary" /> Assign Assessment
-          </DialogTitle>
-          <DialogDescription>
-            Send an assessment to selected employees. Each employee will be notified and the assessment will appear in their list.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription className="text-xs">
+            Send an assessment to selected employees. Each one will be notified and the assessment will appear in their list.
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {showTemplatePicker && (
             <div className="space-y-1.5">
               <Label className="text-xs">Template *</Label>
@@ -206,7 +215,7 @@ export default function AssignTemplateDialog({
               </div>
               {template.type === 'adaptive' && (
                 <p className="text-[11px] text-muted-foreground">
-                  Adaptive — pulls questions from the employee's latest registry submission.
+                  Adaptive — uses the employee's latest registry submission when available, otherwise falls back to domain skills.
                 </p>
               )}
             </div>
@@ -254,15 +263,33 @@ export default function AssignTemplateDialog({
                 </div>
               </TabsContent>
 
+              {/* Select All toolbar */}
+              <div className="flex items-center justify-between mt-3 px-1">
+                <span className="text-[11px] text-muted-foreground">
+                  {pickedUsers.size} of {candidateUsers.length} selected
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={candidateUsers.length === 0}
+                  onClick={toggleSelectAll}
+                >
+                  {allVisibleSelected ? 'Deselect all' : 'Select all'}
+                </Button>
+              </div>
+
               {/* Candidate list */}
-              <div className="rounded-lg border border-border max-h-72 overflow-y-auto mt-3">
+              <div className="rounded-lg border border-border mt-2">
                 {candidateUsers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground p-3 text-center">
+                  <p className="text-xs text-muted-foreground p-4 text-center">
                     {mode === 'domain' && !pickedDomain ? 'Select a domain to see candidates.' : 'No matching users.'}
                   </p>
                 ) : (
                   candidateUsers.map((u) => {
                     const isDup = !!getActiveAssignmentsForEmployee(template.id, u.id);
+                    const isSelf = u.id === user?.id;
                     return (
                       <label
                         key={u.id}
@@ -273,7 +300,14 @@ export default function AssignTemplateDialog({
                           onCheckedChange={() => toggleUser(u.id)}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">{u.full_name}</p>
+                          <p className="text-xs font-medium text-foreground truncate flex items-center gap-1.5">
+                            {u.full_name}
+                            {isSelf && (
+                              <Badge variant="outline" className="text-[9px] py-0 px-1 border-primary/30 text-primary">
+                                You
+                              </Badge>
+                            )}
+                          </p>
                           <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
                         </div>
                         {isDup && (
@@ -288,7 +322,7 @@ export default function AssignTemplateDialog({
               </div>
 
               {duplicates.size > 0 && (
-                <label className="flex items-center gap-2 text-xs text-foreground">
+                <label className="flex items-center gap-2 text-xs text-foreground mt-3">
                   <Checkbox checked={overrideDuplicates} onCheckedChange={(v) => setOverrideDuplicates(!!v)} />
                   Re-assign even if employee already has an active assignment ({duplicates.size})
                 </label>
@@ -304,14 +338,15 @@ export default function AssignTemplateDialog({
           )}
         </div>
 
-        <DialogFooter>
+        {/* Sticky footer */}
+        <div className="border-t bg-background px-6 py-3 flex justify-end gap-2 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
           <Button onClick={handleAssign} disabled={!!blocker || submitting}>
             {submitting ? <Loader2 size={13} className="animate-spin mr-1.5" /> : null}
             Assign
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
