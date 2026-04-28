@@ -1,0 +1,1 @@
+UPDATE competency_levels SET score_range_min = 90, score_range_max = 100 WHERE level = 5;
