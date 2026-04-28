@@ -4,7 +4,7 @@ import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuest
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useCompetencyLevelStore } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, scoreToLevelDynamic, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 
@@ -453,11 +453,34 @@ export default function AssessmentDetailPage() {
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">AI Score</p>
             {attempt?.total_ai_score != null ? (
-              <p
-                className={`text-2xl font-bold ${attempt.total_ai_score >= 75 ? "text-success" : attempt.total_ai_score >= 50 ? "text-warning" : "text-destructive"}`}
-              >
-                {attempt.total_ai_score}%
-              </p>
+              <>
+                <p
+                  className={`text-2xl font-bold ${attempt.total_ai_score >= 75 ? "text-success" : attempt.total_ai_score >= 50 ? "text-warning" : "text-destructive"}`}
+                >
+                  {attempt.total_ai_score}%
+                </p>
+                {(() => {
+                  const aiLevel = scoreToLevelDynamic(competencyLevels, attempt.total_ai_score);
+                  const verifiedLevels = (review?.skill_reviews ?? [])
+                    .map((s: any) => s.verified_level)
+                    .filter((v: any) => typeof v === "number");
+                  const verifiedAvg = verifiedLevels.length > 0
+                    ? Math.round(verifiedLevels.reduce((a: number, b: number) => a + b, 0) / verifiedLevels.length)
+                    : null;
+                  return (
+                    <div className="mt-1.5 flex flex-col items-center gap-1">
+                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                        AI: {getFormattedLevelLabel(competencyLevels, aiLevel)}
+                      </Badge>
+                      {verifiedAvg != null && review?.status === "completed" && (
+                        <Badge className="text-[10px] h-5 px-1.5 bg-success/15 text-success border-success/30">
+                          Verified: {getFormattedLevelLabel(competencyLevels, verifiedAvg)}
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
             ) : (
               <p className="text-2xl font-bold text-muted-foreground">—</p>
             )}
