@@ -112,12 +112,10 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                         className="w-full flex items-start gap-3 px-5 py-3 text-left hover:bg-muted/20 transition-colors"
                         onClick={() => setExpandedId(isExpanded ? null : ev.question_id)}
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                          ev.score >= 75 ? 'bg-success/15 text-success' :
-                          ev.score >= 50 ? 'bg-warning/15 text-warning' :
-                          'bg-destructive/15 text-destructive'
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          ev.score >= 50 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
                         }`}>
-                          {ev.score}
+                          {ev.score >= 50 ? <CheckCircle size={16} /> : <XCircle size={16} />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-foreground line-clamp-2">{question ? getDisplayQuestionText(question.question_text, question.question_type) : 'Question unavailable'}</p>
@@ -153,13 +151,15 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                             </div>
                           </div>
 
-                          {/* AI Feedback */}
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                              <MessageSquare size={10} /> AI Feedback
-                            </p>
-                            <p className="text-xs text-foreground bg-primary/5 border border-primary/10 rounded-lg p-3">{ev.feedback}</p>
-                          </div>
+                          {/* Feedback */}
+                          {ev.feedback && (
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                                <MessageSquare size={10} /> Feedback
+                              </p>
+                              <p className="text-xs text-foreground bg-primary/5 border border-primary/10 rounded-lg p-3">{ev.feedback}</p>
+                            </div>
+                          )}
 
                           {/* Dimension scores — hide for MCQ (binary) */}
                           {!isMCQ && ev.dimensions.length > 0 && (
