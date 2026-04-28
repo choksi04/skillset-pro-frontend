@@ -4,7 +4,7 @@ import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuest
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useCompetencyLevelStore, scoreToLevelDynamic, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore } from "@/stores/competencyLevelStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 
