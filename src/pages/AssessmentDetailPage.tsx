@@ -283,11 +283,22 @@ export default function AssessmentDetailPage() {
     assessment.is_adaptive && linkedTemplate
       ? Math.max(1, (linkedTemplate.skills_per_assessment ?? 0) * (linkedTemplate.questions_per_skill ?? 0))
       : null;
+  const actualQuestionCount = assessment.assessment_questions.length;
+  const questionsNotYetGenerated = !assessment.is_adaptive && actualQuestionCount === 0;
   const questionCountLabel = assessment.is_adaptive
     ? adaptiveCap
       ? `Up to ${adaptiveCap} questions (adaptive)`
       : `Adaptive`
-    : `${assessment.assessment_questions.length} questions`;
+    : questionsNotYetGenerated
+      ? `Questions pending generation`
+      : `${actualQuestionCount} questions`;
+
+  // Re-attempt eligibility (after a terminal attempt, when assignment still has attempts left)
+  const assignment = useAssignmentStore.getState().getAssignmentByAssessmentId(assessment.id);
+  const isAttemptTerminal =
+    attempt && (attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed");
+  const reattemptGate = isOwner && isAttemptTerminal ? canStartNewAttempt(assessment.id) : { allowed: false };
+  const canReattempt = isOwner && isAttemptTerminal && reattemptGate.allowed;
 
   // Inline runner mode — replaces the legacy /assessment-exec page
   if (runnerActive && isOwner) {
