@@ -141,6 +141,38 @@ export default function AssessmentDetailPage() {
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
 
+  // Map question_id -> ai evaluation row for the result badge column
+  const evalByQuestionId = useMemo(() => {
+    const m = new Map<string, { score: number }>();
+    for (const ev of attempt?.ai_evaluations ?? []) m.set(ev.question_id, { score: ev.score });
+    return m;
+  }, [attempt?.ai_evaluations]);
+
+  // Backfill ai_evaluations for adaptive attempts that were finalized before
+  // per-question rows were being written. Idempotent. Runs once when the gap
+  // is detected for this attempt.
+  const [backfilled, setBackfilled] = useState<string | null>(null);
+  useEffect(() => {
+    if (!attempt || !assessment) return;
+    const isTerminal =
+      attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed";
+    if (!isTerminal) return;
+    if ((attempt.ai_evaluations?.length ?? 0) > 0) return;
+    if (!assessment.is_adaptive) return;
+    if (backfilled === attempt.id) return;
+    setBackfilled(attempt.id);
+    useAdaptiveEngineStore
+      .getState()
+      .reconstructEvaluationsFromHistory(attempt.id)
+      .then((didWork) => {
+        if (didWork) {
+          fetchAttempts();
+          toast.success("Per-question results restored");
+        }
+      })
+      .catch(() => {/* silent */});
+  }, [attempt?.id, attempt?.status, attempt?.ai_evaluations?.length, assessment?.is_adaptive, backfilled, fetchAttempts, assessment]);
+
   // Fetch employee name for team view
   useEffect(() => {
     if (!assessment || isOwner) return;
