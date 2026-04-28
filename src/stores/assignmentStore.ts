@@ -192,7 +192,8 @@ async function generateAssessmentForTemplate(
     return { assessmentId: null, reason: 'Adaptive template missing domain' };
   }
 
-  // Verify the employee has a submitted registry for this domain (engine needs self-ratings).
+  // Registry submission is OPTIONAL. If the employee has one, we use it for
+  // self-rating-driven skill picking; otherwise we fall back to domain skills.
   const { data: subs } = await supabase
     .from('skill_registry_submissions')
     .select('id')
@@ -203,9 +204,7 @@ async function generateAssessmentForTemplate(
     .order('submitted_at', { ascending: false })
     .limit(1);
   const submission = subs?.[0];
-  if (!submission) {
-    return { assessmentId: null, reason: 'Employee has not submitted a registry for this domain yet' };
-  }
+  const submissionId = submission?.id ?? `tmpl-${template.id}`;
 
   // Pre-flight: make sure we can resolve at least one usable skill with MCQs.
   let candidateSkills: string[] = [];
@@ -215,7 +214,7 @@ async function generateAssessmentForTemplate(
       .select('skill_id')
       .eq('template_id', template.id);
     candidateSkills = (tplSkills || []).map((s: any) => s.skill_id);
-  } else {
+  } else if (submission) {
     const { data: ratingsData } = await supabase
       .from('skill_self_ratings')
       .select('skill_id, rating')
@@ -225,8 +224,19 @@ async function generateAssessmentForTemplate(
       .slice(0, template.skills_per_assessment)
       .map((r: any) => r.skill_id);
   }
+  // Fallback: pull skills mapped to the domain when no registry / no ratings.
   if (candidateSkills.length === 0) {
-    return { assessmentId: null, reason: 'No matching skills in employee registry' };
+    const { data: domainSkills } = await supabase
+      .from('domain_skill_mappings')
+      .select('skill_id')
+      .eq('domain_id', template.domain_id)
+      .is('deleted_on', null);
+    candidateSkills = (domainSkills || [])
+      .map((s: any) => s.skill_id)
+      .slice(0, template.skills_per_assessment);
+  }
+  if (candidateSkills.length === 0) {
+    return { assessmentId: null, reason: 'No skills available for this domain' };
   }
   const { data: mcqRows } = await supabase
     .from('questions')

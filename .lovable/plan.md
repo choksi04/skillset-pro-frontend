@@ -1,86 +1,74 @@
-## Manager Review — Rebuild to Literal Spec
+# Fix Assign Assessment flow
 
-Collapse the existing 3-action model (Approve / Adjust / Reassess) into the simpler flow defined in the spec:
+Four related issues in `AssignTemplateDialog` and `assignmentStore`:
 
-- **STEP 1 — View**: answers + AI evaluation
-- **STEP 2 — Actions**: adjust score, add comments, mark verified
-- **STEP 3 — Rule**: final score = verified score (manager's value)
-
-"Reassess" disappears as a per-skill action. Reassessment remains a separate, existing flow (`reassessment_requests` table, triggered elsewhere) and is unaffected. Reassess is out of scope completely.
-
----
-
-### Behavior changes
-
-**Per-skill row (new model)**
-
-- Always shows: Skill · Self Rating · AI Level + Score · Verified Level · Comment.
-- "Verified Level" defaults to the AI-calculated level. Manager can edit it inline (Select L1–L5) — editing it is the "adjust score" action.
-- Inline comment icon opens a small popover/dialog to edit per-skill comment.
-- A row is considered "actioned" once the manager has touched it (changed the level OR explicitly clicked Verify on the row, OR the panel-level Verify-All is used).
-
-**Panel actions**
-
-- Per-skill: edit Verified Level + edit Comment (auto-saved).
-- Overall: Overall Comment textarea + single primary button **"Mark Verified"** (replaces "Finalize Review").
-- "Mark Verified" requires every row to have a Verified Level set (defaults to AI level on load, so this is satisfied unless explicitly cleared).
-
-**Final score rule**
-
-- On Mark Verified: every skill produces an `official_skill_entries` row with `final_level = verified_level` (the manager's value, which is AI level by default or the adjusted value).
-- No skill is dropped (today's "reassess" filter is removed).
-- Assignment status transitions to `verified` (already wired via `syncAssignmentForReview`).
+1. Assignment fails with "Employee has not submitted a registry for this domain yet" — registry submission was made a hard prerequisite, but per spec it is **optional**.
+2. The Assign UI is a centered modal — should be a **right-side Sheet** (consistent with rest of app) with a **sticky footer**.
+3. No **Select All / Deselect All** control.
+4. The **current user (creator)** is filtered out of the candidate list, so an admin/manager creating an assessment can't assign one to themselves.
 
 ---
 
-### Files to change
+## Changes
 
-**Data model (migration)**
+### 1. `src/stores/assignmentStore.ts` — registry no longer required
 
-- `supabase/migrations/<ts>_review_verified_score.sql`
-  - `ALTER TABLE review_skill_entries ADD COLUMN verified_level integer`.
-  - Backfill: `verified_level = COALESCE(manager_adjusted_level, ai_calculated_level)` for existing rows where `manager_action` is not 'reassess'.
-  - Keep `manager_action` and `manager_adjusted_level` columns (don't drop — historical data + reduces blast radius). New code stops writing to them.
+In `generateAssessmentForTemplate` (adaptive branch):
 
-**Store (`src/stores/reviewStore.ts`)**
+- **Remove** the hard block that returns `"Employee has not submitted a registry for this domain yet"`.
+- Still attempt to look up the latest submitted registry to use its `id` as `submission_id` and to pull self-ratings when `skill_selection_mode !== 'custom'`.
+- If **no submission exists**:
+  - Use a synthetic `submission_id` like `tmpl-<templateId>` (mirrors the fixed branch).
+  - For `skill_selection_mode === 'custom'`, proceed with the template's explicit skill list (no registry needed).
+  - For default mode (registry-driven skill picking), fall back to **all skills mapped to the template's domain** via `domain_skill_mappings`, capped at `template.skills_per_assessment`. If still empty → fail with `"No skills available for this domain"`.
+- Keep the existing MCQ availability pre-flight check.
 
-- Remove `ReviewAction` type. Replace `SkillReviewEntry` fields:
-  - drop `manager_action`, `manager_adjusted_level`
-  - add `verified_level: number`, initialized to `ai_calculated_level`
-- Replace `setSkillAction(...)` with `setVerifiedLevel(reviewId, skillId, level)`.
-- Keep `setSkillComment`, `setOverallComment`.
-- Rename `completeReview` → `verifyReview`. New logic: insert one `official_skill_entries` row per skill using `verified_level` as `final_level`. No filtering.
-- `fetchReviews`: read `verified_level` (fallback to `ai_calculated_level`).
-- `createReview`: insert with `verified_level = ai_calculated_level`.
+The adaptive engine (`adaptiveEngineStore.ts`) already handles a missing submission gracefully (`if (submission)` guard), so runtime is safe.
 
-**UI**
+### 2. `src/components/templates/AssignTemplateDialog.tsx` — Sheet + sticky footer
 
-- `src/components/assessment/ManagerReviewPanel.tsx` — rewrite skill row + footer:
-  - Replace Approve/Adjust/Reassess buttons with an inline Verified-Level Select + comment icon.
-  - Replace "Finalize Review" with "Mark Verified" (confirmation dialog updated copy).
-  - Drop the "skills marked for reassessment will not generate entries" warning.
-- `src/pages/ReviewsPage.tsx` — same row/footer rebuild as the panel above.
-- `src/pages/AssessmentDetailPage.tsx` — `getEffectiveStatus`: rename `"approved"` label/key path if needed (it currently maps `review.status === 'completed'` → `"approved"`; keep the key, just ensure the badge reads "Verified").
-- `src/stores/onboardingStore.ts` — update Manager step copy from "Approve, adjust, or request reassessment for each skill." to "Adjust scores and mark each review as verified.".
+- Replace `Dialog`/`DialogContent`/`DialogHeader`/`DialogFooter` with `Sheet`/`SheetContent` (`side="right"`, width ~`w-[560px] sm:max-w-[560px]`).
+- Layout `SheetContent` as a flex column: `flex flex-col h-full`.
+  - `SheetHeader` — fixed at top (no scroll).
+  - Scrollable middle region: `<div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">` containing template summary, mode tabs, domain/search inputs, candidate list, duplicates checkbox, summary line.
+  - Footer: `<div className="border-t bg-background px-6 py-3 flex justify-end gap-2 shrink-0">` with Cancel + Assign buttons. Always visible.
+- The candidate list inside loses its own `max-h-72` — it can grow naturally because the parent already scrolls. Keep a sensible min height for empty state.
+- Rename component file usage stays the same; export name unchanged.
 
-**Untouched**
+### 3. Select All / Deselect All
 
-- `reassessment_requests` table and the existing reassessment workflow (separate feature). - Remove this as this is out of scope now
-- Notifications, reviewer reassignment, AI feedback details panel.
-- Assignment status machine — `verified` already wired.
+Above the candidate list, add a small toolbar row showing:
+
+- Left: `"<n> of <total> selected"` text.
+- Right: a single ghost button that toggles between **Select all** and **Deselect all** based on whether all currently visible candidates are selected.
+
+Selection respects the current filter (search / picked domain) — only operates on `candidateUsers`.
+
+Remove the auto-pre-select-all `useEffect` that runs when domain mode loads (it surprises the user); rely on the explicit Select all button instead. Keep `pickedUsers` reset on dialog open.
+
+### 4. Include the creator in the candidate list
+
+In the user fetch effect:
+
+- **Remove** the `rows = rows.filter((u) => u.id !== user?.id)` line so the current user appears.
+- Render a small `(You)` badge next to the creator's name in the row for clarity.
+- Manager scope filter (`u.domain_id === user.domain_id`) is preserved — the manager's own domain assignment already includes themselves.
+
+No store changes needed for this; assignment logic already supports any `employee_id`.
 
 ---
 
-### Edge cases
+## Files touched
 
-- Existing in-flight reviews with `manager_action = 'reassess'` and no `verified_level` after migration: backfill leaves `verified_level` NULL for those rows; UI defaults the Select to `ai_calculated_level` so manager can still finish them under the new model. They will produce an official entry on Mark Verified (no longer skipped).
-- Self-review (reviewer == employee) flow unchanged.
-- Admin reviewer reassignment unchanged.
+- `src/stores/assignmentStore.ts` — relax adaptive registry requirement; add domain-skill fallback.
+- `src/components/templates/AssignTemplateDialog.tsx` — Sheet conversion, sticky footer, Select All toggle, include self with `(You)` badge.
+
+No DB migration. No changes to other callers — `AssignTemplateDialog` is invoked from `AssessmentTemplatesPage` and `TeamAssessmentsPage` with the same props.
 
 ---
 
-### Out of scope
+## Out of scope
 
-- No changes to the assessment generation, AI evaluation, attempt, or registry submission flows.
-- No new permissions or RBAC changes.
-- Reassess
+- Reworking the registry-driven skill ranking algorithm beyond the simple "fall back to domain skills" path.
+- Changing `TemplateAssignmentsSheet` (already a Sheet).
+- Touching the unrelated `UsersPage` Badge ref warning visible in console logs.
