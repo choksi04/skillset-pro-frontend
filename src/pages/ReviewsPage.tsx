@@ -247,34 +247,7 @@ function ReviewCard({ review }: { review: ManagerReview }) {
               </table>
             </div>
 
-            {attempt && assessment && (
-              <div className="px-5 py-3 border-t border-border">
-                <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setDetailsOpen(!detailsOpen)}>
-                  <Eye size={12} /> {detailsOpen ? 'Hide' : 'View'} AI Feedback Details
-                </Button>
-                {detailsOpen && (
-                  <div className="mt-3 space-y-3">
-                    {attempt.ai_evaluations.map((ev) => {
-                      const q = assessment.assessment_questions.find((aq) => aq.question_id === ev.question_id);
-                      return (
-                        <div key={ev.question_id} className="rounded-lg border border-border p-3 bg-muted/20">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Badge variant="secondary" className="text-xs">{skillMap.get(q?.skill_id ?? '')?.skill_name ?? 'Skill'}</Badge>
-                            <span className="text-xs text-muted-foreground">Score: {ev.score}%</span>
-                          </div>
-                          <p className="text-xs text-foreground">{ev.feedback}</p>
-                          {ev.dimensions.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {ev.dimensions.map((d) => <span key={d.dimension} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{d.dimension}: {d.score}%</span>)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+
 
             {!isCompleted && (
               <div className="px-5 py-4 border-t border-border space-y-3">
