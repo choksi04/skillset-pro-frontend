@@ -50,12 +50,6 @@ const coreTourSteps: TourStep[] = [
     roles: ['admin'], position: 'right',
   },
   {
-    id: 'cycles', title: 'Review Cycles',
-    description: 'Activate a cycle to auto-generate assessments for submitted registries. Only one active cycle per tenant.',
-    targetSelector: '[data-tour="cycles"]',
-    roles: ['admin'], position: 'right',
-  },
-  {
     id: 'registry', title: 'Skill Registry',
     description: 'Employees submit self-evaluated skills here. Each submission is a new version with full history.',
     targetSelector: '[data-tour="registry"]',
