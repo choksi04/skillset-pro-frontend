@@ -12,6 +12,7 @@ import { useRegistryStore } from "@/stores/registryStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import EvalResults from "@/components/assessment/EvalResults";
+import ResultSummaryCard from "@/components/assessment/ResultSummaryCard";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
 import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
@@ -415,7 +416,7 @@ export default function AssessmentDetailPage() {
       </div>
 
       {/* Metadata Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Questions</p>
