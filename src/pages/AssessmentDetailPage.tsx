@@ -461,7 +461,7 @@ export default function AssessmentDetailPage() {
                 </p>
                 {(() => {
                   const aiLevel = scoreToLevelDynamic(competencyLevels, attempt.total_ai_score);
-                  const verifiedLevels = (review?.skill_ratings ?? [])
+                  const verifiedLevels = (review?.skill_reviews ?? [])
                     .map((s: any) => s.verified_level)
                     .filter((v: any) => typeof v === "number");
                   const verifiedAvg = verifiedLevels.length > 0
