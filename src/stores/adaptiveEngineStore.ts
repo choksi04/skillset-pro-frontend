@@ -489,8 +489,24 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       });
     }
 
+    // Build per-question evaluation rows from the adaptive history (binary MCQ grading).
+    const evalRows = state.skills.flatMap((skill) =>
+      skill.history.map((h) => ({
+        attempt_id: attemptId,
+        question_id: h.question_id,
+        score: h.correct ? 100 : 0,
+        confidence: 1,
+        feedback: h.correct
+          ? 'Correct answer.'
+          : 'Incorrect — selected option did not match the correct answer.',
+        dimensions: [] as any,
+        created_by: userId,
+      })),
+    );
+
     await Promise.all([
       supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId),
+      supabase.from('ai_evaluations').delete().eq('attempt_id', attemptId),
       supabase
         .from('assessment_attempts')
         .update({
@@ -523,10 +539,17 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       );
     }
 
+    if (evalRows.length > 0) {
+      await supabase.from('ai_evaluations').insert(evalRows);
+    }
+
     const totalAi =
       skillScores.length > 0
         ? Math.round(skillScores.reduce((a, s) => a + s.avg_score, 0) / skillScores.length)
         : 0;
+
+    // Refresh attempts so EvalResults sees the new ai_evaluations rows.
+    await useAttemptStore.getState().fetchAttempts();
     useAttemptStore.setState((s) => ({
       attempts: s.attempts.map((a) =>
         a.id === attemptId
