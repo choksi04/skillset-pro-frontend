@@ -114,7 +114,7 @@ export default function AssessmentDetailPage() {
     }
     return map;
   }, [competencyLevels]);
-  
+
   // Build a map from competency level UUID to label
   const levelLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -170,8 +170,18 @@ export default function AssessmentDetailPage() {
           toast.success("Per-question results restored");
         }
       })
-      .catch(() => {/* silent */});
-  }, [attempt?.id, attempt?.status, attempt?.ai_evaluations?.length, assessment?.is_adaptive, backfilled, fetchAttempts, assessment]);
+      .catch(() => {
+        /* silent */
+      });
+  }, [
+    attempt?.id,
+    attempt?.status,
+    attempt?.ai_evaluations?.length,
+    assessment?.is_adaptive,
+    backfilled,
+    fetchAttempts,
+    assessment,
+  ]);
 
   // Fetch employee name for team view
   useEffect(() => {
@@ -272,7 +282,10 @@ export default function AssessmentDetailPage() {
     setStartingRunner(true);
     try {
       const existing = getAttemptForAssessment(assessment.id);
-      if (existing && (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed")) {
+      if (
+        existing &&
+        (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed")
+      ) {
         toast.info("This assessment has already been submitted.");
         setStartingRunner(false);
         return;
@@ -548,8 +561,7 @@ export default function AssessmentDetailPage() {
       {/* Assessment Questions list — collapsible.
           - Admins/managers always see it (editable when canManage).
           - Owners see it once the attempt is terminal (read-only) with a Result column. */}
-      {assessment.assessment_questions.length > 0 &&
-        ((!isOwner && isAdmin) || (isOwner && isAttemptTerminal)) && (
+      {assessment.assessment_questions.length > 0 && ((!isOwner && isAdmin) || (isOwner && isAttemptTerminal)) && (
         <Collapsible defaultOpen={isOwner ? true : !isAttemptTerminal && !isPendingEval}>
           <div className="rounded-xl border border-border bg-card">
             <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
@@ -557,20 +569,28 @@ export default function AssessmentDetailPage() {
                 <h3 className="text-sm font-semibold text-foreground">
                   {isOwner ? "Attempted Questions" : "Assessment Questions"}
                 </h3>
-                <Badge variant="outline" className="text-[10px]">{assessment.assessment_questions.length}</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {assessment.assessment_questions.length}
+                </Badge>
               </div>
               <div className="flex items-center gap-2">
                 {canManage && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={(e) => { e.stopPropagation(); setAddQuestionOpen(true); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAddQuestionOpen(true);
+                    }}
                     className="gap-1.5 h-7 text-xs"
                   >
                     <Plus size={12} /> Add Question
                   </Button>
                 )}
-                <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                <ChevronDown
+                  size={14}
+                  className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+                />
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -580,7 +600,7 @@ export default function AssessmentDetailPage() {
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Question</TableHead>
-                      {(isOwner && isAttemptTerminal) && <TableHead className="w-28">Result</TableHead>}
+                      {isOwner && isAttemptTerminal && <TableHead className="w-28">Result</TableHead>}
                       {canManage && <TableHead className="w-16 text-right">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -590,7 +610,9 @@ export default function AssessmentDetailPage() {
                       const ev = evalByQuestionId.get(aq.question_id);
                       const isMCQ = q?.question_type === "mcq";
                       let resultBadge: JSX.Element = (
-                        <Badge variant="outline" className="text-[10px]">—</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          —
+                        </Badge>
                       );
                       if (ev) {
                         const correct = isMCQ ? ev.score === 100 : ev.score >= 50;
@@ -618,12 +640,10 @@ export default function AssessmentDetailPage() {
                                 <TooltipTrigger asChild>
                                   <p className="text-sm text-foreground line-clamp-2 cursor-help">{previewText}</p>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-md whitespace-pre-wrap">
-                                  {fullText}
-                                </TooltipContent>
+                                <TooltipContent className="max-w-md whitespace-pre-wrap">{fullText}</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
-                            <div className="mt-2 flex flex-col gap-1 items-start">
+                            <div className="mt-2 flex gap-1 items-start">
                               <Badge variant="outline" className="text-[10px] h-4 px-1.5">
                                 {skillName}
                               </Badge>
@@ -635,9 +655,7 @@ export default function AssessmentDetailPage() {
                               </Badge>
                             </div>
                           </TableCell>
-                          {isOwner && isAttemptTerminal && (
-                            <TableCell className="pt-3">{resultBadge}</TableCell>
-                          )}
+                          {isOwner && isAttemptTerminal && <TableCell className="pt-3">{resultBadge}</TableCell>}
                           {canManage && (
                             <TableCell className="text-right pt-3">
                               <Button
@@ -667,7 +685,10 @@ export default function AssessmentDetailPage() {
           <div className="rounded-xl border border-border bg-card">
             <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
               <h3 className="text-sm font-semibold text-foreground">Evaluation Results</h3>
-              <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              <ChevronDown
+                size={14}
+                className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+              />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="border-t border-border p-5">
