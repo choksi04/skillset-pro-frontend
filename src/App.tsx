@@ -85,7 +85,8 @@ const App = () => (
               <Route path="/assessments/:assessmentId" element={<AssessmentDetailPage />} />
               <Route path="/team-assessments" element={<RoleGuard allowed={["admin", "manager"]}><TeamAssessmentsPage /></RoleGuard>} />
               <Route path="/team-assessments/:assessmentId" element={<RoleGuard allowed={["admin", "manager"]}><AssessmentDetailPage /></RoleGuard>} />
-              <Route path="/assessment-exec" element={<AssessmentExecPage />} />
+              {/* Legacy /assessment-exec routes deep-link into the inline runner on the detail page */}
+              <Route path="/assessment-exec" element={<LegacyExecRedirect />} />
               <Route path="/help" element={<UserGuidePage />} />
 
               {/* Admin only */}
