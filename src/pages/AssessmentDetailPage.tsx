@@ -46,7 +46,10 @@ import {
   RefreshCw,
   Trash2,
   Plus,
+  ChevronDown,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAssignmentStore } from "@/stores/assignmentStore";
 import { getQuestionPreviewText } from "@/lib/questionContent";
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
