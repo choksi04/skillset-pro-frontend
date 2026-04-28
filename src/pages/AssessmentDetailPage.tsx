@@ -14,6 +14,10 @@ import { supabase } from "@/integrations/supabase/client";
 import EvalResults from "@/components/assessment/EvalResults";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
+import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
+import FixedRunner from "@/components/assessment/FixedRunner";
+import { useTemplateStore } from "@/stores/templateStore";
+import { canStartNewAttempt } from "@/stores/assignmentStore";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,12 +69,13 @@ export default function AssessmentDetailPage() {
     removeAssessmentQuestion,
     addAssessmentQuestion,
   } = useAssessmentStore();
-  const { getAttemptForAssessment, fetchAttempts, retryEvaluation } = useAttemptStore();
+  const { getAttemptForAssessment, fetchAttempts, retryEvaluation, startAttempt } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
+  const { templates, fetchTemplates } = useTemplateStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
@@ -78,6 +83,8 @@ export default function AssessmentDetailPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
+  const [runnerActive, setRunnerActive] = useState(false);
+  const [startingRunner, setStartingRunner] = useState(false);
 
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
@@ -90,6 +97,7 @@ export default function AssessmentDetailPage() {
     fetchReviews();
     fetchRegistry();
     fetchLevels();
+    fetchTemplates();
   }, []);
 
   // Build a map from competency level UUID to level number
@@ -217,6 +225,33 @@ export default function AssessmentDetailPage() {
     }
   };
 
+  // Start (or resume) the inline runner — replaces the legacy /assessment-exec page
+  const handleStartRunner = async () => {
+    if (!assessment) return;
+    const gate = canStartNewAttempt(assessment.id);
+    if (!gate.allowed) {
+      toast.error(gate.reason ?? "You cannot start a new attempt for this assessment.");
+      return;
+    }
+    setStartingRunner(true);
+    try {
+      const existing = getAttemptForAssessment(assessment.id);
+      if (existing && (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed")) {
+        toast.info("This assessment has already been submitted.");
+        setStartingRunner(false);
+        return;
+      }
+      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id);
+      await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
+      await fetchAttempts();
+      setRunnerActive(true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start assessment");
+    } finally {
+      setStartingRunner(false);
+    }
+  };
+
   if (!assessment) {
     return (
       <div className="space-y-6">
@@ -238,6 +273,51 @@ export default function AssessmentDetailPage() {
     .map((id) => skillMap.get(id)?.skill_name)
     .filter(Boolean)
     .join(", ");
+
+  // Adaptive question-count display: cards show an upper bound from the template.
+  const linkedTemplate = templates.find((t) => t.id === assessment.template_id);
+  const adaptiveCap =
+    assessment.is_adaptive && linkedTemplate
+      ? Math.max(1, (linkedTemplate.skills_per_assessment ?? 0) * (linkedTemplate.questions_per_skill ?? 0))
+      : null;
+  const questionCountLabel = assessment.is_adaptive
+    ? adaptiveCap
+      ? `Up to ${adaptiveCap} questions (adaptive)`
+      : `Adaptive`
+    : `${assessment.assessment_questions.length} questions`;
+
+  // Inline runner mode — replaces the legacy /assessment-exec page
+  if (runnerActive && isOwner) {
+    const exitRunner = async () => {
+      await fetchAssessments();
+      await fetchAttempts();
+      setRunnerActive(false);
+    };
+    return (
+      <div className="space-y-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={exitRunner}
+          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft size={14} /> Back to Assessment
+        </Button>
+        {assessment.is_adaptive ? (
+          <AdaptiveRunner
+            assessment={assessment}
+            attemptId={attempt?.id ?? ""}
+            employeeId={assessment.employee_id}
+            tenantId={assessment.tenant_id}
+            employeeName={user?.full_name ?? "Employee"}
+            onComplete={exitRunner}
+          />
+        ) : (
+          <FixedRunner assessment={assessment} onComplete={exitRunner} onCancel={exitRunner} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -265,7 +345,7 @@ export default function AssessmentDetailPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           {[
-            `${assessment.assessment_questions.length} questions`,
+            questionCountLabel,
             `${assessment.duration_minutes} min`,
             new Date(assessment.created_at).toLocaleDateString(),
           ]
@@ -279,7 +359,14 @@ export default function AssessmentDetailPage() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Questions</p>
-            <p className="text-2xl font-bold text-foreground">{assessment.assessment_questions.length}</p>
+            {assessment.is_adaptive ? (
+              <>
+                <p className="text-2xl font-bold text-foreground">{adaptiveCap ?? "—"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">max (adaptive)</p>
+              </>
+            ) : (
+              <p className="text-2xl font-bold text-foreground">{assessment.assessment_questions.length}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -324,13 +411,13 @@ export default function AssessmentDetailPage() {
       {/* CTA Buttons */}
       <div className="flex items-center gap-3">
         {isOwner && status === "pending" && (
-          <Button onClick={() => navigate(`/assessment-exec?startId=${assessment.id}`)} className="gap-1.5">
-            <Play size={14} /> Start Assessment
+          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+            {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Start Assessment
           </Button>
         )}
         {isOwner && status === "in_progress" && (
-          <Button onClick={() => navigate(`/assessment-exec?startId=${assessment.id}`)} className="gap-1.5">
-            <Play size={14} /> Resume Assessment
+          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+            {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume Assessment
           </Button>
         )}
         {isPendingEval && isOwner && (

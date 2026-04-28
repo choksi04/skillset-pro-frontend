@@ -16,7 +16,7 @@ import QuestionBankPage from "@/pages/QuestionBankPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import TeamAssessmentsPage from "@/pages/TeamAssessmentsPage";
 import AssessmentDetailPage from "@/pages/AssessmentDetailPage";
-import AssessmentExecPage from "@/pages/AssessmentExecPage";
+
 import ReviewsPage from "@/pages/ReviewsPage";
 import AssessmentTemplatesPage from "@/pages/AssessmentTemplatesPage";
 import AssessmentTemplateEditPage from "@/pages/AssessmentTemplateEditPage";
@@ -32,6 +32,13 @@ import AllRegistriesPage from "@/pages/AllRegistriesPage";
 import NotFound from "@/pages/NotFound";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+
+function LegacyExecRedirect() {
+  const [searchParams] = useSearchParams();
+  const startId = searchParams.get("startId");
+  return <Navigate to={startId ? `/assessments/${startId}` : "/assessments"} replace />;
+}
 
 const queryClient = new QueryClient();
 
@@ -85,7 +92,8 @@ const App = () => (
               <Route path="/assessments/:assessmentId" element={<AssessmentDetailPage />} />
               <Route path="/team-assessments" element={<RoleGuard allowed={["admin", "manager"]}><TeamAssessmentsPage /></RoleGuard>} />
               <Route path="/team-assessments/:assessmentId" element={<RoleGuard allowed={["admin", "manager"]}><AssessmentDetailPage /></RoleGuard>} />
-              <Route path="/assessment-exec" element={<AssessmentExecPage />} />
+              {/* Legacy /assessment-exec routes deep-link into the inline runner on the detail page */}
+              <Route path="/assessment-exec" element={<LegacyExecRedirect />} />
               <Route path="/help" element={<UserGuidePage />} />
 
               {/* Admin only */}

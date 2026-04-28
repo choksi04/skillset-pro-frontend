@@ -1,74 +1,93 @@
-# Fix Assign Assessment flow
+## Goals
 
-Four related issues in `AssignTemplateDialog` and `assignmentStore`:
+1. Eliminate the legacy `/assessment-exec` page. Start/Resume should run the assessment **inline on the existing detail page** (`/assessments/:assessmentId`) — no extra navigation, no extra page.
+2. Fix the adaptive engine so it can generate questions **even when the employee has not submitted a registry**, mirroring the same fallback used at assignment time. The adaptive engine failed even when the registry is submitted and available.
 
-1. Assignment fails with "Employee has not submitted a registry for this domain yet" — registry submission was made a hard prerequisite, but per spec it is **optional**.
-2. The Assign UI is a centered modal — should be a **right-side Sheet** (consistent with rest of app) with a **sticky footer**.
-3. No **Select All / Deselect All** control.
-4. The **current user (creator)** is filtered out of the candidate list, so an admin/manager creating an assessment can't assign one to themselves.
+---
+
+## Problem analysis
+
+- Today, "Start Assessment" navigates to `/assessment-exec?startId=...`. That page is a parallel runner UI duplicating the detail view.
+- For the failing case (assessment `8824…0bba`):
+  - Template is **adaptive**, `skill_selection_mode = top_n`, domain has 4 mapped skills with 60–160 published MCQs each.
+  - The employee has **no registry submission** for the domain.
+  - `assignmentStore.generateAssessmentForTemplate` correctly creates the empty adaptive assessment (registry is optional there).
+  - But `adaptiveEngineStore.initAdaptiveAttempt` only reads skills from the registry submission and has **no domain-skill fallback** → `candidateSkills = []` → returns `'No skills resolved for this adaptive assessment'`.
+  - `AdaptiveRunner` shows the error toast briefly, then `currentQuestion === null` renders `"No more questions — wrapping up…"`.
 
 ---
 
 ## Changes
 
-### 1. `src/stores/assignmentStore.ts` — registry no longer required
+### A. Remove `/assessment-exec` and run inline
 
-In `generateAssessmentForTemplate` (adaptive branch):
+1. `**src/pages/AssessmentDetailPage.tsx**` — make this the single runner.
+  - Add local state: `runnerActive: boolean`, plus all the fixed-runner state currently in `AssessmentExecPage` (answers, currentIdx, timer, paused, etc.). For adaptive, just toggle the panel.
+  - "Start Assessment" / "Resume Assessment" buttons set `runnerActive = true` and call the existing `startAttempt` / `updateAssessmentStatus('in_progress')` flow.
+  - When `runnerActive` and `assessment.is_adaptive`, render `<AdaptiveRunner …>` directly inside the page (replaces the metadata cards). On `onComplete`: refresh + return to summary view.
+  - When `runnerActive` and NOT adaptive, render the modern exam UI (top bar with timer/pause/submit, sidebar question navigator, MCQ/coding/scenario panels, confirm-submit dialog) — copied/extracted from `AssessmentExecPage`.
+  - Auto-submit, pause/resume, time-spent tracking, and auto-create-manager-review logic are ported over verbatim.
+  - To keep the file manageable, extract the runner UI into two new components:
+    - `src/components/assessment/FixedRunner.tsx` — the modern exam UI (timer + sidebar + question panel + submit dialog).
+    - `src/components/assessment/AssessmentResultsList.tsx` — *not needed*; results already render via `EvalResults` on the detail page.
+2. `**src/App.tsx**` — delete the `/assessment-exec` route. Add a redirect for safety:
+  ```tsx
+   <Route path="/assessment-exec" element={<Navigate to="/assessments" replace />} />
+  ```
+   (Existing deep links with `?startId=` should redirect to `/assessments/:id` — handled by a tiny redirector component that reads the param.)
+3. **Delete** `src/pages/AssessmentExecPage.tsx` once the logic is extracted.
+4. **Update navigations** that point to `/assessment-exec`:
+  - `AssessmentDetailPage.tsx` lines 327 & 332 — replace `navigate('/assessment-exec?startId=…')` with local `setRunnerActive(true)` + start logic.
+  - Search the rest of the codebase (`rg "assessment-exec"`) and update any other references (e.g., notifications, dashboards, sidebar) to point to `/assessments/:id`.
 
-- **Remove** the hard block that returns `"Employee has not submitted a registry for this domain yet"`.
-- Still attempt to look up the latest submitted registry to use its `id` as `submission_id` and to pull self-ratings when `skill_selection_mode !== 'custom'`.
-- If **no submission exists**:
-  - Use a synthetic `submission_id` like `tmpl-<templateId>` (mirrors the fixed branch).
-  - For `skill_selection_mode === 'custom'`, proceed with the template's explicit skill list (no registry needed).
-  - For default mode (registry-driven skill picking), fall back to **all skills mapped to the template's domain** via `domain_skill_mappings`, capped at `template.skills_per_assessment`. If still empty → fail with `"No skills available for this domain"`.
-- Keep the existing MCQ availability pre-flight check.
+### B. Fix adaptive engine — domain-skill fallback
 
-The adaptive engine (`adaptiveEngineStore.ts`) already handles a missing submission gracefully (`if (submission)` guard), so runtime is safe.
+`**src/stores/adaptiveEngineStore.ts` › `initAdaptiveAttempt**` (around lines 183–215):
 
-### 2. `src/components/templates/AssignTemplateDialog.tsx` — Sheet + sticky footer
+After the existing `top_n` branch that reads from the registry submission, add the same fallback used in `assignmentStore.generateAssessmentForTemplate`:
 
-- Replace `Dialog`/`DialogContent`/`DialogHeader`/`DialogFooter` with `Sheet`/`SheetContent` (`side="right"`, width ~`w-[560px] sm:max-w-[560px]`).
-- Layout `SheetContent` as a flex column: `flex flex-col h-full`.
-  - `SheetHeader` — fixed at top (no scroll).
-  - Scrollable middle region: `<div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">` containing template summary, mode tabs, domain/search inputs, candidate list, duplicates checkbox, summary line.
-  - Footer: `<div className="border-t bg-background px-6 py-3 flex justify-end gap-2 shrink-0">` with Cancel + Assign buttons. Always visible.
-- The candidate list inside loses its own `max-h-72` — it can grow naturally because the parent already scrolls. Keep a sensible min height for empty state.
-- Rename component file usage stays the same; export name unchanged.
+```ts
+// Fallback: if no registry submission / no ratings, pull skills mapped to the domain.
+if (candidateSkills.length === 0 && assessmentRow.domain_id) {
+  const { data: domainSkills } = await supabase
+    .from('domain_skill_mappings')
+    .select('skill_id')
+    .eq('domain_id', assessmentRow.domain_id)
+    .is('deleted_on', null);
+  candidateSkills = (domainSkills || [])
+    .map((s: any) => s.skill_id)
+    .slice(0, templateRow.skills_per_assessment ?? 5);
+}
+```
 
-### 3. Select All / Deselect All
+This mirrors the assignment-time logic so the engine and the assignment stay in sync, and registry submission remains truly optional.
 
-Above the candidate list, add a small toolbar row showing:
+The downstream MCQ-availability check (`skillsWithMcq` / `usableSkills`) remains unchanged and will correctly pass with the 4 mapped skills.
 
-- Left: `"<n> of <total> selected"` text.
-- Right: a single ghost button that toggles between **Select all** and **Deselect all** based on whether all currently visible candidates are selected.
+### C. Show non-zero metadata for adaptive assessments before they start
 
-Selection respects the current filter (search / picked domain) — only operates on `candidateUsers`.
+The "0 questions" label on the card is technically correct for adaptive (questions are picked live). To avoid user confusion, on `AssessmentDetailPage` and the listing card:
 
-Remove the auto-pre-select-all `useEffect` that runs when domain mode loads (it surprises the user); rely on the explicit Select all button instead. Keep `pickedUsers` reset on dialog open.
-
-### 4. Include the creator in the candidate list
-
-In the user fetch effect:
-
-- **Remove** the `rows = rows.filter((u) => u.id !== user?.id)` line so the current user appears.
-- Render a small `(You)` badge next to the creator's name in the row for clarity.
-- Manager scope filter (`u.domain_id === user.domain_id`) is preserved — the manager's own domain assignment already includes themselves.
-
-No store changes needed for this; assignment logic already supports any `employee_id`.
+- For adaptive assessments, replace `"{n} questions"` with `"Up to {skills_per_assessment × questions_per_skill} questions (adaptive)"` — read these numbers from the linked template via existing template data.
+- The Questions metadata card on the detail page shows the same upper-bound figure with an "(adaptive)" suffix.
 
 ---
 
-## Files touched
+## Files to touch
 
-- `src/stores/assignmentStore.ts` — relax adaptive registry requirement; add domain-skill fallback.
-- `src/components/templates/AssignTemplateDialog.tsx` — Sheet conversion, sticky footer, Select All toggle, include self with `(You)` badge.
-
-No DB migration. No changes to other callers — `AssignTemplateDialog` is invoked from `AssessmentTemplatesPage` and `TeamAssessmentsPage` with the same props.
+- `src/pages/AssessmentDetailPage.tsx` — host the runner inline; replace navigate calls; render correct counts for adaptive.
+- `src/components/assessment/FixedRunner.tsx` — **new**; extracted modern exam UI.
+- `src/pages/AssessmentExecPage.tsx` — **delete**.
+- `src/App.tsx` — drop the `/assessment-exec` route, add a redirect.
+- `src/stores/adaptiveEngineStore.ts` — add domain-skill fallback in `initAdaptiveAttempt`.
+- `src/pages/AssessmentsPage.tsx` — adjust the card sub-label for adaptive ("Up to N questions (adaptive)").
+- Anywhere else `rg "assessment-exec"` finds (notifications, dashboards) — repoint to `/assessments/:id`.
+- `mem://logic/assessment-engine/generation-constraints` — append note that adaptive engine falls back to domain-mapped skills when no registry exists.
+- User Guide — update "Taking an Assessment" section to remove references to a separate exec page.
 
 ---
 
 ## Out of scope
 
-- Reworking the registry-driven skill ranking algorithm beyond the simple "fall back to domain skills" path.
-- Changing `TemplateAssignmentsSheet` (already a Sheet).
-- Touching the unrelated `UsersPage` Badge ref warning visible in console logs.
+- Re-architecting fixed vs adaptive runners into one component (kept separate; just hosted on the same page).
+- Changing review/evaluation logic.

@@ -83,8 +83,8 @@ const managerExtraSteps: TourStep[] = [
 
 const employeeExtraSteps: TourStep[] = [
   { id: 'emp-registry', title: 'Submit Your Skills', description: 'Rate your proficiency across the skills assigned to your domain.', targetSelector: '[data-tour="registry"]', roles: ['employee'], position: 'right' },
-  { id: 'emp-assessment', title: 'Take Assessments', description: 'Complete your generated assessments with timed questions.', targetSelector: '[data-tour="assessment-exec"]', roles: ['employee'], position: 'right' },
-  { id: 'emp-feedback', title: 'View Feedback', description: 'Review AI-generated feedback and scores for each answered question.', targetSelector: '[data-tour="assessment-exec"]', roles: ['employee'], position: 'right' },
+  { id: 'emp-assessment', title: 'Take Assessments', description: 'Complete your generated assessments with timed questions.', targetSelector: '[data-tour="assessments-list"]', roles: ['employee'], position: 'right' },
+  { id: 'emp-feedback', title: 'View Feedback', description: 'Review AI-generated feedback and scores for each answered question.', targetSelector: '[data-tour="assessments-list"]', roles: ['employee'], position: 'right' },
 ];
 
 export function getTourStepsForRole(role: UserRole): TourStep[] {
