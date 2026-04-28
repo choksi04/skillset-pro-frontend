@@ -225,6 +225,33 @@ export default function AssessmentDetailPage() {
     }
   };
 
+  // Start (or resume) the inline runner — replaces the legacy /assessment-exec page
+  const handleStartRunner = async () => {
+    if (!assessment) return;
+    const gate = canStartNewAttempt(assessment.id);
+    if (!gate.allowed) {
+      toast.error(gate.reason ?? "You cannot start a new attempt for this assessment.");
+      return;
+    }
+    setStartingRunner(true);
+    try {
+      const existing = getAttemptForAssessment(assessment.id);
+      if (existing && (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed")) {
+        toast.info("This assessment has already been submitted.");
+        setStartingRunner(false);
+        return;
+      }
+      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id);
+      await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
+      await fetchAttempts();
+      setRunnerActive(true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start assessment");
+    } finally {
+      setStartingRunner(false);
+    }
+  };
+
   if (!assessment) {
     return (
       <div className="space-y-6">
