@@ -15,6 +15,7 @@ import EvalResults from "@/components/assessment/EvalResults";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
 import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
+import { useAdaptiveEngineStore } from "@/stores/adaptiveEngineStore";
 import FixedRunner from "@/components/assessment/FixedRunner";
 import { useTemplateStore } from "@/stores/templateStore";
 import { canStartNewAttempt } from "@/stores/assignmentStore";
