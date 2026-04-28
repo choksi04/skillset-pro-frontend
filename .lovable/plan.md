@@ -1,93 +1,74 @@
 ## Goals
 
-1. Eliminate the legacy `/assessment-exec` page. Start/Resume should run the assessment **inline on the existing detail page** (`/assessments/:assessmentId`) — no extra navigation, no extra page.
-2. Fix the adaptive engine so it can generate questions **even when the employee has not submitted a registry**, mirroring the same fallback used at assignment time. The adaptive engine failed even when the registry is submitted and available.
+Fix the post-submission assessment view so employees and managers can see meaningful per-question results, enable re-attempts, and clean up the manager review UI.
+
+Remove the confidence level from the system, we don't need this as of MVP.
+
+When Assessment questions are not generated yet, it is showing zero questions on the assessment card when user is opening the "My Assessment" page. It is showing wrong details as questions are not yet finalized.
 
 ---
 
-## Problem analysis
+## Root cause analysis
 
-- Today, "Start Assessment" navigates to `/assessment-exec?startId=...`. That page is a parallel runner UI duplicating the detail view.
-- For the failing case (assessment `8824…0bba`):
-  - Template is **adaptive**, `skill_selection_mode = top_n`, domain has 4 mapped skills with 60–160 published MCQs each.
-  - The employee has **no registry submission** for the domain.
-  - `assignmentStore.generateAssessmentForTemplate` correctly creates the empty adaptive assessment (registry is optional there).
-  - But `adaptiveEngineStore.initAdaptiveAttempt` only reads skills from the registry submission and has **no domain-skill fallback** → `candidateSkills = []` → returns `'No skills resolved for this adaptive assessment'`.
-  - `AdaptiveRunner` shows the error toast briefly, then `currentQuestion === null` renders `"No more questions — wrapping up…"`.
+**Why "0 questions evaluated" / empty Per-Question Results:**
+
+The assessment in question is **adaptive**. Adaptive MCQs are graded locally inside `adaptiveEngineStore.recordAnswer` / `finalizeAdaptiveAttempt` and the attempt is marked `evaluated` directly — but **no rows are ever written to `ai_evaluations**`. `EvalResults.tsx` iterates `attempt.ai_evaluations` to render the overall AI score, dimension averages, and the Per-Question Results section, so all three appear empty.
+
+The fixed (non-adaptive) flow uses `evaluate-assessment` Edge Function, which DOES write `ai_evaluations`, so it works there.
+
+**Why no Re-attempt button:** `AssessmentDetailPage` only shows Start (when `pending`) or Resume (when `in_progress`). It never renders a Re-attempt CTA when the attempt is `evaluated` or `submitted`, even though `canStartNewAttempt()` and `assignment.max_attempts` already support multiple attempts.
 
 ---
 
 ## Changes
 
-### A. Remove `/assessment-exec` and run inline
+### A. Adaptive engine — write per-question evaluations
 
-1. `**src/pages/AssessmentDetailPage.tsx**` — make this the single runner.
-  - Add local state: `runnerActive: boolean`, plus all the fixed-runner state currently in `AssessmentExecPage` (answers, currentIdx, timer, paused, etc.). For adaptive, just toggle the panel.
-  - "Start Assessment" / "Resume Assessment" buttons set `runnerActive = true` and call the existing `startAttempt` / `updateAssessmentStatus('in_progress')` flow.
-  - When `runnerActive` and `assessment.is_adaptive`, render `<AdaptiveRunner …>` directly inside the page (replaces the metadata cards). On `onComplete`: refresh + return to summary view.
-  - When `runnerActive` and NOT adaptive, render the modern exam UI (top bar with timer/pause/submit, sidebar question navigator, MCQ/coding/scenario panels, confirm-submit dialog) — copied/extracted from `AssessmentExecPage`.
-  - Auto-submit, pause/resume, time-spent tracking, and auto-create-manager-review logic are ported over verbatim.
-  - To keep the file manageable, extract the runner UI into two new components:
-    - `src/components/assessment/FixedRunner.tsx` — the modern exam UI (timer + sidebar + question panel + submit dialog).
-    - `src/components/assessment/AssessmentResultsList.tsx` — *not needed*; results already render via `EvalResults` on the detail page.
-2. `**src/App.tsx**` — delete the `/assessment-exec` route. Add a redirect for safety:
-  ```tsx
-   <Route path="/assessment-exec" element={<Navigate to="/assessments" replace />} />
-  ```
-   (Existing deep links with `?startId=` should redirect to `/assessments/:id` — handled by a tiny redirector component that reads the param.)
-3. **Delete** `src/pages/AssessmentExecPage.tsx` once the logic is extracted.
-4. **Update navigations** that point to `/assessment-exec`:
-  - `AssessmentDetailPage.tsx` lines 327 & 332 — replace `navigate('/assessment-exec?startId=…')` with local `setRunnerActive(true)` + start logic.
-  - Search the rest of the codebase (`rg "assessment-exec"`) and update any other references (e.g., notifications, dashboards, sidebar) to point to `/assessments/:id`.
+`src/stores/adaptiveEngineStore.ts` › `finalizeAdaptiveAttempt`:
 
-### B. Fix adaptive engine — domain-skill fallback
+- For each entry in `skill.history`, insert an `ai_evaluations` row with:
+  - `question_id`, `attempt_id`
+  - `score`: 100 if `correct`, else 0
+  - `feedback`: "Correct answer." / "Incorrect — selected option did not match the correct answer."
+  - `dimensions`: `[]` (MCQ — no rubric dimensions, matches existing EvalResults handling that hides dimensions for MCQ)
+- Update `useAttemptStore` local state with these evaluations so the UI reflects them without a full refetch.
+- Recompute `total_ai_score` from these evaluations (currently it's an average of skill avg_scores — keep behaviour but also expose the per-question detail).
 
-`**src/stores/adaptiveEngineStore.ts` › `initAdaptiveAttempt**` (around lines 183–215):
+This makes adaptive results render identically to fixed results in `EvalResults` (Overall AI Score, Per-Question Results grouped by skill, with right/wrong badges via the existing MCQ correctness rendering).
 
-After the existing `top_n` branch that reads from the registry submission, add the same fallback used in `assignmentStore.generateAssessmentForTemplate`:
+### B. Re-attempt button on the detail page
 
-```ts
-// Fallback: if no registry submission / no ratings, pull skills mapped to the domain.
-if (candidateSkills.length === 0 && assessmentRow.domain_id) {
-  const { data: domainSkills } = await supabase
-    .from('domain_skill_mappings')
-    .select('skill_id')
-    .eq('domain_id', assessmentRow.domain_id)
-    .is('deleted_on', null);
-  candidateSkills = (domainSkills || [])
-    .map((s: any) => s.skill_id)
-    .slice(0, templateRow.skills_per_assessment ?? 5);
-}
-```
+`src/pages/AssessmentDetailPage.tsx`:
 
-This mirrors the assignment-time logic so the engine and the assignment stay in sync, and registry submission remains truly optional.
+- After the attempt is `evaluated`/`submitted`/`reviewed`, if `canStartNewAttempt(assessment.id).allowed === true` AND `isOwner`, render a **"Re-attempt"** button (`RotateCcw` icon) alongside the existing CTAs.
+- Clicking it calls the existing `handleStartRunner()` (which already handles assignment increment + status reset).
+- Show a small helper line: `Attempt {attempt_count}/{max_attempts}` from the assignment.
 
-The downstream MCQ-availability check (`skillsWithMcq` / `usableSkills`) remains unchanged and will correctly pass with the 4 mapped skills.
+### C. Manager review UI cleanup
 
-### C. Show non-zero metadata for adaptive assessments before they start
+`src/components/assessment/ManagerReviewPanel.tsx`:
 
-The "0 questions" label on the card is technically correct for adaptive (questions are picked live). To avoid user confusion, on `AssessmentDetailPage` and the listing card:
+- **Remove** the "View AI Feedback Details" toggle block (lines 238–266). The Per-Question Results from `EvalResults` already provides this information and is now shared between owner and manager views.
+- Wrap the **Skill Review Table**, **Verify Section**, and **Manager Notes** in shadcn `Accordion` items so each section is collapsible. Default open: Skill Review Table.
 
-- For adaptive assessments, replace `"{n} questions"` with `"Up to {skills_per_assessment × questions_per_skill} questions (adaptive)"` — read these numbers from the linked template via existing template data.
-- The Questions metadata card on the detail page shows the same upper-bound figure with an "(adaptive)" suffix.
+`src/pages/AssessmentDetailPage.tsx`:
+
+- Wrap the **Assessment Questions admin table** (lines 480–547) in a `Collapsible`, default **closed** when the assessment status is `completed`/`evaluated`/`approved` (manager viewing a submitted assessment). Default open when `pending`/`in_progress`.
+- Wrap the **Skills list** line (lines 404–409) and **EvalResults** block in `Collapsible`s with sensible defaults (EvalResults open by default).
+
+### D. Shared EvalResults usage (managers see same per-question results)
+
+`EvalResults` is already rendered for both owner and manager (line 550 of AssessmentDetailPage gates only on `isEvaluated`). After change A, managers automatically get the same Per-Question Results with right/wrong badges and feedback. No changes needed there beyond what A delivers.
 
 ---
 
 ## Files to touch
 
-- `src/pages/AssessmentDetailPage.tsx` — host the runner inline; replace navigate calls; render correct counts for adaptive.
-- `src/components/assessment/FixedRunner.tsx` — **new**; extracted modern exam UI.
-- `src/pages/AssessmentExecPage.tsx` — **delete**.
-- `src/App.tsx` — drop the `/assessment-exec` route, add a redirect.
-- `src/stores/adaptiveEngineStore.ts` — add domain-skill fallback in `initAdaptiveAttempt`.
-- `src/pages/AssessmentsPage.tsx` — adjust the card sub-label for adaptive ("Up to N questions (adaptive)").
-- Anywhere else `rg "assessment-exec"` finds (notifications, dashboards) — repoint to `/assessments/:id`.
-- `mem://logic/assessment-engine/generation-constraints` — append note that adaptive engine falls back to domain-mapped skills when no registry exists.
-- User Guide — update "Taking an Assessment" section to remove references to a separate exec page.
-
----
+- `src/stores/adaptiveEngineStore.ts` — write `ai_evaluations` rows in `finalizeAdaptiveAttempt`; update local attempt cache.
+- `src/pages/AssessmentDetailPage.tsx` — add Re-attempt button; wrap admin question table and EvalResults in collapsibles.
+- `src/components/assessment/ManagerReviewPanel.tsx` — remove "View AI Feedback Details" block; wrap sections in Accordion.
 
 ## Out of scope
 
-- Re-architecting fixed vs adaptive runners into one component (kept separate; just hosted on the same page).
-- Changing review/evaluation logic.
+- Routing the results into a separate URL/page — the detail page already IS a dedicated route (`/assessments/:id`, `/team-assessments/:id`). Per-question results stay on this page in the now-richer EvalResults section. (If a fully separate `/assessments/:id/results` route is desired, please confirm — current scope keeps results on the dedicated detail page.)
+- Re-running AI evaluation on existing already-finalized adaptive attempts retroactively. The fix applies to new submissions; existing ones can be backfilled with a one-shot script if needed.
