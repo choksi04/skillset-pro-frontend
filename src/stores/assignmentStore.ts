@@ -255,7 +255,7 @@ async function generateAssessmentForTemplate(
     .insert({
       tenant_id: tenantId,
       employee_id: employeeId,
-      submission_id: submission.id,
+      submission_id: submissionId,
       domain_id: template.domain_id,
       template_id: template.id,
       is_adaptive: true,
@@ -275,7 +275,7 @@ async function generateAssessmentForTemplate(
         id: assessmentId,
         tenant_id: tenantId,
         employee_id: employeeId,
-        submission_id: submission.id,
+        submission_id: submissionId,
         domain_id: template.domain_id!,
         template_id: template.id,
         is_reassessment: false,
