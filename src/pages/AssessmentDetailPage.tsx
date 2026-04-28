@@ -671,12 +671,12 @@ export default function AssessmentDetailPage() {
         </Collapsible>
       )}
 
-      {/* Evaluation Results — collapsible, default open */}
+      {/* Per-Question Details — collapsible, default open */}
       {isEvaluated && attempt && (
         <Collapsible defaultOpen>
           <div className="rounded-xl border border-border bg-card">
             <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
-              <h3 className="text-sm font-semibold text-foreground">Evaluation Results</h3>
+              <h3 className="text-sm font-semibold text-foreground">Per-Question Details</h3>
               <ChevronDown
                 size={14}
                 className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
