@@ -100,8 +100,7 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
               <span className="text-lg text-muted-foreground font-normal">/100</span>
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              {attempt.ai_evaluations.length} questions evaluated · Confidence avg:{' '}
-              {Math.round((attempt.ai_evaluations.reduce((s, e) => s + e.confidence, 0) / (attempt.ai_evaluations.length || 1)) * 100)}%
+              {attempt.ai_evaluations.length} questions evaluated
             </p>
           </>
         )}
@@ -264,7 +263,6 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                           )}
 
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-1">
-                            {!isMCQ && <span>Confidence: {Math.round(ev.confidence * 100)}%</span>}
                             {answer && <span>Time spent: {answer.time_spent_seconds}s</span>}
                           </div>
                         </div>
