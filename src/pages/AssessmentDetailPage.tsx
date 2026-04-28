@@ -274,6 +274,51 @@ export default function AssessmentDetailPage() {
     .filter(Boolean)
     .join(", ");
 
+  // Adaptive question-count display: cards show an upper bound from the template.
+  const linkedTemplate = templates.find((t) => t.id === assessment.template_id);
+  const adaptiveCap =
+    assessment.is_adaptive && linkedTemplate
+      ? Math.max(1, (linkedTemplate.skills_per_assessment ?? 0) * (linkedTemplate.questions_per_skill ?? 0))
+      : null;
+  const questionCountLabel = assessment.is_adaptive
+    ? adaptiveCap
+      ? `Up to ${adaptiveCap} questions (adaptive)`
+      : `Adaptive`
+    : `${assessment.assessment_questions.length} questions`;
+
+  // Inline runner mode — replaces the legacy /assessment-exec page
+  if (runnerActive && isOwner) {
+    const exitRunner = async () => {
+      await fetchAssessments();
+      await fetchAttempts();
+      setRunnerActive(false);
+    };
+    return (
+      <div className="space-y-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={exitRunner}
+          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft size={14} /> Back to Assessment
+        </Button>
+        {assessment.is_adaptive ? (
+          <AdaptiveRunner
+            assessment={assessment}
+            attemptId={attempt?.id ?? ""}
+            employeeId={assessment.employee_id}
+            tenantId={assessment.tenant_id}
+            employeeName={user?.full_name ?? "Employee"}
+            onComplete={exitRunner}
+          />
+        ) : (
+          <FixedRunner assessment={assessment} onComplete={exitRunner} onCancel={exitRunner} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
