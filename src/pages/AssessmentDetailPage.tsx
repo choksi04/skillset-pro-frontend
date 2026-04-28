@@ -378,8 +378,13 @@ export default function AssessmentDetailPage() {
                 <p className="text-2xl font-bold text-foreground">{adaptiveCap ?? "—"}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">max (adaptive)</p>
               </>
+            ) : questionsNotYetGenerated ? (
+              <>
+                <p className="text-2xl font-bold text-muted-foreground">—</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">pending</p>
+              </>
             ) : (
-              <p className="text-2xl font-bold text-foreground">{assessment.assessment_questions.length}</p>
+              <p className="text-2xl font-bold text-foreground">{actualQuestionCount}</p>
             )}
           </CardContent>
         </Card>
