@@ -57,22 +57,6 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Aggregate dimension averages
-  const dimensionAverages = useMemo(() => {
-    const dims: Record<string, { total: number; count: number }> = {};
-    for (const ev of attempt.ai_evaluations) {
-      for (const d of ev.dimensions) {
-        if (!dims[d.dimension]) dims[d.dimension] = { total: 0, count: 0 };
-        dims[d.dimension].total += d.score;
-        dims[d.dimension].count += 1;
-      }
-    }
-    return Object.entries(dims).map(([name, { total, count }]) => ({
-      name,
-      avg: Math.round(total / count),
-    }));
-  }, [attempt.ai_evaluations]);
-
   // Group evaluations by skill
   const evalsBySkill = useMemo(() => {
     const grouped: Record<string, AIEvaluation[]> = {};
@@ -88,83 +72,17 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Overall Score */}
-      <div className="rounded-xl border border-border bg-card p-6 text-center">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Overall AI Score</p>
-        {isPendingEval ? (
-          <p className="text-sm text-warning">Pending AI Evaluation</p>
-        ) : (
-          <>
-            <p className={`text-5xl font-bold ${scoreColor(attempt.total_ai_score ?? 0)}`}>
-              {attempt.total_ai_score ?? 0}
-              <span className="text-lg text-muted-foreground font-normal">/100</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {attempt.ai_evaluations.length} questions evaluated
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Skill Scores */}
-      {attempt.skill_scores.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-4">Skill Scores & Calculated Levels</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {attempt.skill_scores.map((ss) => {
-              const skill = skillMap.get(ss.skill_id);
-              return (
-                <div key={ss.skill_id} className="rounded-lg border border-border p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-foreground">{skill?.skill_name ?? 'Unknown Skill'}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-semibold ${scoreColor(ss.avg_score)}`}>{ss.avg_score}%</span>
-                    </div>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${scoreBarColor(ss.avg_score)}`} style={{ width: `${ss.avg_score}%` }} />
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-[10px] text-muted-foreground">{ss.question_count} questions evaluated</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5">Target: L{ss.target_level}</Badge>
-                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-bold">Achieved: L{ss.calculated_level}</Badge>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Dimension Breakdown */}
-      {dimensionAverages.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-4">Evaluation Dimensions</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {dimensionAverages.map((dim) => (
-              <div key={dim.name} className="rounded-lg border border-border p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-foreground">{dim.name}</span>
-                  <span className={`text-sm font-semibold ${scoreColor(dim.avg)}`}>{dim.avg}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${scoreBarColor(dim.avg)}`} style={{ width: `${dim.avg}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
+      {isPendingEval && (
+        <div className="rounded-xl border border-border bg-card p-4 text-center">
+          <p className="text-sm text-warning">Pending Evaluation</p>
         </div>
       )}
 
       {/* Per-Question Results */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Per-Question Results</h3>
-
         {Object.entries(evalsBySkill).map(([skillId, evals]) => {
           const skill = skillMap.get(skillId);
-          const skillAvg = Math.round(evals.reduce((s, e) => s + e.score, 0) / evals.length);
+          const correctCount = evals.filter((e) => e.score >= 50).length;
 
           return (
             <div key={skillId} className="rounded-xl border border-border bg-card overflow-hidden">
@@ -174,7 +92,9 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                   <span className="text-sm font-medium text-foreground">{skill?.skill_name ?? 'Unknown Skill'}</span>
                   <span className="text-xs text-muted-foreground">({evals.length} questions)</span>
                 </div>
-                <span className={`text-sm font-semibold ${scoreColor(skillAvg)}`}>{skillAvg}/100</span>
+                <span className="text-xs text-muted-foreground">
+                  {correctCount} / {evals.length} correct
+                </span>
               </div>
 
               <div className="divide-y divide-border">
