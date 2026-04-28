@@ -53,7 +53,7 @@ export default function AssessmentTemplateEditPage() {
 
   // Adaptive
   const [domainId, setDomainId] = useState<string>('');
-  const [skillMode, setSkillMode] = useState<SkillSelectionMode>('top_n');
+  const [skillMode, setSkillMode] = useState<SkillSelectionMode>('custom');
   const [skillsPerAssessment, setSkillsPerAssessment] = useState(5);
   const [questionsPerSkill, setQuestionsPerSkill] = useState(4);
   const [questionTypes, setQuestionTypes] = useState<string[]>(['mcq']);
@@ -87,7 +87,7 @@ export default function AssessmentTemplateEditPage() {
         setDuration(t.duration_minutes);
         setMaxAttempts(t.max_attempts);
         setDomainId(t.domain_id ?? '');
-        setSkillMode((t.skill_selection_mode as SkillSelectionMode) ?? 'top_n');
+        setSkillMode(t.skill_selection_mode === 'custom' ? 'custom' : 'custom');
         setSkillsPerAssessment(t.skills_per_assessment);
         setQuestionsPerSkill(t.questions_per_skill);
         setQuestionTypes(t.question_types?.length ? t.question_types : ['mcq']);
@@ -314,8 +314,13 @@ export default function AssessmentTemplateEditPage() {
                   <Select value={skillMode} onValueChange={(v) => setSkillMode(v as SkillSelectionMode)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="top_n">Top N skills (auto-pick by self-rating)</SelectItem>
-                      <SelectItem value="custom">Custom (pick specific skills)</SelectItem>
+                      <SelectItem value="custom">Manual (pick specific skills)</SelectItem>
+                      <SelectItem value="top_n" disabled>
+                        <span className="flex items-center gap-2">
+                          Top N skills (auto-pick by self-rating)
+                          <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Coming Soon</span>
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
