@@ -41,13 +41,9 @@ function getDisplayQuestionText(questionText: string, questionType?: string): st
 
 export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
   const { questions } = useQuestionStore();
-  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { skills } = useSkillStore();
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
-  const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
-
-  useEffect(() => { fetchLevels(); }, [fetchLevels]);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
