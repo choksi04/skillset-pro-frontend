@@ -25,8 +25,9 @@ import {
 import SearchableSelect from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
 import {
-  MessageSquare, Eye, ShieldCheck, Shield, Bell, UserCog,
+  MessageSquare, Eye, ShieldCheck, Shield, Bell, UserCog, ChevronDown,
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 75 ? 'bg-success' : score >= 50 ? 'bg-warning' : 'bg-destructive';
