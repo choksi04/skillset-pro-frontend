@@ -4,7 +4,7 @@ import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuest
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useCompetencyLevelStore, scoreToLevelDynamic, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore } from "@/stores/competencyLevelStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 
@@ -12,6 +12,7 @@ import { useRegistryStore } from "@/stores/registryStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import EvalResults from "@/components/assessment/EvalResults";
+import ResultSummaryCard from "@/components/assessment/ResultSummaryCard";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
 import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
@@ -415,7 +416,7 @@ export default function AssessmentDetailPage() {
       </div>
 
       {/* Metadata Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Questions</p>
@@ -447,43 +448,6 @@ export default function AssessmentDetailPage() {
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Skills</p>
             <p className="text-2xl font-bold text-foreground">{assessment.skill_ids.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">AI Score</p>
-            {attempt?.total_ai_score != null ? (
-              <>
-                <p
-                  className={`text-2xl font-bold ${attempt.total_ai_score >= 75 ? "text-success" : attempt.total_ai_score >= 50 ? "text-warning" : "text-destructive"}`}
-                >
-                  {attempt.total_ai_score}%
-                </p>
-                {(() => {
-                  const aiLevel = scoreToLevelDynamic(competencyLevels, attempt.total_ai_score);
-                  const verifiedLevels = (review?.skill_reviews ?? [])
-                    .map((s: any) => s.verified_level)
-                    .filter((v: any) => typeof v === "number");
-                  const verifiedAvg = verifiedLevels.length > 0
-                    ? Math.round(verifiedLevels.reduce((a: number, b: number) => a + b, 0) / verifiedLevels.length)
-                    : null;
-                  return (
-                    <div className="mt-1.5 flex flex-col items-center gap-1">
-                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                        AI: {getFormattedLevelLabel(competencyLevels, aiLevel)}
-                      </Badge>
-                      {verifiedAvg != null && review?.status === "completed" && (
-                        <Badge className="text-[10px] h-5 px-1.5 bg-success/15 text-success border-success/30">
-                          Verified: {getFormattedLevelLabel(competencyLevels, verifiedAvg)}
-                        </Badge>
-                      )}
-                    </div>
-                  );
-                })()}
-              </>
-            ) : (
-              <p className="text-2xl font-bold text-muted-foreground">—</p>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -580,6 +544,11 @@ export default function AssessmentDetailPage() {
           </Button>
         )}
       </div>
+
+      {/* Result Summary — terminal attempts only */}
+      {isAttemptTerminal && attempt && (
+        <ResultSummaryCard attempt={attempt} review={review} />
+      )}
 
       {/* Assessment Questions list — collapsible.
           - Admins/managers always see it (editable when canManage).
@@ -702,12 +671,12 @@ export default function AssessmentDetailPage() {
         </Collapsible>
       )}
 
-      {/* Evaluation Results — collapsible, default open */}
+      {/* Per-Question Details — collapsible, default open */}
       {isEvaluated && attempt && (
         <Collapsible defaultOpen>
           <div className="rounded-xl border border-border bg-card">
             <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
-              <h3 className="text-sm font-semibold text-foreground">Evaluation Results</h3>
+              <h3 className="text-sm font-semibold text-foreground">Per-Question Details</h3>
               <ChevronDown
                 size={14}
                 className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180"

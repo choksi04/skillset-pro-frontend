@@ -1,55 +1,95 @@
 ## Goal
 
-On the **My Assessment** detail page (employee viewing their own submitted assessment), show the list of attempted questions with **correct / wrong** results inline.
+Simplify the assessment result experience. Drop percentage-based "Overall AI Score" and rename everything to **Assessment Score**, expressed only as an achieved competency level (e.g. `L3 - Intermediate`). Replace the current confusing logic with a simple rule: the achieved level is the **highest competency level at which the employee answered correctly**, computed per-skill and overall.
 
-## Current behavior (verified)
+## New scoring rule (single source of truth)
 
-- `EvalResults` already renders per-question results with right/wrong badges and AI feedback. It is rendered for both owner and manager when `attempt.status` is `evaluated` / `reviewed`.
-- The user's current attempt (`61141411…`) has:
-  - status = `evaluated`, `total_ai_score` = 13
-  - **16 `attempt_answers` rows but 0 `ai_evaluations` rows**
-- Reason: this adaptive attempt was finalized **before** the recent fix that writes `ai_evaluations` rows during `finalizeAdaptiveAttempt`. So `EvalResults` shows "Overall AI Score 13" but the per-question section is empty.
-- The Assessment Questions table is currently gated `!isOwner` — owners never see the question list, only managers do.
+For each skill in an adaptive attempt:
 
-## Plan
+- Look only at the questions the employee got **correct**.
+- Achieved level = the **maximum `level` among correct answers**.
+- If the employee got nothing correct on that skill → achieved level = **L1** (or "Not achieved" badge — see Open question).
 
-### 1. Backfill `ai_evaluations` for adaptive attempts missing them
-Add a one-time, on-demand reconstruction helper invoked from `AssessmentDetailPage` when:
-- `attempt.status` is `submitted` / `evaluated` / `reviewed`, AND
-- `attempt.ai_evaluations.length === 0`, AND
-- `attempt.adaptive_state` contains a `skills[].history` array with `{question_id, correct}` entries.
+Overall achieved level = **average (rounded) of per-skill achieved levels**, then mapped to its competency label (L1 - Beginner, L2 - Basic, …) via the `competency_levels` table.
 
-Behavior:
-- For each history entry, insert an `ai_evaluations` row: `score = correct ? 100 : 0`, `feedback = "Correct answer." | "Incorrect — review the correct option."`, `confidence = 100`, `dimensions = []`.
-- Recompute `attempt_skill_scores` (avg + level) and `assessment_attempts.total_ai_score` from those rows so the cards reflect reality (the current `13` is stale).
-- Idempotent: skip if rows already exist.
-- Triggered automatically once on detail-page load when the gap is detected; also exposed as a "Recompute results" button in the existing pending-evaluation strip for safety.
+The numeric `total_ai_score` (0–100) and `avg_score` columns are kept in the DB (no migration needed) but are **no longer surfaced anywhere in the UI**. We just stop displaying them.
 
-### 2. Show the question list to the owner on submitted assessments
-Currently the **Assessment Questions** collapsible is `!isOwner && isAdmin`. Extend it so it also renders for the owner once the attempt is terminal (`submitted` / `evaluated` / `reviewed`). For owners:
-- Hide the admin-only Action column and the "Add Question" button (no editing).
-- Default `Collapsible` open so the user immediately sees the list of attempted questions.
-- Keep the same columns: `#`, Question, Skill, Level, Type.
+This replaces the current logic which:
 
-### 3. Per-question Result column for owners
-Inside this owner-visible question list, add a **Result** column showing:
-- `✓ Correct` (success) / `✗ Incorrect` (destructive) badge derived from the matching `ai_evaluations` row (`score >= 50` ⇒ correct for non-MCQ, MCQ uses score === 100).
-- `—` if there is still no evaluation for that question.
+- Computes `avg_score = correctCount / totalAsked * 100` per skill
+- Then maps that percentage back to a level via competency score ranges
+- Causes the reported bug (2/4 correct = 50% → L2, even though both correct answers were at L3).
 
-This gives a quick scannable list. The full per-question breakdown (employee answer, correct option, AI feedback) remains available below in the existing `EvalResults` "Per-Question Results" section, which the backfill in step 1 will now populate.
+## What changes in the UI — Assessment Detail page
 
-### 4. Surface the question list section regardless of `isEvaluated`
-The "Evaluation Results" `Collapsible` is already gated by `isEvaluated`. After the backfill runs, the existing attempt becomes properly populated and this section will work as designed for both owner and manager — no further change needed there.
+### 1. Remove the "AI Score" metadata card
+
+Delete the 4th metadata card ("AI Score 13% / AI: L2 / Verified: Lx") in the top grid. The grid becomes 3 cards: **Questions, Duration, Skills**.
+
+### 2. Add a new "Result Summary" card (only when attempt is terminal)
+
+Replaces the removed AI Score tile and the existing `EvalResults` "Overall AI Score" panel. Shown above the Attempted Questions table. Contents:
+
+```
+RESULT SUMMARY
+Achieved Level: [ L3 - Intermediate ]      ← big badge, derived
+Verified Level: [ L3 - Intermediate ]      ← only if manager review completed
+
+Questions Attempted: 4
+Correct: 2     Wrong: 2
+
+Skill-wise breakdown
+─────────────────────────────────────────────
+React          2 / 3 correct     L3 - Intermediate
+Node.js        1 / 2 correct     L2 - Basic
+TypeScript     0 / 1 correct     —
+```
+
+- "Achieved Level" badge replaces the percentage display.
+- "Verified Level" appears only when `review.status === 'completed'`, computed as the rounded average of `verified_level` across `skill_reviews`.
+- Skill-wise rows pull from `attempt.adaptive_state.skills[*].history` (correct vs total, max level among correct).
+
+### 3. Rename all "AI Score" / "AI Evaluation" labels
+
+- "Overall AI Score" → removed entirely.
+- "AI Score" card label → removed.
+- The `EvalResults` "Per-Question Results" section header stays, but its top **Overall AI Score** block, **Skill Scores & Calculated Levels** block, and **Evaluation Dimensions** block are removed (since those reintroduce the percentage). Per-question expandable rows (employee answer, correct option, feedback) stay — they're useful.
+- Manager Review Panel and notifications continue to call this an "Assessment" / "Assessment Score". Anywhere user-facing text says "AI Score" → change to "Assessment Score".
+
+### 4. Attempted Questions table
+
+Already shows ✓ Correct / ✗ Incorrect per question — keep as is. This is the only place the per-question right/wrong info needs to live.
+
+## What changes in the engine — `src/stores/adaptiveEngineStore.ts`
+
+In `**finalizeAdaptiveAttempt**` and `**reconstructEvaluationsFromHistory**`, replace the level-calculation block with the simple rule:
+
+```ts
+const correctLevels = skill.history.filter(h => h.correct).map(h => h.level);
+const calculated_level = correctLevels.length
+  ? Math.max(...correctLevels)
+  : 1; // or null — see Open question
+```
+
+Remove the existing 2-correct-at-a-level threshold logic (lines ~467–484) and the percentage-derived level mapping. Keep `avg_score` written to the DB for backward compatibility but stop using it for level decisions. `total_ai_score` is still written (avg of avg_score) but no UI reads it.
+
+This single change fixes the reported bug — the 2 correct L3 answers now produce `calculated_level = 3`, not L2.
 
 ## Files to touch
 
-- `src/stores/adaptiveEngineStore.ts` — add `reconstructEvaluationsFromHistory(attemptId)` helper that performs the backfill described in step 1 (also recomputes `attempt_skill_scores` + `total_ai_score`).
-- `src/pages/AssessmentDetailPage.tsx`
-  - On mount / when attempt is loaded, detect the gap and call the helper, then `fetchAttempts()`.
-  - Loosen the Assessment Questions gate so owners see it on terminal attempts (read-only) with a new `Result` column.
-- No DB migration required (uses existing tables/columns).
+- `src/stores/adaptiveEngineStore.ts` — replace level calculation in `finalizeAdaptiveAttempt` and `reconstructEvaluationsFromHistory` with "max level among correct answers".
+- `src/pages/AssessmentDetailPage.tsx` — drop the AI Score card; render a new `ResultSummaryCard` for terminal attempts; remove `EvalResults` overall/skill/dimension blocks (or replace `EvalResults` with a slimmer version).
+- `src/components/assessment/EvalResults.tsx` — strip the Overall AI Score, Skill Scores, and Dimension Breakdown sections. Keep only "Per-Question Results" with right/wrong + feedback. Rename remaining "AI" wording to "Assessment".
+
+No DB migration. No changes to manager review, registry, or notification flows.
 
 ## Out of scope
 
-- Changing the AI evaluation pipeline for fixed (non-adaptive) assessments — that path already writes `ai_evaluations` correctly.
-- Reworking the manager view (already updated in the previous turn).
+- Changing the fixed (non-adaptive) assessment evaluation pipeline — it still uses AI-graded scores. We only simplify the **display** there to show level instead of percentage; underlying scores stay.
+- Touching the competency_levels score ranges (no longer used for level derivation in adaptive attempts after this change).
+
+## Open question (please confirm before I implement)
+
+When an employee gets **zero correct answers** on a skill, what should we show?
+
+Ans: **L1 - Beginner** (treat as the lowest level achieved) — keeps every skill mapped to a level.

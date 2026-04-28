@@ -465,23 +465,10 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const skillScores: SkillScore[] = [];
 
     for (const skill of state.skills) {
-      const correctByLevel: Record<number, number> = {};
-      for (const h of skill.history) {
-        if (h.correct) correctByLevel[h.level] = (correctByLevel[h.level] ?? 0) + 1;
-      }
-
-      let finalLevel: number | null = null;
-      for (let lvl = MAX_LEVEL; lvl >= MIN_LEVEL; lvl--) {
-        if ((correctByLevel[lvl] ?? 0) >= 2) {
-          finalLevel = lvl;
-          break;
-        }
-      }
-      if (finalLevel == null) {
-        const lastLevel =
-          skill.history[skill.history.length - 1]?.level ?? skill.startLevel;
-        finalLevel = Math.max(MIN_LEVEL, lastLevel - 1);
-      }
+      // Simplified rule: achieved level = max level among CORRECT answers.
+      // If nothing correct → L1. avg_score retained for backward compatibility only.
+      const correctLevels = skill.history.filter((h) => h.correct).map((h) => h.level);
+      const finalLevel = correctLevels.length ? clampLevel(Math.max(...correctLevels)) : MIN_LEVEL;
 
       const total = skill.history.length || 1;
       const correctCount = skill.history.filter((h) => h.correct).length;
@@ -622,11 +609,9 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         const total = skill.history.length;
         const correctCount = skill.history.filter((h) => h.correct).length;
         const avg_score = Math.round((correctCount / total) * 100);
-        // Final level approx: highest level the user got correct, else startLevel-1, clamped
+        // Simplified: achieved level = max level among CORRECT answers, else L1.
         const correctLevels = skill.history.filter((h) => h.correct).map((h) => h.level);
-        const finalLevel = correctLevels.length
-          ? Math.max(...correctLevels)
-          : Math.max(MIN_LEVEL, (skill.startLevel ?? 1) - 1);
+        const finalLevel = correctLevels.length ? Math.max(...correctLevels) : MIN_LEVEL;
         return {
           skill_id: skill.skill_id,
           avg_score,
