@@ -512,78 +512,108 @@ export default function AssessmentDetailPage() {
         )}
       </div>
 
-      {/* Admin: Question Management for pending assessments */}
-      {canManage && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Assessment Questions</h3>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setAddQuestionOpen(true)}
-              className="gap-1.5 h-7 text-xs"
-            >
-              <Plus size={12} /> Add Question
-            </Button>
-          </div>
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Question</TableHead>
-                  <TableHead>Skill</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="w-16 text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assessment.assessment_questions.map((aq, idx) => {
-                  const q = questionMap.get(aq.question_id);
-                  return (
-                    <TableRow key={aq.question_id}>
-                      <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell
-                        className="text-sm text-foreground max-w-xs truncate"
-                        title={q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
-                      >
-                        {q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px]">
-                          {skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {(() => {
-                          const lvl = levelNumberMap.get(aq.target_level);
-                          const label = levelLabelMap.get(aq.target_level) || aq.target_level;
-                          return lvl != null ? `L${lvl} - ${label}` : label;
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                          onClick={() => setConfirmRemoveQuestion(aq.question_id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </TableCell>
+      {/* Assessment Questions list — collapsible. Shown to admins/managers always; default
+          collapsed once the assessment has been submitted/evaluated. Editable only when
+          the assessment is still in pending/in_progress (canManage). */}
+      {!isOwner && isAdmin && assessment.assessment_questions.length > 0 && (
+        <Collapsible defaultOpen={!isAttemptTerminal && !isPendingEval}>
+          <div className="rounded-xl border border-border bg-card">
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-foreground">Assessment Questions</h3>
+                <Badge variant="outline" className="text-[10px]">{assessment.assessment_questions.length}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {canManage && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); setAddQuestionOpen(true); }}
+                    className="gap-1.5 h-7 text-xs"
+                  >
+                    <Plus size={12} /> Add Question
+                  </Button>
+                )}
+                <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Question</TableHead>
+                      <TableHead>Skill</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead>Type</TableHead>
+                      {canManage && <TableHead className="w-16 text-right">Action</TableHead>}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {assessment.assessment_questions.map((aq, idx) => {
+                      const q = questionMap.get(aq.question_id);
+                      return (
+                        <TableRow key={aq.question_id}>
+                          <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell
+                            className="text-sm text-foreground max-w-xs truncate"
+                            title={q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
+                          >
+                            {q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">
+                              {skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {(() => {
+                              const lvl = levelNumberMap.get(aq.target_level);
+                              const label = levelLabelMap.get(aq.target_level) || aq.target_level;
+                              return lvl != null ? `L${lvl} - ${label}` : label;
+                            })()}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
+                          {canManage && (
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                onClick={() => setConfirmRemoveQuestion(aq.question_id)}
+                              >
+                                <Trash2 size={12} />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CollapsibleContent>
           </div>
-        </div>
+        </Collapsible>
       )}
 
-      {/* Evaluation Results */}
-      {isEvaluated && attempt && <EvalResults attempt={attempt} assessment={assessment} />}
+      {/* Evaluation Results — collapsible, default open */}
+      {isEvaluated && attempt && (
+        <Collapsible defaultOpen>
+          <div className="rounded-xl border border-border bg-card">
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
+              <h3 className="text-sm font-semibold text-foreground">Evaluation Results</h3>
+              <ChevronDown size={14} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border p-5">
+                <EvalResults attempt={attempt} assessment={assessment} />
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
 
       {/* Manager Review Panel (inline for team assessments) */}
       {!isOwner && review && attempt && (
