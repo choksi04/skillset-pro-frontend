@@ -439,6 +439,23 @@ export default function AssessmentDetailPage() {
             {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume Assessment
           </Button>
         )}
+        {canReattempt && (
+          <div className="flex items-center gap-2">
+            <Button onClick={handleStartRunner} disabled={startingRunner} variant="outline" className="gap-1.5">
+              {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Re-attempt
+            </Button>
+            {assignment && (
+              <span className="text-xs text-muted-foreground">
+                Attempt {assignment.attempt_count}/{assignment.max_attempts}
+              </span>
+            )}
+          </div>
+        )}
+        {isOwner && isAttemptTerminal && !reattemptGate.allowed && assignment && (
+          <span className="text-xs text-muted-foreground">
+            Attempt {assignment.attempt_count}/{assignment.max_attempts} · Max attempts reached
+          </span>
+        )}
         {isPendingEval && isOwner && (
           <div className="flex items-center gap-2">
             <TooltipProvider>
