@@ -69,12 +69,13 @@ export default function AssessmentDetailPage() {
     removeAssessmentQuestion,
     addAssessmentQuestion,
   } = useAssessmentStore();
-  const { getAttemptForAssessment, fetchAttempts, retryEvaluation } = useAttemptStore();
+  const { getAttemptForAssessment, fetchAttempts, retryEvaluation, startAttempt } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
+  const { templates, fetchTemplates } = useTemplateStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
