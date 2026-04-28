@@ -32,6 +32,13 @@ import AllRegistriesPage from "@/pages/AllRegistriesPage";
 import NotFound from "@/pages/NotFound";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+
+function LegacyExecRedirect() {
+  const [searchParams] = useSearchParams();
+  const startId = searchParams.get("startId");
+  return <Navigate to={startId ? `/assessments/${startId}` : "/assessments"} replace />;
+}
 
 const queryClient = new QueryClient();
 
