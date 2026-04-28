@@ -210,6 +210,20 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       }
     }
 
+    // Fallback: when no registry submission / no ratings exist, fall back to the
+    // skills mapped to the assessment's domain. Mirrors assignmentStore so that a
+    // submitted registry remains optional (per project rules).
+    if (candidateSkills.length === 0 && assessmentRow.domain_id) {
+      const { data: domainSkills } = await supabase
+        .from('domain_skill_mappings')
+        .select('skill_id')
+        .eq('domain_id', assessmentRow.domain_id)
+        .is('deleted_on', null);
+      candidateSkills = (domainSkills || [])
+        .map((s: any) => s.skill_id)
+        .slice(0, templateRow.skills_per_assessment ?? 5);
+    }
+
     if (candidateSkills.length === 0) {
       return { state: null, reason: 'No skills resolved for this adaptive assessment' };
     }
