@@ -545,6 +545,11 @@ export default function AssessmentDetailPage() {
         )}
       </div>
 
+      {/* Result Summary — terminal attempts only */}
+      {isAttemptTerminal && attempt && (
+        <ResultSummaryCard attempt={attempt} review={review} />
+      )}
+
       {/* Assessment Questions list — collapsible.
           - Admins/managers always see it (editable when canManage).
           - Owners see it once the attempt is terminal (read-only) with a Result column. */}
