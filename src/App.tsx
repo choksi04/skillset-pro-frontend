@@ -16,7 +16,7 @@ import QuestionBankPage from "@/pages/QuestionBankPage";
 import AssessmentsPage from "@/pages/AssessmentsPage";
 import TeamAssessmentsPage from "@/pages/TeamAssessmentsPage";
 import AssessmentDetailPage from "@/pages/AssessmentDetailPage";
-import AssessmentExecPage from "@/pages/AssessmentExecPage";
+
 import ReviewsPage from "@/pages/ReviewsPage";
 import AssessmentTemplatesPage from "@/pages/AssessmentTemplatesPage";
 import AssessmentTemplateEditPage from "@/pages/AssessmentTemplateEditPage";
