@@ -351,6 +351,30 @@ export default function AssessmentTemplateEditPage() {
                   </Select>
                 </div>
 
+                {skillMode === "custom" && domainId && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Pick Skills ({pickedSkills.length} selected)</Label>
+                    <div className="rounded-lg border border-border max-h-60 overflow-y-auto">
+                      {skillsForDomain.length === 0 ? (
+                        <p className="text-xs text-muted-foreground p-3">No skills mapped to this domain.</p>
+                      ) : (
+                        skillsForDomain.map((s) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 px-3 py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/30"
+                          >
+                            <Checkbox
+                              checked={pickedSkills.includes(s.id)}
+                              onCheckedChange={() => togglePickedSkill(s.id)}
+                            />
+                            <span className="text-xs text-foreground">{s.skill_name}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Skills per Assessment</Label>
@@ -383,29 +407,6 @@ export default function AssessmentTemplateEditPage() {
                     </p>
                   </div>
                 </div>
-                {skillMode === "custom" && domainId && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">Pick Skills ({pickedSkills.length} selected)</Label>
-                    <div className="rounded-lg border border-border max-h-60 overflow-y-auto">
-                      {skillsForDomain.length === 0 ? (
-                        <p className="text-xs text-muted-foreground p-3">No skills mapped to this domain.</p>
-                      ) : (
-                        skillsForDomain.map((s) => (
-                          <label
-                            key={s.id}
-                            className="flex items-center gap-2 px-3 py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/30"
-                          >
-                            <Checkbox
-                              checked={pickedSkills.includes(s.id)}
-                              onCheckedChange={() => togglePickedSkill(s.id)}
-                            />
-                            <span className="text-xs text-foreground">{s.skill_name}</span>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <Label className="text-xs">Question Types</Label>
