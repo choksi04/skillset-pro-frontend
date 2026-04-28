@@ -648,7 +648,7 @@ export default function AssessmentDetailPage() {
                                 {skillName}
                               </Badge>
                               <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                                {lvlNum != null ? `L${lvlNum} - ${lvlLabel}` : lvlLabel}
+                                {lvlNum != null ? `${lvlLabel}` : lvlLabel}
                               </Badge>
                               <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize">
                                 {q?.question_type || "—"}
