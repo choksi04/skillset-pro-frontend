@@ -65,6 +65,13 @@ interface AdaptiveEngineStore {
   ) => Promise<void>;
   /** Compute final per-skill levels and write attempt_skill_scores. Returns the scores. */
   finalizeAdaptiveAttempt: (attemptId: string, assessmentId: string) => Promise<SkillScore[]>;
+  /**
+   * Backfill `ai_evaluations` + `attempt_skill_scores` + `total_ai_score` for an
+   * adaptive attempt that was finalized before per-question evaluation rows were
+   * being written. Idempotent: no-op when ai_evaluations already exist for the
+   * attempt or when the adaptive history is empty.
+   */
+  reconstructEvaluationsFromHistory: (attemptId: string) => Promise<boolean>;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -567,5 +574,100 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
 
     syncAssignmentForAttempt(assessmentId, 'evaluated').catch(() => {});
     return skillScores;
+  },
+
+  reconstructEvaluationsFromHistory: async (attemptId: string) => {
+    // 1) Skip if evaluations already exist
+    const { count: existingCount } = await supabase
+      .from('ai_evaluations')
+      .select('id', { count: 'exact', head: true })
+      .eq('attempt_id', attemptId);
+    if ((existingCount ?? 0) > 0) return false;
+
+    // 2) Load the attempt + adaptive_state
+    const { data: att, error: attErr } = await supabase
+      .from('assessment_attempts')
+      .select('id, assessment_id, adaptive_state')
+      .eq('id', attemptId)
+      .maybeSingle();
+    if (attErr || !att) return false;
+
+    const state = (att.adaptive_state ?? {}) as Partial<AdaptiveAttemptState>;
+    const skills = Array.isArray(state.skills) ? state.skills : [];
+    if (skills.length === 0) return false;
+
+    const userId = await getCurrentUserId();
+    const now = new Date().toISOString();
+
+    // 3) Build evaluation rows from per-skill history
+    const evalRows = skills.flatMap((skill) =>
+      (skill.history ?? []).map((h) => ({
+        attempt_id: attemptId,
+        question_id: h.question_id,
+        score: h.correct ? 100 : 0,
+        confidence: 1,
+        feedback: h.correct
+          ? 'Correct answer.'
+          : 'Incorrect — selected option did not match the correct answer.',
+        dimensions: [] as any,
+        created_by: userId,
+      })),
+    );
+    if (evalRows.length === 0) return false;
+
+    // 4) Recompute per-skill scores
+    const skillScores = skills
+      .filter((s) => (s.history ?? []).length > 0)
+      .map((skill) => {
+        const total = skill.history.length;
+        const correctCount = skill.history.filter((h) => h.correct).length;
+        const avg_score = Math.round((correctCount / total) * 100);
+        // Final level approx: highest level the user got correct, else startLevel-1, clamped
+        const correctLevels = skill.history.filter((h) => h.correct).map((h) => h.level);
+        const finalLevel = correctLevels.length
+          ? Math.max(...correctLevels)
+          : Math.max(MIN_LEVEL, (skill.startLevel ?? 1) - 1);
+        return {
+          skill_id: skill.skill_id,
+          avg_score,
+          calculated_level: clampLevel(finalLevel),
+          target_level: skill.startLevel ?? 1,
+          question_count: total,
+        };
+      });
+
+    const totalAi =
+      skillScores.length > 0
+        ? Math.round(skillScores.reduce((a, s) => a + s.avg_score, 0) / skillScores.length)
+        : 0;
+
+    // 5) Persist (clear scores first to keep idempotent on retry)
+    await supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId);
+    await supabase.from('ai_evaluations').insert(evalRows);
+    if (skillScores.length > 0) {
+      await supabase.from('attempt_skill_scores').insert(
+        skillScores.map((ss) => ({
+          attempt_id: attemptId,
+          skill_id: ss.skill_id,
+          avg_score: ss.avg_score,
+          calculated_level: ss.calculated_level,
+          target_level: ss.target_level,
+          question_count: ss.question_count,
+          created_by: userId,
+        })),
+      );
+    }
+    await supabase
+      .from('assessment_attempts')
+      .update({
+        total_ai_score: totalAi,
+        evaluated_at: now,
+        modified_by: userId,
+        modified_at: now,
+      })
+      .eq('id', attemptId);
+
+    await useAttemptStore.getState().fetchAttempts();
+    return true;
   },
 }));

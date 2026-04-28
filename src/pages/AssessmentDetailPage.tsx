@@ -15,6 +15,7 @@ import EvalResults from "@/components/assessment/EvalResults";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
 import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
+import { useAdaptiveEngineStore } from "@/stores/adaptiveEngineStore";
 import FixedRunner from "@/components/assessment/FixedRunner";
 import { useTemplateStore } from "@/stores/templateStore";
 import { canStartNewAttempt } from "@/stores/assignmentStore";
@@ -139,6 +140,38 @@ export default function AssessmentDetailPage() {
 
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
+
+  // Map question_id -> ai evaluation row for the result badge column
+  const evalByQuestionId = useMemo(() => {
+    const m = new Map<string, { score: number }>();
+    for (const ev of attempt?.ai_evaluations ?? []) m.set(ev.question_id, { score: ev.score });
+    return m;
+  }, [attempt?.ai_evaluations]);
+
+  // Backfill ai_evaluations for adaptive attempts that were finalized before
+  // per-question rows were being written. Idempotent. Runs once when the gap
+  // is detected for this attempt.
+  const [backfilled, setBackfilled] = useState<string | null>(null);
+  useEffect(() => {
+    if (!attempt || !assessment) return;
+    const isTerminal =
+      attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed";
+    if (!isTerminal) return;
+    if ((attempt.ai_evaluations?.length ?? 0) > 0) return;
+    if (!assessment.is_adaptive) return;
+    if (backfilled === attempt.id) return;
+    setBackfilled(attempt.id);
+    useAdaptiveEngineStore
+      .getState()
+      .reconstructEvaluationsFromHistory(attempt.id)
+      .then((didWork) => {
+        if (didWork) {
+          fetchAttempts();
+          toast.success("Per-question results restored");
+        }
+      })
+      .catch(() => {/* silent */});
+  }, [attempt?.id, attempt?.status, attempt?.ai_evaluations?.length, assessment?.is_adaptive, backfilled, fetchAttempts, assessment]);
 
   // Fetch employee name for team view
   useEffect(() => {
@@ -512,15 +545,18 @@ export default function AssessmentDetailPage() {
         )}
       </div>
 
-      {/* Assessment Questions list — collapsible. Shown to admins/managers always; default
-          collapsed once the assessment has been submitted/evaluated. Editable only when
-          the assessment is still in pending/in_progress (canManage). */}
-      {!isOwner && isAdmin && assessment.assessment_questions.length > 0 && (
-        <Collapsible defaultOpen={!isAttemptTerminal && !isPendingEval}>
+      {/* Assessment Questions list — collapsible.
+          - Admins/managers always see it (editable when canManage).
+          - Owners see it once the attempt is terminal (read-only) with a Result column. */}
+      {assessment.assessment_questions.length > 0 &&
+        ((!isOwner && isAdmin) || (isOwner && isAttemptTerminal)) && (
+        <Collapsible defaultOpen={isOwner ? true : !isAttemptTerminal && !isPendingEval}>
           <div className="rounded-xl border border-border bg-card">
             <CollapsibleTrigger className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-foreground">Assessment Questions</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {isOwner ? "Attempted Questions" : "Assessment Questions"}
+                </h3>
                 <Badge variant="outline" className="text-[10px]">{assessment.assessment_questions.length}</Badge>
               </div>
               <div className="flex items-center gap-2">
@@ -547,12 +583,31 @@ export default function AssessmentDetailPage() {
                       <TableHead>Skill</TableHead>
                       <TableHead>Level</TableHead>
                       <TableHead>Type</TableHead>
+                      {isOwner && isAttemptTerminal && <TableHead className="w-24">Result</TableHead>}
                       {canManage && <TableHead className="w-16 text-right">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {assessment.assessment_questions.map((aq, idx) => {
                       const q = questionMap.get(aq.question_id);
+                      const ev = evalByQuestionId.get(aq.question_id);
+                      const isMCQ = q?.question_type === "mcq";
+                      let resultBadge: JSX.Element = (
+                        <Badge variant="outline" className="text-[10px]">—</Badge>
+                      );
+                      if (ev) {
+                        const correct = isMCQ ? ev.score === 100 : ev.score >= 50;
+                        resultBadge = correct ? (
+                          <Badge className="text-[10px] bg-success/15 text-success border-success/20 gap-1">
+                            <CheckCircle size={10} /> Correct
+                          </Badge>
+                        ) : (
+                          <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/20 gap-1">
+                            <Trash2 size={10} className="hidden" />
+                            <span className="inline-flex items-center gap-1">✗ Incorrect</span>
+                          </Badge>
+                        );
+                      }
                       return (
                         <TableRow key={aq.question_id}>
                           <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
@@ -575,6 +630,9 @@ export default function AssessmentDetailPage() {
                             })()}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
+                          {isOwner && isAttemptTerminal && (
+                            <TableCell>{resultBadge}</TableCell>
+                          )}
                           {canManage && (
                             <TableCell className="text-right">
                               <Button
