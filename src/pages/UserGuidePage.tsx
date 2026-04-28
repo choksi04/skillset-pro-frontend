@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChevronDown, ChevronRight, Play, Shield, Users, User,
   Brain, Network, HelpCircle, ClipboardCheck, BarChart3, CheckCircle, Sparkles,
-  SlidersHorizontal, RefreshCw, Database,
+  SlidersHorizontal, RefreshCw, Database, FileText, Bell, Layers, Award,
 } from 'lucide-react';
 
 interface GuideStep {
@@ -24,10 +24,12 @@ const platformOverview: GuideStep[] = [
     icon: <Sparkles size={16} />,
     steps: [
       'Employees submit self-assessed skill ratings via the Skill Registry — available anytime, with full version history.',
-      'The system automatically generates tailored assessments based on self-ratings (via Review Cycles).',
-      'AI evaluates answers across multiple dimensions (concept understanding, technical correctness, practicality, clarity).',
-      'Managers review AI evaluations, compare with self-ratings, and approve final skill levels.',
-      'Official validated skill entries are recorded in the All Registries view.',
+      'Admins design Assessment Templates (adaptive or fixed) that define how skills are tested.',
+      'When a Review Cycle is activated, the system auto-generates an assessment per employee using the active template and their submitted self-ratings.',
+      'Adaptive assessments step questions up or down in difficulty based on the employee\'s answers — the achieved level per skill is the highest level answered correctly.',
+      'AI evaluates open-ended (scenario / coding) answers across multiple dimensions; MCQs are scored deterministically.',
+      'Managers review the achieved level per skill and Approve, Adjust, or request a Reassessment.',
+      'Approved levels become the validated registry, visible across the organization in All Registries.',
     ],
   },
 ];
@@ -55,13 +57,14 @@ const setupFlowGuide: GuideStep[] = [
     description: 'Follow these steps in order to configure the platform for your organization.',
     icon: <CheckCircle size={16} />,
     steps: [
-      'Step 1: Create Skills — Go to Skill Library and add skills organized by categories.',
-      'Step 2: Create Domains — Go to Domains and create functional areas (e.g. Frontend Engineering).',
-      'Step 3: Map Skills to Domains — From Domain detail view, link relevant skills to each domain.',
-      'Step 4: Add Questions — Go to Question Bank or use AI Generation to create assessment questions for each skill and level.',
-      'Step 5: Employees can now submit their Skill Registry at any time — no cycle required for self-assessment.',
-      'Step 6: Start a Review Cycle to trigger assessment generation for submitted registries.',
-      'Track your progress via the Setup Progress indicator in the sidebar Settings section.',
+      'Step 1: Create Skills — Go to Skill Library and add skills organized by categories (with optional Topics for sharper AI questions).',
+      'Step 2: Create Domains — Go to Domains and create functional areas (e.g. Frontend Engineering); assign a Domain Lead and managers.',
+      'Step 3: Map Skills to Domains — From the Domain detail view, link relevant skills to each domain.',
+      'Step 4: Add Questions — Use Question Bank or AI Generation to create MCQ, Coding, and Scenario questions for each skill and competency level.',
+      'Step 5: Configure Competency Levels & scoring under Settings → Assessment Config (5-level framework, score ranges, question limits per level).',
+      'Step 6: Create an Assessment Template (adaptive or fixed) under Settings → Assessment Templates and pick the skills to be assessed.',
+      'Step 7: Activate a Review Cycle to auto-generate assessments for submitted registries using the active template.',
+      'Track your progress via the Setup Progress indicator in the sidebar.',
     ],
   },
 ];
