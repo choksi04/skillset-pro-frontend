@@ -151,26 +151,8 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                             </div>
                           )}
 
-                          {/* Dimension scores — hide for MCQ (binary) */}
-                          {!isMCQ && ev.dimensions.length > 0 && (
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">Dimension Scores</p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {ev.dimensions.map((dim) => (
-                                  <div key={dim.dimension} className="rounded-md border border-border p-2">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-[10px] font-medium text-foreground">{dim.dimension}</span>
-                                      <span className={`text-xs font-semibold ${scoreColor(dim.score)}`}>{dim.score}</span>
-                                    </div>
-                                    <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-1">
-                                      <div className={`h-full rounded-full ${scoreBarColor(dim.score)}`} style={{ width: `${dim.score}%` }} />
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground">{dim.comment}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+
+
 
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-1">
                             {answer && <span>Time spent: {answer.time_spent_seconds}s</span>}
