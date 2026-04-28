@@ -51,7 +51,7 @@ import {
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAssignmentStore } from "@/stores/assignmentStore";
-import { getQuestionPreviewText } from "@/lib/questionContent";
+import { getQuestionPreviewText, getQuestionDisplayText } from "@/lib/questionContent";
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
   if (review?.status === "completed") return "approved";
@@ -580,10 +580,7 @@ export default function AssessmentDetailPage() {
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Question</TableHead>
-                      <TableHead>Skill</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead>Type</TableHead>
-                      {isOwner && isAttemptTerminal && <TableHead className="w-24">Result</TableHead>}
+                      {(isOwner && isAttemptTerminal) && <TableHead className="w-28">Result</TableHead>}
                       {canManage && <TableHead className="w-16 text-right">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -603,38 +600,46 @@ export default function AssessmentDetailPage() {
                           </Badge>
                         ) : (
                           <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/20 gap-1">
-                            <Trash2 size={10} className="hidden" />
                             <span className="inline-flex items-center gap-1">✗ Incorrect</span>
                           </Badge>
                         );
                       }
+                      const previewText = q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id;
+                      const fullText = q ? getQuestionDisplayText(q.question_text, q.question_type) : aq.question_id;
+                      const lvlNum = levelNumberMap.get(aq.target_level);
+                      const lvlLabel = levelLabelMap.get(aq.target_level) || aq.target_level;
+                      const skillName = skillMap.get(aq.skill_id)?.skill_name || aq.skill_id;
                       return (
-                        <TableRow key={aq.question_id}>
-                          <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                          <TableCell
-                            className="text-sm text-foreground max-w-xs truncate"
-                            title={q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
-                          >
-                            {q ? getQuestionPreviewText(q.question_text, q.question_type) : aq.question_id}
+                        <TableRow key={aq.question_id} className="align-top">
+                          <TableCell className="text-xs text-muted-foreground pt-3">{idx + 1}</TableCell>
+                          <TableCell className="py-3">
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-sm text-foreground line-clamp-2 cursor-help">{previewText}</p>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-md whitespace-pre-wrap">
+                                  {fullText}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="mt-2 flex flex-col gap-1 items-start">
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                {skillName}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                {lvlNum != null ? `L${lvlNum} - ${lvlLabel}` : lvlLabel}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize">
+                                {q?.question_type || "—"}
+                              </Badge>
+                            </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px]">
-                              {skillMap.get(aq.skill_id)?.skill_name || aq.skill_id}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {(() => {
-                              const lvl = levelNumberMap.get(aq.target_level);
-                              const label = levelLabelMap.get(aq.target_level) || aq.target_level;
-                              return lvl != null ? `L${lvl} - ${label}` : label;
-                            })()}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{q?.question_type || "—"}</TableCell>
                           {isOwner && isAttemptTerminal && (
-                            <TableCell>{resultBadge}</TableCell>
+                            <TableCell className="pt-3">{resultBadge}</TableCell>
                           )}
                           {canManage && (
-                            <TableCell className="text-right">
+                            <TableCell className="text-right pt-3">
                               <Button
                                 size="sm"
                                 variant="ghost"
