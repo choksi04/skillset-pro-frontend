@@ -39,7 +39,7 @@ const coreTourSteps: TourStep[] = [
   },
   {
     id: 'templates', title: 'Assessment Templates',
-    description: 'Design reusable Adaptive or Fixed assessment templates. Templates are the blueprint a Review Cycle uses to generate assessments.',
+    description: 'Design reusable Adaptive or Fixed assessment templates. Templates are the blueprint admins use when assigning assessments to employees.',
     targetSelector: '[data-tour="templates"]',
     roles: ['admin'], position: 'right',
   },
@@ -47,12 +47,6 @@ const coreTourSteps: TourStep[] = [
     id: 'competency-config', title: 'Competency Levels',
     description: 'Configure the 5-level framework, score ranges, and per-level question limits. Levels are read dynamically from your settings.',
     targetSelector: '[data-tour="assessment-config"]',
-    roles: ['admin'], position: 'right',
-  },
-  {
-    id: 'cycles', title: 'Review Cycles',
-    description: 'Activate a cycle to auto-generate assessments for submitted registries. Only one active cycle per tenant.',
-    targetSelector: '[data-tour="cycles"]',
     roles: ['admin'], position: 'right',
   },
   {
@@ -91,7 +85,7 @@ const adminExtraSteps: TourStep[] = [
   { id: 'admin-skills', title: 'Add Skills', description: 'Build your skill library by adding categories, skills, and optional topics.', targetSelector: '[data-tour="skills"]', roles: ['admin'], position: 'right' },
   { id: 'admin-mapping', title: 'Map Skills to Domains', description: 'Link skills to domains to define what capabilities each functional area requires.', targetSelector: '[data-tour="domains"]', roles: ['admin'], position: 'right' },
   { id: 'admin-questions', title: 'Manage Questions', description: 'Author or AI-generate MCQ, Coding, and Scenario questions; watch the coverage gaps banner.', targetSelector: '[data-tour="questions"]', roles: ['admin'], position: 'right' },
-  { id: 'admin-templates', title: 'Build a Template', description: 'Create an Assessment Template (Adaptive or Fixed) and pick the skills to assess. Required before activating a cycle.', targetSelector: '[data-tour="templates"]', roles: ['admin'], position: 'right' },
+  { id: 'admin-templates', title: 'Build a Template', description: 'Create an Assessment Template (Adaptive or Fixed) and pick the skills to assess. Required before assigning an assessment.', targetSelector: '[data-tour="templates"]', roles: ['admin'], position: 'right' },
   { id: 'admin-reports', title: 'View Reports', description: 'Access organization-wide analytics on the HR Dashboard and All Registries.', targetSelector: '[data-tour="hr-dashboard"]', roles: ['admin'], position: 'right' },
 ];
 

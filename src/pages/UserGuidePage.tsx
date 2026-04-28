@@ -25,7 +25,7 @@ const platformOverview: GuideStep[] = [
     steps: [
       'Employees submit self-assessed skill ratings via the Skill Registry — available anytime, with full version history.',
       'Admins design Assessment Templates (adaptive or fixed) that define how skills are tested.',
-      'When a Review Cycle is activated, the system auto-generates an assessment per employee using the active template and their submitted self-ratings.',
+      'Admins create assessments from a template and assign them to employees.',
       'Adaptive assessments step questions up or down in difficulty based on the employee\'s answers — the achieved level per skill is the highest level answered correctly.',
       'AI evaluates open-ended (scenario / coding) answers across multiple dimensions; MCQs are scored deterministically.',
       'Managers review the achieved level per skill and Approve, Adjust, or request a Reassessment.',
@@ -42,7 +42,7 @@ const navigationGuide: GuideStep[] = [
     steps: [
       'Insights — Dashboard and All Registries for monitoring and analytics.',
       'Operations — Skill Registry and Assessments for day-to-day workflow.',
-      'Settings — Skill Library, Domains, Users, Questions, and Review Cycles for platform configuration.',
+      'Settings — Skill Library, Domains, Users, Question Bank, Assessment Templates, and Assessment Config for platform configuration.',
       'Support — Help & Tutorial for guidance.',
       'Employees see a simplified view with only Operations, Insights, and Support.',
       'Managers see Operations, Settings (limited), and Insights.',
@@ -63,7 +63,7 @@ const setupFlowGuide: GuideStep[] = [
       'Step 4: Add Questions — Use Question Bank or AI Generation to create MCQ, Coding, and Scenario questions for each skill and competency level.',
       'Step 5: Configure Competency Levels & scoring under Settings → Assessment Config (5-level framework, score ranges, question limits per level).',
       'Step 6: Create an Assessment Template (adaptive or fixed) under Settings → Assessment Templates and pick the skills to be assessed.',
-      'Step 7: Activate a Review Cycle to auto-generate assessments for submitted registries using the active template.',
+      'Step 7: Create an assessment from a template and assign it to employees from the Assessment Templates page.',
       'Track your progress via the Setup Progress indicator in the sidebar.',
     ],
   },
@@ -113,7 +113,7 @@ const adminGuide: GuideStep[] = [
   },
   {
     title: 'Assessment Templates',
-    description: 'Reusable blueprints that define how an assessment is generated and delivered. Required before activating a Review Cycle.',
+    description: 'Reusable blueprints that define how an assessment is generated and delivered.',
     icon: <FileText size={16} />,
     steps: [
       'Navigate to Settings > Assessment Templates and click "Create Template".',
@@ -121,8 +121,9 @@ const adminGuide: GuideStep[] = [
       'For Adaptive: select a Domain, set Skills per Assessment, Questions per Skill, allowed Question Types, and Skill Selection Mode (Manual is required; Top-N auto-pick is "Coming Soon").',
       'For Fixed: pick the exact questions and order; toggle shuffle for questions and options.',
       'Set Duration (minutes), Max Attempts (enables re-attempts when > 1), and a clear Name & Description.',
-      'Save as Draft while iterating; switch Status to Active to make it available for Review Cycles.',
-      'Templates can be edited, duplicated, or soft-deleted. Active templates linked to a running cycle are protected.',
+      'Save as Draft while iterating; switch Status to Active to make it available for assignment.',
+      'Use the Assignments sheet on a template to assign it to one or many employees — assigned assessments appear in their Assessments list.',
+      'Templates can be edited, duplicated, or soft-deleted.',
     ],
   },
   {
@@ -133,23 +134,9 @@ const adminGuide: GuideStep[] = [
       'Navigate to Settings > Assessment Config.',
       'Edit the 5 competency levels (L1 Beginner → L5 Expert): name, description, and score range (min–max).',
       'Ensure ranges are contiguous and L5 ends at 100 — gaps cause incorrect level resolution.',
-      'Configure Question Limits per level — minimum number of questions required per skill+level for an assessment to be generated (the readiness gate).',
-      'Configure generation caps — maximum questions per skill+level the engine will pick when generating an assessment.',
+      'Configure Question Limits per level — minimum number of published questions per skill+level required to build an assessment.',
+      'Configure generation caps — maximum questions per skill+level included when an assessment is built.',
       'Scoring rules update dynamically to reflect your configured score ranges.',
-    ],
-  },
-  {
-    title: 'Review Cycles',
-    description: 'Activate a cycle to trigger assessment generation for submitted registries. Only one cycle may be active per tenant at a time.',
-    icon: <RefreshCw size={16} />,
-    steps: [
-      'Navigate to Settings > Review Cycles and click "Create Cycle".',
-      'Pick the scope — choose one or more domains; only employees in those domains will be in scope.',
-      'Select the Active Assessment Template that will be used for generation.',
-      'Activate the cycle — eligible employees with submitted registries get assessments auto-generated; the readiness gate (configured question minimums) blocks generation when content is missing.',
-      'Monitor progress via the Admin Dashboard: counts for Pending, In Progress, Submitted, Reviewed, and Completed.',
-      'Use manual interventions to Resubmit, Regenerate, or Reset an employee\'s attempt when needed.',
-      'End the cycle when reviews are complete; archived cycles remain visible for audit.',
     ],
   },
   {
@@ -223,7 +210,7 @@ const employeeGuide: GuideStep[] = [
     steps: [
       'Navigate to Operations > My Registry from the sidebar.',
       'You must be assigned to a Domain for skills to appear — contact your admin if your registry is empty.',
-      'The Skill Registry is always available — no need to wait for an active review cycle.',
+      'The Skill Registry is always available — submit anytime.',
       'Click "Start Self Review" to create your first version, or "Create New Version" to update.',
       'Skills are grouped by category — rate each on the configured competency scale (e.g. L1 Beginner → L5 Expert).',
       'Your previous version ratings are shown inline for reference (e.g. "Last version: L3").',
@@ -312,7 +299,7 @@ export default function UserGuidePage() {
           <Sparkles size={14} className="text-primary" /> How the Platform Works
         </h3>
         <div className="flex flex-wrap gap-2 items-center text-xs text-muted-foreground">
-          {['Self-Assessment', 'Auto-Generated Assessment', 'AI Evaluation', 'Manager Review', 'Validated Registry'].map((step, i, arr) => (
+          {['Self-Assessment', 'Assigned Assessment', 'AI Evaluation', 'Manager Review', 'Validated Registry'].map((step, i, arr) => (
             <span key={i} className="flex items-center gap-2">
               <Badge variant="outline" className="text-[10px] bg-card">{step}</Badge>
               {i < arr.length - 1 && <ChevronRight size={12} className="text-muted-foreground" />}
