@@ -1,7 +1,6 @@
-import { useMemo, useState, useEffect } from 'react';
-import { AssessmentAttempt, AIEvaluation, scoreToLevel } from '@/stores/attemptStore';
+import { useMemo, useState } from 'react';
+import { AssessmentAttempt, AIEvaluation } from '@/stores/attemptStore';
 import { useQuestionStore, questionTypeLabels } from '@/stores/questionStore';
-import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { Assessment } from '@/stores/assessmentStore';
 import { Badge } from '@/components/ui/badge';
@@ -12,11 +11,6 @@ interface EvalResultsProps {
   assessment: Assessment;
 }
 
-const scoreColor = (score: number) =>
-  score >= 75 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-destructive';
-
-const scoreBarColor = (score: number) =>
-  score >= 75 ? 'bg-success' : score >= 50 ? 'bg-warning' : 'bg-destructive';
 
 function parseMCQForDisplay(questionText: string) {
   try {
