@@ -83,6 +83,8 @@ export default function AssessmentDetailPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
+  const [runnerActive, setRunnerActive] = useState(false);
+  const [startingRunner, setStartingRunner] = useState(false);
 
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
@@ -95,6 +97,7 @@ export default function AssessmentDetailPage() {
     fetchReviews();
     fetchRegistry();
     fetchLevels();
+    fetchTemplates();
   }, []);
 
   // Build a map from competency level UUID to level number
