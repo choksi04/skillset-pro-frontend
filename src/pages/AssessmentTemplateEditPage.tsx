@@ -603,6 +603,19 @@ export default function AssessmentTemplateEditPage() {
           </Card>
         </div>
       </div>
+
+      <QuestionPickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        initialSelectedIds={pickedQuestions}
+        onSave={(ids) => setPickedQuestions(ids)}
+      />
+      <SelectedQuestionsSheet
+        open={viewAllOpen}
+        onOpenChange={setViewAllOpen}
+        selectedIds={pickedQuestions}
+        onRemove={(id) => togglePickedQuestion(id)}
+      />
     </div>
   );
 }
