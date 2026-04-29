@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, ChevronDown, ChevronRight, Check, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
 import {
@@ -51,6 +51,8 @@ export default function QuestionPickerSheet({
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // Reset buffered state when sheet opens
   useEffect(() => {
