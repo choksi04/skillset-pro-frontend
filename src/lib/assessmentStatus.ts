@@ -28,11 +28,9 @@ export function getEffectiveStatus(
   if (attempt.status === "in_progress") return "in_progress";
   if (attempt.status === "submitted") return "submitted";
 
-  // Match the review to THIS attempt only. Fall back to assessment-level match
-  // for legacy rows that may not have attempt_id populated.
-  const review =
-    reviews.find((r) => r.attempt_id === attempt.id) ??
-    reviews.find((r) => !r.attempt_id && r.assessment_id && r.assessment_id /* assessment-level legacy */);
+  // Match the review to THIS attempt only. Reviews from older attempts on the
+  // same assessment must not bleed into the current attempt's status.
+  const review = reviews.find((r) => r.attempt_id === attempt.id);
 
   if (review) {
     if (review.status === "completed") return "approved";
