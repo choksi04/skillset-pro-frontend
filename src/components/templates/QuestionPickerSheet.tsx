@@ -99,6 +99,15 @@ export default function QuestionPickerSheet({
     });
   }, [published, search, skillFilter, levelFilter, typeFilter, skillMap]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
+  const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, filtered.length);
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
