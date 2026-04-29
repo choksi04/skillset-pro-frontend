@@ -92,6 +92,7 @@ export default function AssessmentDetailPage() {
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
   const [runnerActive, setRunnerActive] = useState(false);
   const [startingRunner, setStartingRunner] = useState(false);
+  const [confirmReattempt, setConfirmReattempt] = useState(false);
 
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
@@ -320,7 +321,7 @@ export default function AssessmentDetailPage() {
         return;
       }
 
-      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id);
+      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id, forceNewAttempt);
       await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
       await fetchAttempts();
       setRunnerActive(true);
@@ -331,7 +332,10 @@ export default function AssessmentDetailPage() {
     }
   };
 
-  const handleReattempt = () => handleStartRunner(true);
+  const handleReattempt = async () => {
+    setConfirmReattempt(false);
+    await handleStartRunner(true);
+  };
 
   if (!assessment) {
     return (
@@ -512,7 +516,7 @@ export default function AssessmentDetailPage() {
         )}
         {canReattempt && (
           <div className="flex items-center gap-2">
-            <Button onClick={handleReattempt} disabled={startingRunner} variant="outline" className="gap-1.5">
+            <Button onClick={() => setConfirmReattempt(true)} disabled={startingRunner} variant="outline" className="gap-1.5">
               {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Re-attempt
             </Button>
             {assignment && (
@@ -769,6 +773,31 @@ export default function AssessmentDetailPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Re-attempt Dialog */}
+      <AlertDialog open={confirmReattempt} onOpenChange={setConfirmReattempt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new attempt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This starts a fresh attempt from scratch. The timer restarts and your previous answers
+              won&apos;t carry over. Your earlier result stays on record, but the displayed result will be
+              replaced once this new attempt is evaluated.
+              {assignment && (
+                <>
+                  {" "}This will count as attempt {assignment.attempt_count + 1} of {assignment.max_attempts}.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReattempt} disabled={startingRunner}>
+              {startingRunner ? "Starting…" : "Start New Attempt"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -89,7 +89,7 @@ interface AttemptStore {
   loading: boolean;
   initialized: boolean;
   fetchAttempts: () => Promise<void>;
-  startAttempt: (assessmentId: string, tenantId: string, employeeId: string) => Promise<string>;
+  startAttempt: (assessmentId: string, tenantId: string, employeeId: string, forceNew?: boolean) => Promise<string>;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => Promise<void>;
   submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
   getAttemptForAssessment: (assessmentId: string) => AssessmentAttempt | undefined;
@@ -159,9 +159,14 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     }
   },
 
-  startAttempt: async (assessmentId, tenantId, employeeId) => {
-    const existing = get().attempts.find((a) => a.assessment_id === assessmentId);
-    if (existing) return existing.id;
+  startAttempt: async (assessmentId, tenantId, employeeId, forceNew = false) => {
+    if (!forceNew) {
+      // Resume only if there is an active (non-terminal) attempt.
+      const active = get().attempts.find(
+        (a) => a.assessment_id === assessmentId && a.status === 'in_progress',
+      );
+      if (active) return active.id;
+    }
 
     const userId = getCurrentUserId();
     const { data: row, error } = await supabase
