@@ -14,8 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Layers, ListChecks, Loader2, Save, Search, X } from "lucide-react";
+import { ArrowLeft, Layers, ListChecks, Loader2, Save, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useCompetencyLevelStore, getLevelLabelsByIdMap } from "@/stores/competencyLevelStore";
+import { usePageTitleStore } from "@/stores/pageTitleStore";
+import QuestionPickerSheet from "@/components/templates/QuestionPickerSheet";
+import SelectedQuestionsSheet from "@/components/templates/SelectedQuestionsSheet";
+import SelectedQuestionRow from "@/components/templates/SelectedQuestionRow";
 
 const ALL_QUESTION_TYPES = [
   { value: "mcq", label: "MCQ" },
