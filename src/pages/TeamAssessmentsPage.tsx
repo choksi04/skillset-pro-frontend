@@ -103,7 +103,7 @@ export default function TeamAssessmentsPage() {
       <div className="relative max-w-sm">
         <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search by employee, domain..."
+          placeholder="Search by employee or assessment name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-8 h-9 text-sm"
