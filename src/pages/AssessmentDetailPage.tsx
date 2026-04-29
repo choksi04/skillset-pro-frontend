@@ -92,6 +92,7 @@ export default function AssessmentDetailPage() {
   const [confirmRemoveQuestion, setConfirmRemoveQuestion] = useState<string | null>(null);
   const [runnerActive, setRunnerActive] = useState(false);
   const [startingRunner, setStartingRunner] = useState(false);
+  const [confirmReattempt, setConfirmReattempt] = useState(false);
 
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
