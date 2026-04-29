@@ -66,10 +66,15 @@ export default function AssessmentTemplateEditPage() {
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [shuffleOptions, setShuffleOptions] = useState(false);
   const [pickedQuestions, setPickedQuestions] = useState<string[]>([]);
-  const [questionSearch, setQuestionSearch] = useState("");
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [viewAllOpen, setViewAllOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
+
+  const { levels: competencyLevels } = useCompetencyLevelStore();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   useEffect(() => {
     fetchDomains();
