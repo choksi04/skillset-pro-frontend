@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
 import TemplateAssignmentsSheet from '@/components/templates/TemplateAssignmentsSheet';
 import { useAssignmentStore } from '@/stores/assignmentStore';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function AssessmentTemplatesPage() {
   const navigate = useNavigate();
