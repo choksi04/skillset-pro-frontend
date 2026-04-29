@@ -53,15 +53,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAssignmentStore } from "@/stores/assignmentStore";
 import { getQuestionPreviewText, getQuestionDisplayText } from "@/lib/questionContent";
-
-function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === "completed") return "approved";
-  if (review) return "review_pending";
-  if (attempt?.status === "evaluated") return "evaluated";
-  if (attempt?.status === "submitted") return "completed";
-  if (attempt?.status === "in_progress" || assessment.status === "in_progress") return "in_progress";
-  return assessment.status;
-}
+import { getEffectiveStatus } from "@/lib/assessmentStatus";
 
 export default function AssessmentDetailPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
