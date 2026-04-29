@@ -310,10 +310,41 @@ export default function QuestionPickerSheet({
           )}
         </div>
 
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between gap-2 px-6 py-2 border-t border-border bg-muted/20">
+            <span className="text-[11px] text-muted-foreground">
+              Showing {rangeStart}–{rangeEnd} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft size={13} />
+              </Button>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                Page {safePage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight size={13} />
+              </Button>
+            </div>
+          </div>
+        )}
+
         <SheetFooter className="px-6 py-3 border-t border-border bg-card">
           <div className="flex items-center justify-between w-full">
             <span className="text-xs text-muted-foreground">
-              {filtered.length} shown · {selected.size} selected
+              {filtered.length} match · {selected.size} selected
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
