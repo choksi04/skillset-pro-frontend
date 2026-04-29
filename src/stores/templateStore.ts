@@ -1,10 +1,10 @@
-import { create } from 'zustand';
-import { supabase } from '@/integrations/supabase/client';
-import { getCurrentUserId } from '@/lib/audit';
+import { create } from "zustand";
+import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/audit";
 
-export type TemplateType = 'adaptive' | 'fixed';
-export type TemplateStatus = 'draft' | 'active';
-export type SkillSelectionMode = 'top_n' | 'custom';
+export type TemplateType = "adaptive" | "fixed";
+export type TemplateStatus = "draft" | "active";
+export type SkillSelectionMode = "top_n" | "custom";
 
 export interface AssessmentTemplate {
   id: string;
@@ -87,7 +87,7 @@ function rowToTemplate(r: any): AssessmentTemplate {
     id: r.id,
     tenant_id: r.tenant_id,
     name: r.name,
-    description: r.description ?? '',
+    description: r.description ?? "",
     type: r.type,
     status: r.status,
     duration_minutes: r.duration_minutes,
@@ -97,7 +97,7 @@ function rowToTemplate(r: any): AssessmentTemplate {
     skill_selection_mode: r.skill_selection_mode,
     skills_per_assessment: r.skills_per_assessment ?? 5,
     questions_per_skill: r.questions_per_skill ?? 4,
-    question_types: Array.isArray(r.question_types) ? r.question_types : ['mcq'],
+    question_types: Array.isArray(r.question_types) ? r.question_types : ["mcq"],
     shuffle_questions: !!r.shuffle_questions,
     shuffle_options: !!r.shuffle_options,
     created_at: r.created_at,
@@ -118,14 +118,13 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     set({ loading: true });
     try {
       const { data, error } = await supabase
-        .from('assessment_templates')
-        .select('*')
-        .is('deleted_on', null)
-        .order('created_at', { ascending: false });
+        .from("assessment_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       set({ templates: (data || []).map(rowToTemplate), loading: false, initialized: true });
     } catch (err) {
-      console.error('Failed to fetch templates:', err);
+      console.error("Failed to fetch templates:", err);
       set({ loading: false, initialized: true });
     }
   },
@@ -134,8 +133,8 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
 
   fetchTemplateRelations: async (id) => {
     const [skillsRes, questionsRes] = await Promise.all([
-      supabase.from('assessment_template_skills').select('*').eq('template_id', id),
-      supabase.from('assessment_template_questions').select('*').eq('template_id', id).order('position'),
+      supabase.from("assessment_template_skills").select("*").eq("template_id", id),
+      supabase.from("assessment_template_questions").select("*").eq("template_id", id).order("position"),
     ]);
     const skill_ids = (skillsRes.data || []).map((s: any) => s.skill_id);
     const question_ids = (questionsRes.data || []).map((q: any) => q.question_id);
@@ -155,14 +154,14 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     const payload = {
       tenant_id: input.tenant_id,
       name: input.name.trim(),
-      description: input.description?.trim() ?? '',
+      description: input.description?.trim() ?? "",
       type: input.type,
       status: input.status,
       duration_minutes: input.duration_minutes,
       max_attempts: input.max_attempts,
       reattempt_enabled: input.reattempt_enabled,
-      domain_id: input.type === 'adaptive' ? input.domain_id : null,
-      skill_selection_mode: input.type === 'adaptive' ? input.skill_selection_mode : null,
+      domain_id: input.type === "adaptive" ? input.domain_id : null,
+      skill_selection_mode: input.type === "adaptive" ? input.skill_selection_mode : null,
       skills_per_assessment: input.skills_per_assessment,
       questions_per_skill: input.questions_per_skill,
       question_types: input.question_types,
@@ -174,21 +173,21 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
 
     if (input.id) {
       const { error } = await supabase
-        .from('assessment_templates')
+        .from("assessment_templates")
         .update({ ...payload, modified_at: now, modified_by: userId })
-        .eq('id', input.id);
+        .eq("id", input.id);
       if (error) {
-        console.error('Failed to update template:', error);
+        console.error("Failed to update template:", error);
         return null;
       }
     } else {
       const { data, error } = await supabase
-        .from('assessment_templates')
+        .from("assessment_templates")
         .insert({ ...payload, created_by: userId })
         .select()
         .single();
       if (error || !data) {
-        console.error('Failed to create template:', error);
+        console.error("Failed to create template:", error);
         return null;
       }
       templateId = data.id;
@@ -198,21 +197,23 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
 
     // Replace skill_ids
     if (input.skill_ids) {
-      await supabase.from('assessment_template_skills').delete().eq('template_id', templateId);
+      await supabase.from("assessment_template_skills").delete().eq("template_id", templateId);
       if (input.skill_ids.length > 0) {
-        await supabase.from('assessment_template_skills').insert(
-          input.skill_ids.map((skill_id) => ({ template_id: templateId!, skill_id })),
-        );
+        await supabase
+          .from("assessment_template_skills")
+          .insert(input.skill_ids.map((skill_id) => ({ template_id: templateId!, skill_id })));
       }
     }
 
     // Replace question_ids (with order)
     if (input.question_ids) {
-      await supabase.from('assessment_template_questions').delete().eq('template_id', templateId);
+      await supabase.from("assessment_template_questions").delete().eq("template_id", templateId);
       if (input.question_ids.length > 0) {
-        await supabase.from('assessment_template_questions').insert(
-          input.question_ids.map((question_id, position) => ({ template_id: templateId!, question_id, position })),
-        );
+        await supabase
+          .from("assessment_template_questions")
+          .insert(
+            input.question_ids.map((question_id, position) => ({ template_id: templateId!, question_id, position })),
+          );
       }
     }
 
@@ -225,11 +226,11 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     const userId = getCurrentUserId();
     const now = new Date().toISOString();
     const { error } = await supabase
-      .from('assessment_templates')
+      .from("assessment_templates")
       .update({ deleted_on: now, deleted_by: userId })
-      .eq('id', id);
+      .eq("id", id);
     if (error) {
-      console.error('Failed to delete template:', error);
+      console.error("Failed to delete template:", error);
       throw error;
     }
     set((state) => ({ templates: state.templates.filter((t) => t.id !== id) }));
@@ -239,11 +240,11 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     const userId = getCurrentUserId();
     const now = new Date().toISOString();
     const { error } = await supabase
-      .from('assessment_templates')
+      .from("assessment_templates")
       .update({ status, modified_at: now, modified_by: userId })
-      .eq('id', id);
+      .eq("id", id);
     if (error) {
-      console.error('Failed to update template status:', error);
+      console.error("Failed to update template status:", error);
       return;
     }
     set((state) => ({
