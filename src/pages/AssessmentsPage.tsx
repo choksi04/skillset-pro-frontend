@@ -1,27 +1,25 @@
-import { useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAssessmentStore, Assessment, assessmentStatusConfig } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useQuestionStore } from '@/stores/questionStore';
-import { useSkillStore } from '@/stores/skillStore';
-import { useDomainStore } from '@/stores/domainStore';
-import { useReviewStore } from '@/stores/reviewStore';
-import { useTemplateStore } from '@/stores/templateStore';
-import { useAssignmentStore } from '@/stores/assignmentStore';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import {
-  ClipboardCheck, Search, ArrowRight,
-} from 'lucide-react';
+import { useMemo, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAssessmentStore, Assessment, assessmentStatusConfig } from "@/stores/assessmentStore";
+import { useAttemptStore } from "@/stores/attemptStore";
+import { useQuestionStore } from "@/stores/questionStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useDomainStore } from "@/stores/domainStore";
+import { useReviewStore } from "@/stores/reviewStore";
+import { useTemplateStore } from "@/stores/templateStore";
+import { useAssignmentStore } from "@/stores/assignmentStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ClipboardCheck, Search, ArrowRight } from "lucide-react";
 
 function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === 'completed') return 'approved';
-  if (review) return 'review_pending';
-  if (attempt?.status === 'evaluated') return 'evaluated';
-  if (attempt?.status === 'submitted') return 'completed';
-  if (attempt?.status === 'in_progress' || assessment.status === 'in_progress') return 'in_progress';
+  if (review?.status === "completed") return "approved";
+  if (review) return "review_pending";
+  if (attempt?.status === "evaluated") return "evaluated";
+  if (attempt?.status === "submitted") return "completed";
+  if (attempt?.status === "in_progress" || assessment.status === "in_progress") return "in_progress";
   return assessment.status;
 }
 
@@ -46,17 +44,21 @@ export default function AssessmentsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [assignerNames, setAssignerNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchTemplates(); fetchAssignments();
+    fetchAssessments();
+    fetchQuestions();
+    fetchSkills();
+    fetchDomains();
+    fetchAttempts();
+    fetchReviews();
+    fetchTemplates();
+    fetchAssignments();
   }, []);
 
-  const myAssessments = useMemo(
-    () => assessments.filter((a) => a.employee_id === user?.id),
-    [assessments, user]
-  );
+  const myAssessments = useMemo(() => assessments.filter((a) => a.employee_id === user?.id), [assessments, user]);
 
   // Resolve assigner full names for assignments tied to my assessments
   useEffect(() => {
@@ -67,15 +69,21 @@ export default function AssessmentsPage() {
     });
     const missing = [...ids].filter((id) => !(id in assignerNames));
     if (missing.length === 0) return;
-    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
-      if (data) {
-        setAssignerNames((prev) => {
-          const next = { ...prev };
-          data.forEach((u: any) => { next[u.id] = u.full_name; });
-          return next;
-        });
-      }
-    });
+    supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", missing)
+      .then(({ data }) => {
+        if (data) {
+          setAssignerNames((prev) => {
+            const next = { ...prev };
+            data.forEach((u: any) => {
+              next[u.id] = u.full_name;
+            });
+            return next;
+          });
+        }
+      });
   }, [myAssessments, assignments]);
 
   const getAssessmentName = (a: Assessment) => {
@@ -83,15 +91,13 @@ export default function AssessmentsPage() {
       const t = templates.find((x) => x.id === a.template_id);
       if (t?.name) return t.name;
     }
-    return 'Assessment';
+    return "Assessment";
   };
 
   const filteredMy = useMemo(() => {
     if (!search.trim()) return myAssessments;
     const q = search.toLowerCase();
-    return myAssessments.filter((a) =>
-      getAssessmentName(a).toLowerCase().includes(q)
-    );
+    return myAssessments.filter((a) => getAssessmentName(a).toLowerCase().includes(q));
   }, [myAssessments, search, templates, domains]);
 
   return (
@@ -138,25 +144,34 @@ export default function AssessmentsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-card-foreground">{getAssessmentName(a)}</span>
-                      {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
+                      {a.is_reassessment && (
+                        <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">
+                          Reassessment
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {a.is_adaptive
-                        ? 'Adaptive · questions chosen as you go'
+                        ? "Adaptive · questions chosen as you go"
                         : a.assessment_questions.length === 0
-                          ? 'Questions pending generation'
+                          ? "Questions pending generation"
                           : `${a.assessment_questions.length} questions`}
-                      {' · '}{a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
+                      {" · "}
+                      {a.duration_minutes} min
                     </p>
                     {assignedDate && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {assignerName ? `Assigned by ${assignerName} on ${assignedDate}` : `Assigned on ${assignedDate}`}
+                        {assignerName
+                          ? `Assigned by ${assignerName} on ${assignedDate}`
+                          : `Assigned on ${assignedDate}`}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {attempt?.total_ai_score != null && (
-                      <span className={`text-sm font-semibold ${attempt.total_ai_score >= 75 ? 'text-success' : attempt.total_ai_score >= 50 ? 'text-warning' : 'text-destructive'}`}>
+                      <span
+                        className={`text-sm font-semibold ${attempt.total_ai_score >= 75 ? "text-success" : attempt.total_ai_score >= 50 ? "text-warning" : "text-destructive"}`}
+                      >
                         {attempt.total_ai_score}%
                       </span>
                     )}
