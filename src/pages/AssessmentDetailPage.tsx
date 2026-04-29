@@ -332,7 +332,10 @@ export default function AssessmentDetailPage() {
     }
   };
 
-  const handleReattempt = () => handleStartRunner(true);
+  const handleReattempt = async () => {
+    setConfirmReattempt(false);
+    await handleStartRunner(true);
+  };
 
   if (!assessment) {
     return (
