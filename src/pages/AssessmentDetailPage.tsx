@@ -344,7 +344,7 @@ export default function AssessmentDetailPage() {
       : `${actualQuestionCount} questions`;
 
   // Re-attempt eligibility (after a terminal attempt, when assignment still has attempts left)
-  const assignment = useAssignmentStore.getState().getAssignmentByAssessmentId(assessment.id);
+  const assignment = getAssignmentByAssessmentId(assessment.id);
   const isAttemptTerminal =
     attempt && (attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed");
   const reattemptGate = isOwner && isAttemptTerminal ? canStartNewAttempt(assessment.id) : { allowed: false };
