@@ -81,9 +81,11 @@ export default function AssessmentDetailPage() {
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { templates, fetchTemplates } = useTemplateStore();
+  const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
+  const [assignerName, setAssignerName] = useState("");
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
@@ -103,6 +105,7 @@ export default function AssessmentDetailPage() {
     fetchRegistry();
     fetchLevels();
     fetchTemplates();
+    fetchAssignments();
   }, []);
 
   // Build a map from competency level UUID to level number
@@ -196,6 +199,21 @@ export default function AssessmentDetailPage() {
         if (data) setEmployeeName(data.full_name);
       });
   }, [assessment, isOwner]);
+
+  // Fetch assigner name (who assigned this assessment)
+  useEffect(() => {
+    if (!assessment) return;
+    const asg = getAssignmentByAssessmentId(assessment.id);
+    if (!asg?.assigned_by) { setAssignerName(""); return; }
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", asg.assigned_by)
+      .single()
+      .then(({ data }) => {
+        if (data) setAssignerName(data.full_name);
+      });
+  }, [assessment, assignments]);
 
   // Determine back path
   const backPath = window.location.pathname.startsWith("/team-assessments") ? "/team-assessments" : "/assessments";
@@ -341,7 +359,7 @@ export default function AssessmentDetailPage() {
       : `${actualQuestionCount} questions`;
 
   // Re-attempt eligibility (after a terminal attempt, when assignment still has attempts left)
-  const assignment = useAssignmentStore.getState().getAssignmentByAssessmentId(assessment.id);
+  const assignment = getAssignmentByAssessmentId(assessment.id);
   const isAttemptTerminal =
     attempt && (attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed");
   const reattemptGate = isOwner && isAttemptTerminal ? canStartNewAttempt(assessment.id) : { allowed: false };
@@ -413,6 +431,13 @@ export default function AssessmentDetailPage() {
             .filter(Boolean)
             .join(" · ")}
         </p>
+        {assignment?.assigned_at && (
+          <p className="text-xs text-muted-foreground">
+            {assignerName
+              ? `Assigned by ${assignerName} on ${new Date(assignment.assigned_at).toLocaleDateString()}`
+              : `Assigned on ${new Date(assignment.assigned_at).toLocaleDateString()}`}
+          </p>
+        )}
       </div>
 
       {/* Metadata Cards */}

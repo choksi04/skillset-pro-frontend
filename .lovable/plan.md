@@ -1,44 +1,42 @@
 ## Goal
-Replace the "domain name" shown in the My Assessments and Team Assessments list rows with the **assessment name** (from the linked template). Domain remains visible on detail pages and elsewhere.
+1. In **My Assessments**, drop the "Skill Registry Assessment" fallback so only the actual template name appears (with domain as a quiet fallback when no template is linked).
+2. Show **assigned date** and **assigned by** (assigner full name) on:
+   - Each card in the My Assessments list
+   - The Assessment Detail page header
 
-## Background
-- `assessments` rows do not have a `name` column. They optionally link to `assessment_templates` via `template_id`, which has a `name` field.
-- Registry-generated (non-template) assessments have no name. For these we'll show a sensible fallback: `"Skill Registry Assessment"` (and append a short date if helpful).
-- Domain currently shown is `assessment.domain_id` resolved via `useDomainStore`. This will be removed from the list rows.
+## Data source
+- `assessment_assignments` table holds `assigned_at` and `assigned_by` (text user id). Already exposed via `useAssignmentStore` with `getAssignmentByAssessmentId(assessmentId)` and `fetchAssignments()`.
+- Assigner name resolved from `users.full_name` via a one-shot Supabase query keyed on the unique set of `assigned_by` ids.
 
 ## Changes
 
-### 1. `src/pages/AssessmentsPage.tsx` (My Assessments)
-- Import and call `useTemplateStore` + `fetchTemplates()`.
-- Add helper:
-  ```ts
-  const getAssessmentName = (a: Assessment) => {
-    if (a.template_id) {
-      const t = templates.find((x) => x.id === a.template_id);
-      if (t?.name) return t.name;
-    }
-    return 'Skill Registry Assessment';
-  };
-  ```
-- In the row, replace `{getDomain(a.domain_id)}` with `{getAssessmentName(a)}`.
-- Update the search filter to match against assessment name instead of domain name.
-- Update placeholder text: "Search assessments by name...".
-- Remove the now-unused `getDomain` / `domains` references (keep import only if needed elsewhere; otherwise drop).
+### `src/pages/AssessmentsPage.tsx` (My Assessments)
+- Add imports: `useAssignmentStore`, `supabase`.
+- Call `fetchAssignments()` in the existing init `useEffect`.
+- Change `getAssessmentName(a)`:
+  - If `template_id` matches a template → return template name.
+  - Else → return the domain name (`domains.find(...)`) or empty string.
+  - Remove the `'Skill Registry Assessment'` fallback entirely.
+- After assessments load, build a `Set` of `assigned_by` ids from matching assignments and fetch `users.id, full_name` once → store in local `assignerNames` state map.
+- In each card's secondary line, append:
+  - `Assigned by {name} on {date}` (when assignment exists and `assigned_by` resolves)
+  - `Assigned on {date}` (when assignment exists but no assigner — e.g. registry-generated)
+  - Skip silently if no assignment record.
 
-### 2. `src/pages/TeamAssessmentsPage.tsx` (Team Assessments)
-- Same template lookup as above.
-- Row header becomes: `{employeeName} · {assessmentName}` (drop the domain segment).
-- Keep the `Reassessment` badge.
-- Update search filter to match against employee name + assessment name (drop domain match).
-- Update placeholder text: "Search by employee or assessment name...".
-
-### 3. Detail pages — no change required
-- `AssessmentDetailPage.tsx` and `TeamAssessmentDetailPage` already show domain context; leave those as-is so domain remains visible where useful.
+### `src/pages/AssessmentDetailPage.tsx`
+- Replace the one-off `useAssignmentStore.getState().getAssignmentByAssessmentId(...)` call with a subscribed selector so the component re-renders when assignments load: `const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();`
+- Add `fetchAssignments()` to the init `useEffect`.
+- Resolve assigner full name via a small Supabase lookup (mirrors current `employeeName` pattern at line ~86) when `assignment?.assigned_by` is present.
+- In the header description block (around line 407–415), append a subtle line:
+  - `Assigned by {assignerName} on {formattedDate}` when available
+  - `Assigned on {formattedDate}` if assigner unknown
+  - Omitted entirely when no assignment row exists.
 
 ## Out of scope
-- No DB schema changes. No changes to assessment generation logic.
-- No changes to the "Unknown Domain" backfill issue (separate concern, previously declined).
+- No DB schema changes.
+- No changes to Team Assessments list (assigner info isn't requested there).
+- No changes to assignment creation logic.
 
 ## Files to edit
 - `src/pages/AssessmentsPage.tsx`
-- `src/pages/TeamAssessmentsPage.tsx`
+- `src/pages/AssessmentDetailPage.tsx`
