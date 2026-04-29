@@ -42,27 +42,50 @@ export default function AssessmentsPage() {
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
   const { templates, fetchTemplates } = useTemplateStore();
+  const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
+  const [assignerNames, setAssignerNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchTemplates();
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchTemplates(); fetchAssignments();
   }, []);
+
+  const myAssessments = useMemo(
+    () => assessments.filter((a) => a.employee_id === user?.id),
+    [assessments, user]
+  );
+
+  // Resolve assigner full names for assignments tied to my assessments
+  useEffect(() => {
+    const ids = new Set<string>();
+    myAssessments.forEach((a) => {
+      const asg = getAssignmentByAssessmentId(a.id);
+      if (asg?.assigned_by) ids.add(asg.assigned_by);
+    });
+    const missing = [...ids].filter((id) => !(id in assignerNames));
+    if (missing.length === 0) return;
+    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
+      if (data) {
+        setAssignerNames((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.full_name; });
+          return next;
+        });
+      }
+    });
+  }, [myAssessments, assignments]);
 
   const getAssessmentName = (a: Assessment) => {
     if (a.template_id) {
       const t = templates.find((x) => x.id === a.template_id);
       if (t?.name) return t.name;
     }
-    return 'Skill Registry Assessment';
+    const d = domains.find((x) => x.id === a.domain_id);
+    return d?.name ?? 'Assessment';
   };
-
-  const myAssessments = useMemo(
-    () => assessments.filter((a) => a.employee_id === user?.id),
-    [assessments, user]
-  );
 
   const filteredMy = useMemo(() => {
     if (!search.trim()) return myAssessments;
@@ -70,7 +93,7 @@ export default function AssessmentsPage() {
     return myAssessments.filter((a) =>
       getAssessmentName(a).toLowerCase().includes(q)
     );
-  }, [myAssessments, search, templates]);
+  }, [myAssessments, search, templates, domains]);
 
   return (
     <div className="space-y-6">
