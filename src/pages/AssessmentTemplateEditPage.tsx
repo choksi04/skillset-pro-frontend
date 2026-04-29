@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTemplateStore, TemplateType, SkillSelectionMode } from "@/stores/templateStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useQuestionStore } from "@/stores/questionStore";
+import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { usePageTitleStore } from "@/stores/pageTitleStore";
 import QuestionPickerSheet from "@/components/templates/QuestionPickerSheet";
 import SelectedQuestionsSheet from "@/components/templates/SelectedQuestionsSheet";
 import SelectedQuestionRow from "@/components/templates/SelectedQuestionRow";
+import QuestionDetailSheet from "@/components/questions/QuestionDetailSheet";
 
 const ALL_QUESTION_TYPES = [
   { value: "mcq", label: "MCQ" },
@@ -69,6 +70,7 @@ export default function AssessmentTemplateEditPage() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewAllOpen, setViewAllOpen] = useState(false);
+  const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
@@ -510,6 +512,7 @@ export default function AssessmentTemplateEditPage() {
                               skillName={q ? skillNameMap.get(q.skill_id) : undefined}
                               levelLabel={q ? levelLabels[q.competency_level] : undefined}
                               onRemove={() => togglePickedQuestion(qid)}
+                              onClick={q ? () => setDetailQuestion(q) : undefined}
                             />
                           );
                         })}
@@ -617,6 +620,15 @@ export default function AssessmentTemplateEditPage() {
         selectedIds={pickedQuestions}
         onRemove={(id) => togglePickedQuestion(id)}
       />
+      {detailQuestion && (
+        <QuestionDetailSheet
+          question={detailQuestion}
+          skillName={skillNameMap.get(detailQuestion.skill_id) ?? "Unknown"}
+          topicName={null}
+          onClose={() => setDetailQuestion(null)}
+          levelLabels={levelLabels}
+        />
+      )}
     </div>
   );
 }

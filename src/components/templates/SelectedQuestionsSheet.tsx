@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { useQuestionStore } from "@/stores/questionStore";
+import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
 import {
   useCompetencyLevelStore,
@@ -18,6 +18,7 @@ import {
 } from "@/stores/competencyLevelStore";
 import { formatQuestionForDisplay } from "@/lib/questionFormat";
 import SelectedQuestionRow from "./SelectedQuestionRow";
+import QuestionDetailSheet from "@/components/questions/QuestionDetailSheet";
 
 interface Props {
   open: boolean;
@@ -36,6 +37,7 @@ export default function SelectedQuestionsSheet({
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
   const [search, setSearch] = useState("");
+  const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
 
   useEffect(() => {
     if (open) setSearch("");
@@ -98,6 +100,7 @@ export default function SelectedQuestionsSheet({
                 skillName={q ? skillMap.get(q.skill_id) : undefined}
                 levelLabel={q ? levelLabels[q.competency_level] : undefined}
                 onRemove={() => onRemove(id)}
+                onClick={q ? () => setDetailQuestion(q) : undefined}
               />
             ))
           )}
@@ -109,6 +112,16 @@ export default function SelectedQuestionsSheet({
           </Button>
         </SheetFooter>
       </SheetContent>
+
+      {detailQuestion && (
+        <QuestionDetailSheet
+          question={detailQuestion}
+          skillName={skillMap.get(detailQuestion.skill_id) ?? "Unknown"}
+          topicName={null}
+          onClose={() => setDetailQuestion(null)}
+          levelLabels={levelLabels}
+        />
+      )}
     </Sheet>
   );
 }
