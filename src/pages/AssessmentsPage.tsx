@@ -109,7 +109,7 @@ export default function AssessmentsPage() {
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-card-foreground">{getDomain(a.domain_id)}</span>
+                      <span className="text-sm font-medium text-card-foreground">{getAssessmentName(a)}</span>
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
