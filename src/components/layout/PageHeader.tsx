@@ -3,6 +3,7 @@ import { Search, ChevronRight } from 'lucide-react';
 import HelpButton from '@/components/onboarding/HelpButton';
 import NotificationDropdown from '@/components/layout/NotificationDropdown';
 import { useSkillStore } from '@/stores/skillStore';
+import { usePageTitleStore } from '@/stores/pageTitleStore';
 
 interface BreadcrumbEntry {
   group: string;
@@ -39,10 +40,13 @@ export default function PageHeader() {
   else if (basePath.startsWith('/team-registry/')) basePath = '/team-registry';
   else if (basePath.startsWith('/assessments/')) basePath = '/assessments';
   else if (basePath.startsWith('/team-assessments/')) basePath = '/team-assessments';
+  else if (basePath.startsWith('/assessment-templates/')) basePath = '/assessment-templates';
 
   const crumb = routeBreadcrumbs[basePath];
   const title = crumb?.title || 'Page';
   const group = crumb?.group;
+
+  const overrideTitle = usePageTitleStore((s) => s.title);
 
   // Domain detail breadcrumb
   const isDomainDetail = location.pathname.startsWith('/domains/') && location.pathname !== '/domains';
@@ -57,6 +61,10 @@ export default function PageHeader() {
   const isTeamRegistryDetail = location.pathname.startsWith('/team-registry/') && location.pathname !== '/team-registry';
   const isAssessmentDetail = location.pathname.startsWith('/assessments/') && location.pathname !== '/assessments';
   const isTeamAssessmentDetail = location.pathname.startsWith('/team-assessments/') && location.pathname !== '/team-assessments';
+  const isTemplateDetail = location.pathname.startsWith('/assessment-templates/') && location.pathname !== '/assessment-templates';
+  const templatePathSeg = isTemplateDetail ? location.pathname.split('/assessment-templates/')[1] : null;
+  const isNewTemplate = templatePathSeg === 'new';
+  const templateDetailTitle = overrideTitle || (isNewTemplate ? 'New Assessment Template' : 'Edit Template');
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
@@ -103,8 +111,14 @@ export default function PageHeader() {
             <ChevronRight size={14} className="text-muted-foreground" />
             <span className="font-medium text-card-foreground">Detail</span>
           </>
+        ) : isTemplateDetail ? (
+          <>
+            <Link to="/assessment-templates" className="text-muted-foreground hover:text-foreground transition-colors">Assessment Templates</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground truncate max-w-[400px]">{templateDetailTitle}</span>
+          </>
         ) : (
-          <span className="font-medium text-card-foreground">{title}</span>
+          <span className="font-medium text-card-foreground">{overrideTitle || title}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
