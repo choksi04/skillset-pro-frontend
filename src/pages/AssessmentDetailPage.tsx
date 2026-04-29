@@ -81,9 +81,11 @@ export default function AssessmentDetailPage() {
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { templates, fetchTemplates } = useTemplateStore();
+  const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
+  const [assignerName, setAssignerName] = useState("");
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
@@ -103,6 +105,7 @@ export default function AssessmentDetailPage() {
     fetchRegistry();
     fetchLevels();
     fetchTemplates();
+    fetchAssignments();
   }, []);
 
   // Build a map from competency level UUID to level number
