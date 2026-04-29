@@ -63,8 +63,14 @@ export default function QuestionPickerSheet({
       setLevelFilter("all");
       setTypeFilter("all");
       setExpanded(new Set());
+      setPage(1);
     }
   }, [open, initialSelectedIds]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, skillFilter, levelFilter, typeFilter]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
