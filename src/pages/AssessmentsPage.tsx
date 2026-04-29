@@ -6,6 +6,7 @@ import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
+import { useTemplateStore } from '@/stores/templateStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -38,16 +39,23 @@ export default function AssessmentsPage() {
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
+  const { templates, fetchTemplates } = useTemplateStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews();
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchTemplates();
   }, []);
 
-  const getDomain = (id: string) => domains.find((d) => d.id === id)?.name ?? 'Unknown Domain';
+  const getAssessmentName = (a: Assessment) => {
+    if (a.template_id) {
+      const t = templates.find((x) => x.id === a.template_id);
+      if (t?.name) return t.name;
+    }
+    return 'Skill Registry Assessment';
+  };
 
   const myAssessments = useMemo(
     () => assessments.filter((a) => a.employee_id === user?.id),
@@ -58,9 +66,9 @@ export default function AssessmentsPage() {
     if (!search.trim()) return myAssessments;
     const q = search.toLowerCase();
     return myAssessments.filter((a) =>
-      getDomain(a.domain_id).toLowerCase().includes(q)
+      getAssessmentName(a).toLowerCase().includes(q)
     );
-  }, [myAssessments, search, domains]);
+  }, [myAssessments, search, templates]);
 
   return (
     <div className="space-y-6">
@@ -101,7 +109,7 @@ export default function AssessmentsPage() {
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-card-foreground">{getDomain(a.domain_id)}</span>
+                      <span className="text-sm font-medium text-card-foreground">{getAssessmentName(a)}</span>
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">

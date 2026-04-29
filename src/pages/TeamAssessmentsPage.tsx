@@ -6,6 +6,7 @@ import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
+import { useTemplateStore } from '@/stores/templateStore';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +34,7 @@ export default function TeamAssessmentsPage() {
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
+  const { templates, fetchTemplates } = useTemplateStore();
   const { currentRole, user } = useAuth();
   const navigate = useNavigate();
 
@@ -41,7 +43,7 @@ export default function TeamAssessmentsPage() {
   const [assignOpen, setAssignOpen] = useState(false);
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews();
+    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains(); fetchAttempts(); fetchReviews(); fetchTemplates();
   }, []);
 
   useEffect(() => {
@@ -57,7 +59,13 @@ export default function TeamAssessmentsPage() {
   }, [assessments]);
 
   const getName = (id: string) => userNames[id] || id;
-  const getDomain = (id: string) => domains.find((d) => d.id === id)?.name ?? 'Unknown Domain';
+  const getAssessmentName = (a: Assessment) => {
+    if (a.template_id) {
+      const t = templates.find((x) => x.id === a.template_id);
+      if (t?.name) return t.name;
+    }
+    return 'Skill Registry Assessment';
+  };
 
   const teamAssessments = useMemo(() => {
     if (currentRole === 'admin') return assessments.filter((a) => a.employee_id !== user?.id);
@@ -74,9 +82,9 @@ export default function TeamAssessmentsPage() {
     const q = search.toLowerCase();
     return teamAssessments.filter((a) =>
       getName(a.employee_id).toLowerCase().includes(q) ||
-      getDomain(a.domain_id).toLowerCase().includes(q)
+      getAssessmentName(a).toLowerCase().includes(q)
     );
-  }, [teamAssessments, search, userNames, domains]);
+  }, [teamAssessments, search, userNames, templates]);
 
   return (
     <div className="space-y-6">
@@ -95,7 +103,7 @@ export default function TeamAssessmentsPage() {
       <div className="relative max-w-sm">
         <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search by employee, domain..."
+          placeholder="Search by employee or assessment name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-8 h-9 text-sm"
@@ -126,7 +134,7 @@ export default function TeamAssessmentsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-card-foreground">{getName(a.employee_id)}</span>
                       <span className="text-muted-foreground">·</span>
-                      <span className="text-sm font-medium text-card-foreground">{getDomain(a.domain_id)}</span>
+                      <span className="text-sm font-medium text-card-foreground">{getAssessmentName(a)}</span>
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
