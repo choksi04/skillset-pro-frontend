@@ -1,79 +1,111 @@
 ## Problem
 
-Two issues with the "Re-attempt" flow:
+After clicking **Re-attempt** and going back to the assessments list (or detail page), the assessment shows **"Under Review"** instead of **"In Progress"**. The new attempt is correctly created, but the displayed status is wrong everywhere.
 
-1. **No confirmation** — clicking Re-attempt immediately starts a new attempt with no warning that it creates a fresh attempt and consumes one of the remaining attempts.
-2. **Re-attempt does not actually start a new attempt** — after clicking Re-attempt the UI briefly shows "Creating assessment" and then jumps straight to the completed/evaluated result screen, as if the assessment was already done.
+## Root cause
 
-### Root cause for issue 2
+The status shown in the UI is computed by a helper called `getEffectiveStatus(...)`. It is **duplicated** in two places with the same logic:
 
-`useAttemptStore.startAttempt` (in `src/stores/attemptStore.ts`) short-circuits if **any** attempt already exists for the assessment:
+- `src/pages/AssessmentsPage.tsx` (lines 17–24)
+- `src/pages/AssessmentDetailPage.tsx` (lines 57–64)
 
 ```ts
-const existing = get().attempts.find((a) => a.assessment_id === assessmentId);
-if (existing) return existing.id;
+function getEffectiveStatus(assessment, attempt, review) {
+  if (review?.status === "completed") return "approved";
+  if (review)                          return "review_pending"; // ← bug
+  if (attempt?.status === "evaluated") return "evaluated";
+  if (attempt?.status === "submitted") return "completed";
+  if (attempt?.status === "in_progress" || assessment.status === "in_progress")
+                                       return "in_progress";
+  return assessment.status;
+}
 ```
 
-So when an employee clicks Re-attempt, no new `assessment_attempts` row is inserted. The existing terminal attempt (`status = evaluated`) is reused, the assignment counter never increments, and the runner immediately renders the previous evaluated result instead of a fresh empty attempt.
+Two issues:
 
-Additionally, `AssessmentDetailPage.handleStartRunner` only calls `startAttempt` and then sets `runnerActive = true`, but it does **not** pass any "force new attempt" hint into the store, and the runner uses `getAttemptForAssessment` which (correctly) returns the most recent attempt — which is still the old terminal one.
+1. **Review check happens before attempt check.** A `manager_reviews` row created against the **previous** attempt still exists in the DB. After a re-attempt is started, the new attempt is `in_progress`, but the old review row makes `getEffectiveStatus` return `"review_pending"` → label "Under Review".
+2. **Reviews are not matched to the current attempt.** The lookup is `reviews.find(r => r.assessment_id === assessment.id)`. Since `manager_reviews.attempt_id` exists in the schema, the review should be matched to the **current** (latest) attempt, not just the assessment.
+
+There is also an inconsistency in the unified status vocabulary: the helpers still emit legacy values (`completed`, `review_pending`) instead of the canonical `submitted` / `under_review` already declared in `assessmentStatusConfig`.
+
+Assignment status (`assessment_assignments.status`) is fine — `syncAssignmentForAttempt` already flips it back to `in_progress` when a re-attempt starts. The bug is purely in the UI's effective-status derivation.
 
 ## Plan
 
-### 1. Add a confirmation dialog for Re-attempt
+### 1. Centralise `getEffectiveStatus`
 
-In `src/pages/AssessmentDetailPage.tsx`:
+Create `src/lib/assessmentStatus.ts` exporting one helper used by every page/component. Delete the duplicates in `AssessmentsPage.tsx` and `AssessmentDetailPage.tsx`.
 
-- Add a new state `confirmReattempt: boolean`.
-- The "Re-attempt" button no longer calls `handleReattempt` directly; it opens the confirmation dialog.
-- The dialog shows:
-  - Title: "Start a new attempt?"
-  - Description: explains that this creates a fresh attempt from scratch (previous answers and results stay on record but a new evaluation will replace the displayed result), it will count as attempt `N+1` of `max_attempts`, and the timer restarts.
-  - Cancel / "Start New Attempt" actions.
-- Confirming calls `handleReattempt()` which calls `handleStartRunner(true)`.
+### 2. Fix the precedence and attempt-scoping
 
-Reuse the existing `<AlertDialog>` component already imported in this file — no new dependencies.
+New logic, in priority order (latest attempt is authoritative; old reviews never override an active new attempt):
 
-### 2. Make Re-attempt actually create a new attempt row
+```text
+1. If there is no attempt yet:
+   → return assessment.status (pending / in_progress / …)
 
-In `src/stores/attemptStore.ts`:
+2. If the latest attempt is in_progress:
+   → "in_progress"     (always — ignore any old review row)
 
-- Change `startAttempt` signature to accept an optional `forceNew` flag:
-  ```ts
-  startAttempt: (assessmentId, tenantId, employeeId, forceNew?: boolean) => Promise<string>
-  ```
-- Behavior:
-  - If `forceNew` is **false/undefined**: keep current behavior — if there is an **active** (`in_progress`) attempt, return it (resume). Do **not** return terminal attempts; if the only existing attempts are terminal, fall through to insert a new row. (This also hardens the normal start path.)
-  - If `forceNew` is **true**: always insert a new `assessment_attempts` row with `status = 'in_progress'`, fresh `started_at`, empty answers, no `paused_at`, no `remaining_seconds`, no evaluations.
-- Update the local Zustand state to append the new attempt so `getAttemptForAssessment` (which sorts by `started_at` desc) immediately surfaces the new in-progress row to the runner.
+3. If the latest attempt is submitted (awaiting AI):
+   → "submitted"
 
-### 3. Wire the flag through the page
+4. Look up the review for THIS attempt only
+   (reviews.find(r => r.attempt_id === attempt.id)):
+     - review.status === "completed"  → "approved"
+     - review exists (pending / in_progress) → "under_review"
 
-In `src/pages/AssessmentDetailPage.tsx` `handleStartRunner(forceNewAttempt)`:
+5. If the latest attempt is evaluated (no review yet):
+   → "evaluated"
 
-- Pass `forceNewAttempt` into `startAttempt(...)` so re-attempts insert a brand-new row.
-- After `startAttempt`, call `fetchAttempts()` (already done) so the local cache reflects the new attempt id, then enter the runner.
-- Keep the existing guard that blocks re-attempts when the manager has already approved the review.
+6. Fallback:
+   → assessment.status
+```
 
-### 4. Make sure the assignment attempt counter increments correctly
+This guarantees:
+- A fresh re-attempt (in_progress) shows **"In Progress"** even though a review row from the prior attempt still exists.
+- "Under Review" only appears when the **current** attempt actually has a manager review.
+- "Approved" only appears when the review for the **current** attempt is completed.
 
-`assignmentStore.updateStatusForAssessment` already increments `attempt_count` when transitioning into `in_progress` from a non-`in_progress` state. After the fix:
+### 3. Use canonical status keys
 
-- A terminal assignment (e.g. `evaluated`) will transition to `in_progress` when the new attempt starts, so `attempt_count` increments by 1.
-- The "Attempt N/Max" label next to the Re-attempt button will reflect the new count after `fetchAssignments()` runs (already triggered by `syncAssignmentForAttempt` inside `startAttempt`).
+Return `submitted` and `under_review` (not the legacy `completed` / `review_pending`). `assessmentStatusConfig` in `src/stores/assessmentStore.ts` already maps both new and legacy keys, so badge colours/labels stay consistent across the app.
 
-### 5. Runner behavior
+### 4. Update all call sites
 
-No changes needed in `FixedRunner` / `AdaptiveRunner`. They read the current attempt via `getAttemptForAssessment(assessment.id)` which already returns the most recent attempt. Once a fresh `in_progress` row exists, the runner will render an empty assessment with a fresh timer — exactly like a first attempt — while the old terminal attempt and its evaluations remain in the database for history.
+Replace the local helpers in:
+- `src/pages/AssessmentsPage.tsx` — list page (this is the screen the user reported).
+- `src/pages/AssessmentDetailPage.tsx` — detail page; also update the `canManage` guard which reads `assessment.status` directly so it continues to work.
+- `src/pages/TeamAssessmentsPage.tsx` — verify it uses the same helper (will be updated to import the centralised one).
+
+### 5. Touch-up the detail page guard
+
+In `AssessmentDetailPage.tsx`, `canManage` currently allows admin actions when `assessment.status` is `pending` or `in_progress`. After re-attempt the row’s `status` is already set to `in_progress` (we call `updateAssessmentStatus(..., 'in_progress')`), so this still works. No change needed beyond swapping the helper.
+
+### 6. Status vocabulary reference (final, single source of truth)
+
+| UI status      | When it shows                                                    | Source                          |
+|----------------|------------------------------------------------------------------|---------------------------------|
+| Not Started    | No attempt yet, assessment.status = pending                      | assessment row                  |
+| In Progress    | Latest attempt is `in_progress` (covers re-attempts)             | latest attempt row              |
+| Submitted      | Latest attempt is `submitted` (AI evaluation pending)            | latest attempt row              |
+| Evaluated      | Latest attempt is `evaluated`, no review yet for this attempt    | attempt + review-by-attempt_id  |
+| Under Review   | Review exists for the **current** attempt, not yet completed     | review-by-attempt_id            |
+| Approved       | Review for the **current** attempt is `completed`                | review-by-attempt_id            |
+
+### 7. No DB / schema changes
+
+`manager_reviews.attempt_id` is already populated. `assessment_attempts.started_at` ordering is already used by `getAttemptForAssessment` to surface the latest attempt. Old review rows are kept untouched (history preserved).
 
 ## Files to change
 
-- `src/stores/attemptStore.ts` — extend `startAttempt` with `forceNew` and only short-circuit on an in-progress attempt.
-- `src/pages/AssessmentDetailPage.tsx` — add `confirmReattempt` state + `<AlertDialog>`, route the Re-attempt button through it, and pass `forceNewAttempt` into `startAttempt`.
-
-No DB schema changes are required — the existing `assessment_attempts` table already supports multiple rows per assessment, and `assessment_assignments.attempt_count` / `max_attempts` already track quotas.
+- **New**: `src/lib/assessmentStatus.ts` — single `getEffectiveStatus(assessment, latestAttempt, reviews)` helper.
+- `src/pages/AssessmentsPage.tsx` — import the new helper, drop the local copy, pass the full `reviews` array (so the helper can match by `attempt_id`).
+- `src/pages/AssessmentDetailPage.tsx` — same replacement; remove the local copy.
+- `src/pages/TeamAssessmentsPage.tsx` — align if it derives status the same way.
 
 ## Out of scope
 
-- Showing per-attempt history in the UI (older terminal attempts will continue to exist in the DB but are not surfaced; only the latest attempt drives the result view, matching today's behavior).
-- Changing the status vocabulary (already unified in the previous task).
+- Per-attempt history UI (older attempts and their reviews remain in the DB but aren’t surfaced — same as today).
+- Changing `assessment_assignments.status` mapping — already correct.
+- Changing the canonical status labels in `assessmentStatusConfig` — already unified in a previous task.
