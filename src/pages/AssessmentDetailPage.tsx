@@ -431,6 +431,13 @@ export default function AssessmentDetailPage() {
             .filter(Boolean)
             .join(" · ")}
         </p>
+        {assignment?.assigned_at && (
+          <p className="text-xs text-muted-foreground">
+            {assignerName
+              ? `Assigned by ${assignerName} on ${new Date(assignment.assigned_at).toLocaleDateString()}`
+              : `Assigned on ${new Date(assignment.assigned_at).toLocaleDateString()}`}
+          </p>
+        )}
       </div>
 
       {/* Metadata Cards */}
