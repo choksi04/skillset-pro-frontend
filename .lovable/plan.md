@@ -1,27 +1,44 @@
-# Add Pagination to "Add Questions" Picker Sheet
+## Goal
 
-The picker drawer currently renders the full filtered list (all published questions matching filters), which is heavy when the bank is large. Add simple client-side pagination.
+In the **Selected Questions** drawer (and ideally also the inline Selected list in the Assessment Template editor), make each question row clickable to open a detail panel that shows the full question content, options, and correct answer — matching the experience in the Question Bank.
 
-## Changes — `src/components/templates/QuestionPickerSheet.tsx`
+## Approach
 
-- Add state: `page` (default `1`) and constant `PAGE_SIZE = 20`.
-- Reset `page` to `1` whenever the sheet opens or any filter (`search`, `skillFilter`, `levelFilter`, `typeFilter`) changes.
-- Compute:
-  - `totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))`
-  - `pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)`
-- Render `pageItems` instead of `filtered` in the results list.
-- Add a pagination bar above the existing footer (inside the scrollable area's bottom or as a sticky strip just above `SheetFooter`):
-  - Left: small text `Showing X–Y of N` (where X/Y reflect current page bounds).
-  - Right: `Prev` button, `Page P / Total` indicator, `Next` button.
-  - Buttons disabled at bounds. Use existing `Button` component, `size="sm"`, `variant="outline"`, with `ChevronLeft`/`ChevronRight` icons from `lucide-react`.
-- Selection state and the buffered `Save` flow remain unchanged — selecting on page 1 persists when navigating to page 2.
-- Update the existing footer counter from `{filtered.length} shown` to `{filtered.length} match · page {page}/{totalPages}` for clarity (selection count stays).
+Reuse the existing `QuestionDetailSheet` from `src/pages/QuestionBankPage.tsx` rather than rebuilding it. This guarantees identical formatting (uses `FormattedQuestionContent`, badges, level labels, dates).
 
-## Out of scope
+### Steps
 
-- Server-side pagination (kept client-side; published-question count is bounded and already in store).
-- Changes to `SelectedQuestionsSheet` (operates on small selected set; not needed).
+1. **Extract `QuestionDetailSheet` into a shared component**
+   - Move the inline `QuestionDetailSheet` function (lines 1082–1121 of `QuestionBankPage.tsx`) plus its dependencies (`questionTypeLabels`, `statusStyles`, `FormattedQuestionContent` import) into a new file: `src/components/questions/QuestionDetailSheet.tsx`.
+   - Update `QuestionBankPage.tsx` to import from the new location.
 
-## Files touched
+2. **Make rows clickable in `SelectedQuestionRow.tsx`**
+   - Add an optional `onClick` prop. Wrap the row content in a `button` (or add `role="button"` + `onClick` + cursor/hover styles).
+   - Ensure the **Remove (X)** button stops propagation so it doesn't trigger the detail view.
 
-- Edit: `src/components/templates/QuestionPickerSheet.tsx`
+3. **Wire detail sheet inside `SelectedQuestionsSheet.tsx`**
+   - Add local state `detailQuestion: Question | null`.
+   - Pass `onClick={() => setDetailQuestion(q)}` to each `SelectedQuestionRow`.
+   - Render `<QuestionDetailSheet>` when `detailQuestion` is set, resolving `skillName`, `topicName`, and `levelLabels` from the existing stores already loaded in this component (skills, competencyLevels) plus the topic store.
+
+4. **Apply the same in the inline Selected list** on `AssessmentTemplateEditPage.tsx`
+   - Wherever `SelectedQuestionRow` is rendered inline (outside the sheet), pass the same `onClick` and host the `QuestionDetailSheet` at page level so users can click any selected question to inspect it without going through the secondary drawer.
+
+### Technical notes
+
+- `QuestionDetailSheet` already uses the shared `FormattedQuestionContent`, which renders MCQ options with the correct answer highlighted, scenarios, and coding problems consistently with Question Bank.
+- No data fetching changes required — `useQuestionStore` already has full question objects in `SelectedQuestionsSheet`.
+- Topic name in the sheet can be omitted (pass `null`) if the topic store isn't already loaded here, to keep the change minimal; the detail sheet handles `null` topic gracefully.
+
+### Files
+
+- New: `src/components/questions/QuestionDetailSheet.tsx`
+- Edited: `src/pages/QuestionBankPage.tsx` (import from new location, remove inline def)
+- Edited: `src/components/templates/SelectedQuestionRow.tsx` (clickable + stopPropagation on remove)
+- Edited: `src/components/templates/SelectedQuestionsSheet.tsx` (host detail sheet)
+- Edited: `src/pages/AssessmentTemplateEditPage.tsx` (host detail sheet for inline list)
+
+### Out of scope
+
+- No changes to the Add Questions picker (it already supports expanding to view options).
+- No changes to data model or stores.
