@@ -620,6 +620,15 @@ export default function AssessmentTemplateEditPage() {
         selectedIds={pickedQuestions}
         onRemove={(id) => togglePickedQuestion(id)}
       />
+      {detailQuestion && (
+        <QuestionDetailSheet
+          question={detailQuestion}
+          skillName={skillNameMap.get(detailQuestion.skill_id) ?? "Unknown"}
+          topicName={null}
+          onClose={() => setDetailQuestion(null)}
+          levelLabels={levelLabels}
+        />
+      )}
     </div>
   );
 }
