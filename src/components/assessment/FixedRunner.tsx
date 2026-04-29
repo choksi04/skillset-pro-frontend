@@ -134,7 +134,18 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   const totalSeconds = assessment.duration_minutes * 60;
   const initialRemaining = initialAttempt?.remaining_seconds ?? totalSeconds;
 
-  const [currentIdx, setCurrentIdx] = useState(0);
+  // Resume at the first unanswered question. If everything is answered (e.g.
+  // user paused on the last one after answering all), stay on the last one.
+  const initialIdx = (() => {
+    if (!initialAttempt?.answers?.length) return 0;
+    const firstUnanswered = currentQuestions.findIndex(
+      (aq) => !initialAnswers[aq.question_id]?.trim(),
+    );
+    if (firstUnanswered === -1) return Math.max(0, currentQuestions.length - 1);
+    return firstUnanswered;
+  })();
+
+  const [currentIdx, setCurrentIdx] = useState(initialIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers);
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
