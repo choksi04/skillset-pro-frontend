@@ -27,12 +27,24 @@ export default function AssessmentTemplatesPage() {
   const [confirmDelete, setConfirmDelete] = useState<AssessmentTemplate | null>(null);
   const [assignFor, setAssignFor] = useState<AssessmentTemplate | null>(null);
   const [viewAssignmentsFor, setViewAssignmentsFor] = useState<AssessmentTemplate | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchTemplates();
     fetchDomains();
     fetchAssignments();
+    supabase.from('users').select('id, full_name').is('deleted_on', null).then(({ data }) => {
+      const m: Record<string, string> = {};
+      (data || []).forEach((u: any) => { m[u.id] = u.full_name; });
+      setUserMap(m);
+    });
   }, []);
+
+  const userName = (id: string | null) => (id && userMap[id]) || 'Unknown';
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return '—';
+    try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return '—'; }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
