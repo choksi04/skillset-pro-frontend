@@ -320,7 +320,7 @@ export default function AssessmentDetailPage() {
         return;
       }
 
-      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id);
+      await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id, forceNewAttempt);
       await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
       await fetchAttempts();
       setRunnerActive(true);
