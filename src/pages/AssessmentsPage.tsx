@@ -83,8 +83,7 @@ export default function AssessmentsPage() {
       const t = templates.find((x) => x.id === a.template_id);
       if (t?.name) return t.name;
     }
-    const d = domains.find((x) => x.id === a.domain_id);
-    return d?.name ?? 'Assessment';
+    return 'Assessment';
   };
 
   const filteredMy = useMemo(() => {
