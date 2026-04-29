@@ -778,6 +778,31 @@ export default function AssessmentDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Confirm Re-attempt Dialog */}
+      <AlertDialog open={confirmReattempt} onOpenChange={setConfirmReattempt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new attempt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This starts a fresh attempt from scratch. The timer restarts and your previous answers
+              won&apos;t carry over. Your earlier result stays on record, but the displayed result will be
+              replaced once this new attempt is evaluated.
+              {assignment && (
+                <>
+                  {" "}This will count as attempt {assignment.attempt_count + 1} of {assignment.max_attempts}.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReattempt} disabled={startingRunner}>
+              {startingRunner ? "Starting…" : "Start New Attempt"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Add Question Dialog */}
       <AddQuestionDialog
         open={addQuestionOpen}
