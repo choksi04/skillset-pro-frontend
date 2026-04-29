@@ -974,44 +974,4 @@ export default function QuestionBankPage() {
   );
 }
 
-// ─── Question Detail Sheet ───
-function QuestionDetailSheet({
-  question, skillName, topicName, onClose, levelLabels,
-}: { question: Question; skillName: string; topicName: string | null; onClose: () => void; levelLabels: Record<string, string> }) {
-  return (
-    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Question Details</SheetTitle>
-          <SheetDescription>
-            {skillName}{topicName ? ` → ${topicName}` : ''} · {levelLabels[question.competency_level] || question.competency_level} · {questionTypeLabels[question.question_type]}
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4 mt-4">
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2">
-            <Badge className={`text-xs border ${statusStyles[question.status]}`}>{question.status}</Badge>
-            {question.ai_generated ? (
-              <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles size={10} /> AI Generated</Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs gap-1 border-border text-muted-foreground"><User size={10} /> Manual</Badge>
-            )}
-            <Badge variant="secondary" className="text-xs">{questionTypeLabels[question.question_type]}</Badge>
-          </div>
-
-          {/* Created date */}
-          <p className="text-xs text-muted-foreground">
-            Created {new Date(question.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-          </p>
-
-          {/* Formatted content using shared component */}
-          <FormattedQuestionContent
-            text={question.question_text}
-            guidelines={question.evaluation_guidelines}
-            type={question.question_type}
-          />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
+// QuestionDetailSheet moved to @/components/questions/QuestionDetailSheet
