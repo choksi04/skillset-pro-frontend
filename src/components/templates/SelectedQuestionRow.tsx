@@ -11,6 +11,7 @@ interface Props {
   skillName?: string;
   levelLabel?: string;
   onRemove?: () => void;
+  onClick?: () => void;
 }
 
 export default function SelectedQuestionRow({
@@ -20,13 +21,33 @@ export default function SelectedQuestionRow({
   skillName,
   levelLabel,
   onRemove,
+  onClick,
 }: Props) {
   const display = question
     ? formatQuestionForDisplay(question).display
     : `Question ${fallbackId.slice(0, 8)}…`;
 
+  const clickable = !!onClick && !!question;
+
   return (
-    <div className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 ${
+        clickable ? "cursor-pointer hover:bg-muted/40 hover:border-primary/40 transition-colors" : ""
+      }`}
+    >
       <div className="min-w-0 flex-1">
         <p className="text-xs text-foreground line-clamp-2">
           {typeof index === "number" && (
@@ -57,7 +78,10 @@ export default function SelectedQuestionRow({
           size="sm"
           variant="ghost"
           className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           aria-label="Remove question"
         >
           <X size={13} />
