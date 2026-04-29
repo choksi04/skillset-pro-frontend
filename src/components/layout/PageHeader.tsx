@@ -40,10 +40,13 @@ export default function PageHeader() {
   else if (basePath.startsWith('/team-registry/')) basePath = '/team-registry';
   else if (basePath.startsWith('/assessments/')) basePath = '/assessments';
   else if (basePath.startsWith('/team-assessments/')) basePath = '/team-assessments';
+  else if (basePath.startsWith('/assessment-templates/')) basePath = '/assessment-templates';
 
   const crumb = routeBreadcrumbs[basePath];
   const title = crumb?.title || 'Page';
   const group = crumb?.group;
+
+  const overrideTitle = usePageTitleStore((s) => s.title);
 
   // Domain detail breadcrumb
   const isDomainDetail = location.pathname.startsWith('/domains/') && location.pathname !== '/domains';
@@ -58,6 +61,10 @@ export default function PageHeader() {
   const isTeamRegistryDetail = location.pathname.startsWith('/team-registry/') && location.pathname !== '/team-registry';
   const isAssessmentDetail = location.pathname.startsWith('/assessments/') && location.pathname !== '/assessments';
   const isTeamAssessmentDetail = location.pathname.startsWith('/team-assessments/') && location.pathname !== '/team-assessments';
+  const isTemplateDetail = location.pathname.startsWith('/assessment-templates/') && location.pathname !== '/assessment-templates';
+  const templatePathSeg = isTemplateDetail ? location.pathname.split('/assessment-templates/')[1] : null;
+  const isNewTemplate = templatePathSeg === 'new';
+  const templateDetailTitle = overrideTitle || (isNewTemplate ? 'New Assessment Template' : 'Edit Template');
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
