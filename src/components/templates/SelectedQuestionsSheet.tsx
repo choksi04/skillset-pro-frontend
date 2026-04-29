@@ -37,6 +37,7 @@ export default function SelectedQuestionsSheet({
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
   const [search, setSearch] = useState("");
+  const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
 
   useEffect(() => {
     if (open) setSearch("");
