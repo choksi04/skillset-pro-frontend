@@ -7,7 +7,9 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useTemplateStore } from '@/stores/templateStore';
+import { useAssignmentStore } from '@/stores/assignmentStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
