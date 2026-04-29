@@ -89,7 +89,7 @@ interface AttemptStore {
   loading: boolean;
   initialized: boolean;
   fetchAttempts: () => Promise<void>;
-  startAttempt: (assessmentId: string, tenantId: string, employeeId: string) => Promise<string>;
+  startAttempt: (assessmentId: string, tenantId: string, employeeId: string, forceNew?: boolean) => Promise<string>;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => Promise<void>;
   submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
   getAttemptForAssessment: (assessmentId: string) => AssessmentAttempt | undefined;
