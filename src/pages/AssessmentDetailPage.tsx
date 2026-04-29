@@ -516,7 +516,7 @@ export default function AssessmentDetailPage() {
         )}
         {canReattempt && (
           <div className="flex items-center gap-2">
-            <Button onClick={handleReattempt} disabled={startingRunner} variant="outline" className="gap-1.5">
+            <Button onClick={() => setConfirmReattempt(true)} disabled={startingRunner} variant="outline" className="gap-1.5">
               {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Re-attempt
             </Button>
             {assignment && (
