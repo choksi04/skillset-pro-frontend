@@ -290,8 +290,10 @@ export default function AssessmentDetailPage() {
     }
   };
 
-  // Start (or resume) the inline runner — replaces the legacy /assessment-exec page
-  const handleStartRunner = async () => {
+  // Start (or resume) the inline runner — replaces the legacy /assessment-exec page.
+  // For a re-attempt (after a terminal attempt), pass forceNewAttempt=true to skip
+  // the "already submitted" guard and start a fresh attempt row.
+  const handleStartRunner = async (forceNewAttempt = false) => {
     if (!assessment) return;
     const gate = canStartNewAttempt(assessment.id);
     if (!gate.allowed) {
@@ -301,14 +303,23 @@ export default function AssessmentDetailPage() {
     setStartingRunner(true);
     try {
       const existing = getAttemptForAssessment(assessment.id);
-      if (
+      const isTerminal =
         existing &&
-        (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed")
-      ) {
+        (existing.status === "evaluated" || existing.status === "submitted" || existing.status === "reviewed");
+
+      if (isTerminal && !forceNewAttempt) {
         toast.info("This assessment has already been submitted.");
         setStartingRunner(false);
         return;
       }
+
+      // Once a manager has approved the result, no further attempts are allowed.
+      if (forceNewAttempt && review?.status === "completed") {
+        toast.error("This assessment has been approved by your manager and cannot be re-attempted.");
+        setStartingRunner(false);
+        return;
+      }
+
       await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id);
       await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
       await fetchAttempts();
@@ -319,6 +330,8 @@ export default function AssessmentDetailPage() {
       setStartingRunner(false);
     }
   };
+
+  const handleReattempt = () => handleStartRunner(true);
 
   if (!assessment) {
     return (
@@ -488,18 +501,18 @@ export default function AssessmentDetailPage() {
       {/* CTA Buttons */}
       <div className="flex items-center gap-3">
         {isOwner && status === "pending" && (
-          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+          <Button onClick={() => handleStartRunner(false)} disabled={startingRunner} className="gap-1.5">
             {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Start Assessment
           </Button>
         )}
         {isOwner && status === "in_progress" && (
-          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+          <Button onClick={() => handleStartRunner(false)} disabled={startingRunner} className="gap-1.5">
             {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume Assessment
           </Button>
         )}
         {canReattempt && (
           <div className="flex items-center gap-2">
-            <Button onClick={handleStartRunner} disabled={startingRunner} variant="outline" className="gap-1.5">
+            <Button onClick={handleReattempt} disabled={startingRunner} variant="outline" className="gap-1.5">
               {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Re-attempt
             </Button>
             {assignment && (

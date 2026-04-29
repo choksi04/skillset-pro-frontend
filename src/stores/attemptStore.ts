@@ -419,6 +419,13 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     await get().submitAttempt(attemptId, questionMap, assessmentQuestions);
   },
 
-  getAttemptForAssessment: (assessmentId) =>
-    get().attempts.find((a) => a.assessment_id === assessmentId),
+  getAttemptForAssessment: (assessmentId) => {
+    // Return the most recent attempt so re-attempts surface the new in-progress row
+    // instead of an older terminal one.
+    const matches = get().attempts.filter((a) => a.assessment_id === assessmentId);
+    if (matches.length === 0) return undefined;
+    return matches.slice().sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+    )[0];
+  },
 }));

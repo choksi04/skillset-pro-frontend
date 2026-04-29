@@ -8,13 +8,33 @@ import { getCurrentUserId } from '@/lib/audit';
 
 export type AssessmentStatus = 'pending' | 'in_progress' | 'completed' | 'evaluated' | 'review_pending' | 'approved';
 
+/**
+ * Canonical assessment lifecycle (use these everywhere in the UI):
+ *   pending      → Not Started
+ *   in_progress  → In Progress
+ *   submitted    → Submitted (awaiting AI evaluation)
+ *   evaluated    → Evaluated (awaiting manager review)
+ *   under_review → Under Review (manager actively reviewing)
+ *   approved     → Approved (manager finalised)
+ *
+ * Legacy synonyms still in the database are mapped on read:
+ *   completed → submitted
+ *   review_pending → under_review
+ *   verified / reviewed → approved
+ *   new → pending
+ */
 export const assessmentStatusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: 'Not Started', color: 'bg-muted text-muted-foreground' },
   in_progress: { label: 'In Progress', color: 'bg-info/15 text-info border-info/20' },
-  completed: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' },
+  submitted: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' },
+  completed: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' }, // legacy alias
   evaluated: { label: 'Evaluated', color: 'bg-success/15 text-success border-success/20' },
-  review_pending: { label: 'Under Review', color: 'bg-warning/15 text-warning border-warning/20' },
-  approved: { label: 'Verified', color: 'bg-success/15 text-success border-success/20' },
+  under_review: { label: 'Under Review', color: 'bg-warning/15 text-warning border-warning/20' },
+  review_pending: { label: 'Under Review', color: 'bg-warning/15 text-warning border-warning/20' }, // legacy alias
+  approved: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' },
+  verified: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' }, // legacy alias
+  reviewed: { label: 'Approved', color: 'bg-success/15 text-success border-success/20' }, // legacy alias
+  new: { label: 'Not Started', color: 'bg-muted text-muted-foreground' }, // legacy alias
 };
 
 /**
