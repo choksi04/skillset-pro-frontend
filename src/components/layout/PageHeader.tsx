@@ -3,6 +3,7 @@ import { Search, ChevronRight } from 'lucide-react';
 import HelpButton from '@/components/onboarding/HelpButton';
 import NotificationDropdown from '@/components/layout/NotificationDropdown';
 import { useSkillStore } from '@/stores/skillStore';
+import { usePageTitleStore } from '@/stores/pageTitleStore';
 
 interface BreadcrumbEntry {
   group: string;
