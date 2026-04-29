@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTemplateStore, TemplateType, SkillSelectionMode } from "@/stores/templateStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useQuestionStore } from "@/stores/questionStore";
+import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
