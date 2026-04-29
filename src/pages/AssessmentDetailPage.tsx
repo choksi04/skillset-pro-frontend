@@ -501,18 +501,18 @@ export default function AssessmentDetailPage() {
       {/* CTA Buttons */}
       <div className="flex items-center gap-3">
         {isOwner && status === "pending" && (
-          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+          <Button onClick={() => handleStartRunner(false)} disabled={startingRunner} className="gap-1.5">
             {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Start Assessment
           </Button>
         )}
         {isOwner && status === "in_progress" && (
-          <Button onClick={handleStartRunner} disabled={startingRunner} className="gap-1.5">
+          <Button onClick={() => handleStartRunner(false)} disabled={startingRunner} className="gap-1.5">
             {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume Assessment
           </Button>
         )}
         {canReattempt && (
           <div className="flex items-center gap-2">
-            <Button onClick={handleStartRunner} disabled={startingRunner} variant="outline" className="gap-1.5">
+            <Button onClick={handleReattempt} disabled={startingRunner} variant="outline" className="gap-1.5">
               {startingRunner ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Re-attempt
             </Button>
             {assignment && (
