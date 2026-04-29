@@ -1,43 +1,44 @@
 ## Goal
+Replace the "domain name" shown in the My Assessments and Team Assessments list rows with the **assessment name** (from the linked template). Domain remains visible on detail pages and elsewhere.
 
-Improve the **Per-Question Details** expansion on the assessment result page so MCQs always display the **option text** along with the letter (A/B/C/D) — for the employee's selected answer, the correct answer in the answer box, and the correct answer reference in the AI feedback line.
-
-## Current behavior
-
-In `src/components/assessment/EvalResults.tsx` (MCQ expand block, lines ~119–141):
-
-- **Selected answer** shows just the letter: `Selected: A`
-- **Correct answer reference** shows letter + text correctly already, but only when answer was provided
-- When the employee submitted nothing, the whole MCQ-aware block is skipped (because `answer?.answer_text` is falsy) and the fallback renders `No answer provided` — losing the chance to still show the correct option text
-- The AI feedback string (from `evaluate-assessment` edge function) reads `Incorrect. The correct answer was A.` — letter only, no option text
+## Background
+- `assessments` rows do not have a `name` column. They optionally link to `assessment_templates` via `template_id`, which has a `name` field.
+- Registry-generated (non-template) assessments have no name. For these we'll show a sensible fallback: `"Skill Registry Assessment"` (and append a short date if helpful).
+- Domain currently shown is `assessment.domain_id` resolved via `useDomainStore`. This will be removed from the list rows.
 
 ## Changes
 
-### 1. `src/components/assessment/EvalResults.tsx` — MCQ expand block
+### 1. `src/pages/AssessmentsPage.tsx` (My Assessments)
+- Import and call `useTemplateStore` + `fetchTemplates()`.
+- Add helper:
+  ```ts
+  const getAssessmentName = (a: Assessment) => {
+    if (a.template_id) {
+      const t = templates.find((x) => x.id === a.template_id);
+      if (t?.name) return t.name;
+    }
+    return 'Skill Registry Assessment';
+  };
+  ```
+- In the row, replace `{getDomain(a.domain_id)}` with `{getAssessmentName(a)}`.
+- Update the search filter to match against assessment name instead of domain name.
+- Update placeholder text: "Search assessments by name...".
+- Remove the now-unused `getDomain` / `domains` references (keep import only if needed elsewhere; otherwise drop).
 
-Rewrite the MCQ branch so it always renders when `isMCQ && mcqInfo` is true (regardless of whether `answer.answer_text` exists), and always shows the option text:
+### 2. `src/pages/TeamAssessmentsPage.tsx` (Team Assessments)
+- Same template lookup as above.
+- Row header becomes: `{employeeName} · {assessmentName}` (drop the domain segment).
+- Keep the `Reassessment` badge.
+- Update search filter to match against employee name + assessment name (drop domain match).
+- Update placeholder text: "Search by employee or assessment name...".
 
-- **Selected line**:
-  - If user selected a letter → `Selected: A) <option text>`
-  - If empty → render italic `No answer provided` for the selected line only
-- **Correct/Incorrect line** (always shown when `correctIndex != null`):
-  - Correct → `Correct — A) <option text>`
-  - Incorrect or empty → `Incorrect — Correct answer: A) <option text>`
-- Add a small helper inside the component to map a letter (`A`/`B`/`C`/`D`) to its option text via `mcqInfo.options[letter.charCodeAt(0)-65]`, with bounds check.
-
-### 2. `supabase/functions/evaluate-assessment/index.ts` — `evaluateMCQ` feedback text
-
-Enhance feedback strings to include the option text when it can be parsed from `question_text` JSON:
-
-- Parse `parsed.options` alongside `correctIndex`
-- Correct → `Correct answer selected: A) <option text>.`
-- Incorrect → `Incorrect. The correct answer was A) <option text>.`
-- Same enhancement in the `dimensions[0].comment` string
-- Fallback to current letter-only text if options can't be parsed
-
-This only affects newly generated evaluations. Existing stored feedback strings will remain letter-only (acceptable; the EvalResults UI already shows the full correct answer with text in the answer box).
+### 3. Detail pages — no change required
+- `AssessmentDetailPage.tsx` and `TeamAssessmentDetailPage` already show domain context; leave those as-is so domain remains visible where useful.
 
 ## Out of scope
+- No DB schema changes. No changes to assessment generation logic.
+- No changes to the "Unknown Domain" backfill issue (separate concern, previously declined).
 
-- Non-MCQ question types (scenario/coding) — unchanged
-- Re-evaluating historical attempts
+## Files to edit
+- `src/pages/AssessmentsPage.tsx`
+- `src/pages/TeamAssessmentsPage.tsx`
