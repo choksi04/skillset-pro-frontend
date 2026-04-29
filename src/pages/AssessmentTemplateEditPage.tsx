@@ -73,7 +73,7 @@ export default function AssessmentTemplateEditPage() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
-  const { levels: competencyLevels } = useCompetencyLevelStore();
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   useEffect(() => {
