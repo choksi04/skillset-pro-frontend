@@ -226,7 +226,7 @@ export default function QuestionPickerSheet({
             </p>
           ) : (
             <div className="space-y-2">
-              {filtered.map((q) => {
+              {pageItems.map((q) => {
                 const isOpen = expanded.has(q.id);
                 const isChecked = selected.has(q.id);
                 const formatted = formatQuestionForDisplay(q);
