@@ -4,6 +4,7 @@ import { useAssessmentStore, Assessment, assessmentStatusConfig } from '@/stores
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
+import { useDomainStore } from '@/stores/domainStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useTemplateStore } from '@/stores/templateStore';
 import { useAuth } from '@/contexts/AuthContext';
