@@ -122,19 +122,42 @@ export default function EvalResults({ attempt, assessment }: EvalResultsProps) {
                           <div>
                             <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Employee's Answer</p>
                             <div className={`rounded-lg border border-border bg-card p-3 text-xs text-foreground whitespace-pre-wrap ${question?.question_type === 'coding' ? 'font-mono' : ''}`}>
-                              {isMCQ && mcqInfo && answer?.answer_text ? (
-                                <div className="space-y-1">
-                                  <p>Selected: <span className="font-semibold">{answer.answer_text}</span></p>
-                                  {mcqInfo.correctIndex != null && (
-                                    <p className="flex items-center gap-1">
-                                      {answer.answer_text === String.fromCharCode(65 + mcqInfo.correctIndex)
-                                        ? <><CheckCircle size={12} className="text-success" /> Correct</>
-                                        : <><XCircle size={12} className="text-destructive" /> Incorrect — Correct answer: <span className="font-semibold">{String.fromCharCode(65 + mcqInfo.correctIndex)}) {mcqInfo.options[mcqInfo.correctIndex]}</span></>
-                                      }
+                              {isMCQ && mcqInfo ? (() => {
+                                const selectedLetter = (answer?.answer_text || '').trim().toUpperCase();
+                                const selectedIdx = /^[A-D]$/.test(selectedLetter) ? selectedLetter.charCodeAt(0) - 65 : -1;
+                                const selectedText = selectedIdx >= 0 && selectedIdx < mcqInfo.options.length ? mcqInfo.options[selectedIdx] : null;
+                                const correctIdx = mcqInfo.correctIndex;
+                                const correctLetter = correctIdx != null ? String.fromCharCode(65 + correctIdx) : null;
+                                const correctText = correctIdx != null ? mcqInfo.options[correctIdx] : null;
+                                const isCorrect = selectedIdx >= 0 && correctIdx != null && selectedIdx === correctIdx;
+                                return (
+                                  <div className="space-y-1">
+                                    <p>
+                                      Selected:{' '}
+                                      {selectedText != null ? (
+                                        <span className="font-semibold">{selectedLetter}) {selectedText}</span>
+                                      ) : (
+                                        <span className="italic text-muted-foreground">No answer provided</span>
+                                      )}
                                     </p>
-                                  )}
-                                </div>
-                              ) : (
+                                    {correctLetter != null && (
+                                      <p className="flex items-start gap-1">
+                                        {isCorrect ? (
+                                          <>
+                                            <CheckCircle size={12} className="text-success mt-0.5 shrink-0" />
+                                            <span>Correct — <span className="font-semibold">{correctLetter}) {correctText}</span></span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <XCircle size={12} className="text-destructive mt-0.5 shrink-0" />
+                                            <span>Incorrect — Correct answer: <span className="font-semibold">{correctLetter}) {correctText}</span></span>
+                                          </>
+                                        )}
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })() : (
                                 answer?.answer_text || <span className="italic text-muted-foreground">No answer provided</span>
                               )}
                             </div>
