@@ -70,6 +70,7 @@ export default function AssessmentTemplateEditPage() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewAllOpen, setViewAllOpen] = useState(false);
+  const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
