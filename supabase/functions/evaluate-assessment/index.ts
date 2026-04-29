@@ -35,12 +35,16 @@ interface EvaluationResult {
  */
 function evaluateMCQ(answer: AnswerPayload): EvaluationResult {
   let correctIndex: number | null = null;
+  let options: string[] | null = null;
 
-  // Primary: parse question_text JSON for correctIndex
+  // Primary: parse question_text JSON for correctIndex + options
   try {
     const parsed = JSON.parse(answer.question_text);
     if (typeof parsed.correctIndex === 'number') {
       correctIndex = parsed.correctIndex;
+    }
+    if (Array.isArray(parsed.options)) {
+      options = parsed.options as string[];
     }
   } catch { /* not JSON, fall through */ }
 
@@ -87,15 +91,19 @@ function evaluateMCQ(answer: AnswerPayload): EvaluationResult {
   const isCorrect = userIndex === correctIndex;
   const score = isCorrect ? 100 : 0;
   const correctLetter = String.fromCharCode(65 + correctIndex);
+  const correctOptionText = options && options[correctIndex] ? options[correctIndex] : null;
+  const correctLabel = correctOptionText ? `${correctLetter}) ${correctOptionText}` : correctLetter;
 
   return {
     question_id: answer.question_id,
     score,
     feedback: isCorrect
-      ? 'Correct answer selected.'
-      : `Incorrect. The correct answer was ${correctLetter}.`,
+      ? `Correct answer selected: ${correctLabel}.`
+      : `Incorrect. The correct answer was ${correctLabel}.`,
     dimensions: [
-      { dimension: 'Correctness', score, comment: isCorrect ? 'Answer matches the correct option.' : `Selected answer does not match correct option (${correctLetter}).` },
+      { dimension: 'Correctness', score, comment: isCorrect
+        ? `Answer matches the correct option (${correctLabel}).`
+        : `Selected answer does not match the correct option (${correctLabel}).` },
     ],
     confidence: isCorrect ? 1.0 : 0,
   };
