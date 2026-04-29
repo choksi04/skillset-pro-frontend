@@ -151,6 +151,14 @@ export default function AssessmentTemplatesPage() {
                       {' · '}
                       {t.duration_minutes} min · max {t.max_attempts} attempt{t.max_attempts > 1 ? 's' : ''}
                     </p>
+                    <p className="text-[10px] text-muted-foreground/80 mt-1.5">
+                      Created by <span className="font-medium text-muted-foreground">{userName(t.created_by)}</span> {fmtDate(t.created_at)}
+                      {t.modified_at && (
+                        <>
+                          {' · '}Last updated by <span className="font-medium text-muted-foreground">{userName(t.modified_by)}</span> {fmtDate(t.modified_at)}
+                        </>
+                      )}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {t.status === 'active' && (
