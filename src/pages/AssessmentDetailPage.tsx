@@ -200,6 +200,21 @@ export default function AssessmentDetailPage() {
       });
   }, [assessment, isOwner]);
 
+  // Fetch assigner name (who assigned this assessment)
+  useEffect(() => {
+    if (!assessment) return;
+    const asg = getAssignmentByAssessmentId(assessment.id);
+    if (!asg?.assigned_by) { setAssignerName(""); return; }
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", asg.assigned_by)
+      .single()
+      .then(({ data }) => {
+        if (data) setAssignerName(data.full_name);
+      });
+  }, [assessment, assignments]);
+
   // Determine back path
   const backPath = window.location.pathname.startsWith("/team-assessments") ? "/team-assessments" : "/assessments";
   const backLabel = backPath === "/team-assessments" ? "Back to Team Assessments" : "Back to My Assessments";
