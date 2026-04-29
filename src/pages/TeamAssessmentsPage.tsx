@@ -17,15 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
-
-function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === 'completed') return 'approved';
-  if (review) return 'review_pending';
-  if (attempt?.status === 'evaluated') return 'evaluated';
-  if (attempt?.status === 'submitted') return 'completed';
-  if (attempt?.status === 'in_progress' || assessment.status === 'in_progress') return 'in_progress';
-  return assessment.status;
-}
+import { getEffectiveStatus } from '@/lib/assessmentStatus';
 
 export default function TeamAssessmentsPage() {
   const { assessments, fetchAssessments } = useAssessmentStore();
@@ -119,8 +111,8 @@ export default function TeamAssessmentsPage() {
         <div className="space-y-3">
           {filteredTeam.map((a) => {
             const attempt = getAttemptForAssessment(a.id);
-            const review = reviews.find((r) => r.assessment_id === a.id);
-            const status = getEffectiveStatus(a, attempt, review);
+            const assessmentReviews = reviews.filter((r) => r.assessment_id === a.id);
+            const status = getEffectiveStatus(a, attempt, assessmentReviews);
             const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
 
             return (

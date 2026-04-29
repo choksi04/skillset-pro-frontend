@@ -53,15 +53,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAssignmentStore } from "@/stores/assignmentStore";
 import { getQuestionPreviewText, getQuestionDisplayText } from "@/lib/questionContent";
-
-function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === "completed") return "approved";
-  if (review) return "review_pending";
-  if (attempt?.status === "evaluated") return "evaluated";
-  if (attempt?.status === "submitted") return "completed";
-  if (attempt?.status === "in_progress" || assessment.status === "in_progress") return "in_progress";
-  return assessment.status;
-}
+import { getEffectiveStatus } from "@/lib/assessmentStatus";
 
 export default function AssessmentDetailPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
@@ -132,8 +124,10 @@ export default function AssessmentDetailPage() {
   const assessment = useMemo(() => assessments.find((a) => a.id === assessmentId), [assessments, assessmentId]);
 
   const attempt = assessment ? getAttemptForAssessment(assessment.id) : null;
-  const review = reviews.find((r) => r.assessment_id === assessment?.id);
-  const status = assessment ? getEffectiveStatus(assessment, attempt, review) : "pending";
+  const assessmentReviews = assessment ? reviews.filter((r) => r.assessment_id === assessment.id) : [];
+  // Review tied to the CURRENT attempt (used by re-attempt guard, panels, etc.)
+  const review = attempt ? assessmentReviews.find((r) => r.attempt_id === attempt.id) : undefined;
+  const status = assessment ? getEffectiveStatus(assessment, attempt, assessmentReviews) : "pending";
   const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
   const domain = domains.find((d) => d.id === assessment?.domain_id);
   const isOwner = assessment?.employee_id === user?.id;

@@ -13,15 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ClipboardCheck, Search, ArrowRight } from "lucide-react";
-
-function getEffectiveStatus(assessment: Assessment, attempt: any, review: any): string {
-  if (review?.status === "completed") return "approved";
-  if (review) return "review_pending";
-  if (attempt?.status === "evaluated") return "evaluated";
-  if (attempt?.status === "submitted") return "completed";
-  if (attempt?.status === "in_progress" || assessment.status === "in_progress") return "in_progress";
-  return assessment.status;
-}
+import { getEffectiveStatus } from "@/lib/assessmentStatus";
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -126,8 +118,8 @@ export default function AssessmentsPage() {
         <div className="space-y-3">
           {filteredMy.map((a) => {
             const attempt = getAttemptForAssessment(a.id);
-            const review = reviews.find((r) => r.assessment_id === a.id);
-            const status = getEffectiveStatus(a, attempt, review);
+            const assessmentReviews = reviews.filter((r) => r.assessment_id === a.id);
+            const status = getEffectiveStatus(a, attempt, assessmentReviews);
             const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
 
             const assignment = getAssignmentByAssessmentId(a.id);
