@@ -111,8 +111,14 @@ export default function PageHeader() {
             <ChevronRight size={14} className="text-muted-foreground" />
             <span className="font-medium text-card-foreground">Detail</span>
           </>
+        ) : isTemplateDetail ? (
+          <>
+            <Link to="/assessment-templates" className="text-muted-foreground hover:text-foreground transition-colors">Assessment Templates</Link>
+            <ChevronRight size={14} className="text-muted-foreground" />
+            <span className="font-medium text-card-foreground truncate max-w-[400px]">{templateDetailTitle}</span>
+          </>
         ) : (
-          <span className="font-medium text-card-foreground">{title}</span>
+          <span className="font-medium text-card-foreground">{overrideTitle || title}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
