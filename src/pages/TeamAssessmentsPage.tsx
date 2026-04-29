@@ -134,7 +134,7 @@ export default function TeamAssessmentsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-card-foreground">{getName(a.employee_id)}</span>
                       <span className="text-muted-foreground">·</span>
-                      <span className="text-sm font-medium text-card-foreground">{getDomain(a.domain_id)}</span>
+                      <span className="text-sm font-medium text-card-foreground">{getAssessmentName(a)}</span>
                       {a.is_reassessment && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">Reassessment</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
