@@ -145,7 +145,7 @@ export default function AssessmentTemplatesPage() {
           {filtered.map((t) => (
             <Card
               key={t.id}
-              className="hover:border-primary/30 transition-colors"
+              className="hover:border-primary/30 transition-colors cursor-pointer"
               onClick={() => navigate(`/assessment-templates/${t.id}`)}
             >
               <CardContent className="p-4">
