@@ -471,84 +471,59 @@ export default function AssessmentTemplateEditPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Selected Questions ({pickedQuestions.length})</Label>
-                  {pickedQuestions.length > 0 && (
-                    <div className="space-y-1.5">
-                      {pickedQuestions.map((qid, idx) => {
-                        const q = questions.find((qq) => qq.id === qid);
-                        return (
-                          <div
-                            key={qid}
-                            className="flex items-center justify-between rounded-md bg-muted/30 px-2.5 py-1.5"
-                          >
-                            <span className="text-xs text-foreground truncate flex-1">
-                              {idx + 1}. {q?.question_text.slice(0, 80) ?? qid}
-                              {q && (
-                                <Badge variant="outline" className="ml-2 text-[10px]">
-                                  {skillNameMap.get(q.skill_id) ?? q.skill_id}
-                                </Badge>
-                              )}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                              onClick={() => togglePickedQuestion(qid)}
-                            >
-                              <X size={12} />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Selected Questions ({pickedQuestions.length})
+                    </Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setPickerOpen(true)}
+                    >
+                      <Plus size={13} /> Add Questions
+                    </Button>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs">Add Questions</Label>
-                  <div className="relative">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search published questions..."
-                      value={questionSearch}
-                      onChange={(e) => setQuestionSearch(e.target.value)}
-                      className="pl-8 h-9 text-sm"
-                    />
-                  </div>
-                  <div className="rounded-lg border border-border max-h-72 overflow-y-auto">
-                    {filteredQuestions.length === 0 ? (
-                      <p className="text-xs text-muted-foreground p-3">No published questions found.</p>
-                    ) : (
-                      filteredQuestions.slice(0, 50).map((qq) => (
-                        <label
-                          key={qq.id}
-                          className="flex items-start gap-2 px-3 py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/30"
-                        >
-                          <Checkbox
-                            checked={pickedQuestions.includes(qq.id)}
-                            onCheckedChange={() => togglePickedQuestion(qq.id)}
-                            className="mt-0.5"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs text-foreground line-clamp-2">{qq.question_text}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-[10px]">
-                                {skillNameMap.get(qq.skill_id) ?? qq.skill_id}
-                              </Badge>
-                              <Badge variant="outline" className="text-[10px]">
-                                {qq.question_type}
-                              </Badge>
-                            </div>
-                          </div>
-                        </label>
-                      ))
-                    )}
-                    {filteredQuestions.length > 50 && (
-                      <p className="text-[11px] text-muted-foreground p-2 text-center">
-                        Showing first 50 — refine your search to see more.
+                  {pickedQuestions.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No questions added yet.
                       </p>
-                    )}
-                  </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Click <span className="font-medium text-foreground">Add Questions</span> to pick from your question bank.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5">
+                        {pickedQuestions.slice(0, 15).map((qid, idx) => {
+                          const q = questionMap.get(qid);
+                          return (
+                            <SelectedQuestionRow
+                              key={qid}
+                              index={idx}
+                              question={q}
+                              fallbackId={qid}
+                              skillName={q ? skillNameMap.get(q.skill_id) : undefined}
+                              levelLabel={q ? levelLabels[q.competency_level] : undefined}
+                              onRemove={() => togglePickedQuestion(qid)}
+                            />
+                          );
+                        })}
+                      </div>
+                      {pickedQuestions.length > 15 && (
+                        <button
+                          type="button"
+                          onClick={() => setViewAllOpen(true)}
+                          className="text-xs text-primary hover:underline mt-1"
+                        >
+                          View all {pickedQuestions.length} selected questions →
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
