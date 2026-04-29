@@ -9,6 +9,7 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import QuestionFormSheet from '@/components/questions/QuestionFormSheet';
+import QuestionDetailSheet, { FormattedQuestionContent } from '@/components/questions/QuestionDetailSheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
