@@ -1,40 +1,43 @@
 ## Goal
-Strip every reference to **Review Cycles** and **auto-generated assessments** from the User Guide and Guided Tour. Replace with template-based assignment language.
+
+Improve the **Per-Question Details** expansion on the assessment result page so MCQs always display the **option text** along with the letter (A/B/C/D) — for the employee's selected answer, the correct answer in the answer box, and the correct answer reference in the AI feedback line.
+
+## Current behavior
+
+In `src/components/assessment/EvalResults.tsx` (MCQ expand block, lines ~119–141):
+
+- **Selected answer** shows just the letter: `Selected: A`
+- **Correct answer reference** shows letter + text correctly already, but only when answer was provided
+- When the employee submitted nothing, the whole MCQ-aware block is skipped (because `answer?.answer_text` is falsy) and the fallback renders `No answer provided` — losing the chance to still show the correct option text
+- The AI feedback string (from `evaluate-assessment` edge function) reads `Incorrect. The correct answer was A.` — letter only, no option text
 
 ## Changes
 
-### `src/pages/UserGuidePage.tsx`
+### 1. `src/components/assessment/EvalResults.tsx` — MCQ expand block
 
-1. **Platform Overview bullet** (line 28): `'When a Review Cycle is activated, the system auto-generates an assessment per employee using the active template and their submitted self-ratings.'` → `'Admins create assessments from a template and assign them to employees.'`
+Rewrite the MCQ branch so it always renders when `isMCQ && mcqInfo` is true (regardless of whether `answer.answer_text` exists), and always shows the option text:
 
-2. **Navigation Structure** (line 45): drop "Review Cycles" from the Settings list. New text: `'Settings — Skill Library, Domains, Users, Question Bank, Assessment Templates, and Assessment Config for platform configuration.'`
+- **Selected line**:
+  - If user selected a letter → `Selected: A) <option text>`
+  - If empty → render italic `No answer provided` for the selected line only
+- **Correct/Incorrect line** (always shown when `correctIndex != null`):
+  - Correct → `Correct — A) <option text>`
+  - Incorrect or empty → `Incorrect — Correct answer: A) <option text>`
+- Add a small helper inside the component to map a letter (`A`/`B`/`C`/`D`) to its option text via `mcqInfo.options[letter.charCodeAt(0)-65]`, with bounds check.
 
-3. **Setup Flow Step 7** (line 66): `'Step 7: Activate a Review Cycle to auto-generate assessments for submitted registries using the active template.'` → `'Step 7: Create an assessment from a template and assign it to employees from the Assessment Templates page.'`
+### 2. `supabase/functions/evaluate-assessment/index.ts` — `evaluateMCQ` feedback text
 
-4. **Assessment Templates section**:
-   - Line 116 description: drop "Required before activating a Review Cycle." → `'Reusable blueprints that define how an assessment is generated and delivered.'`
-   - Line 124: `'switch Status to Active to make it available for Review Cycles.'` → `'switch Status to Active to make it available for assignment.'`
-   - Line 125: drop "Active templates linked to a running cycle are protected." → `'Templates can be edited, duplicated, or soft-deleted.'`
-   - Add a new step after Status: `'Use the Assignments sheet on a template to assign it to one or many employees — assigned assessments appear in their Assessments list.'`
+Enhance feedback strings to include the option text when it can be parsed from `question_text` JSON:
 
-5. **Assessment Configuration section** (lines 136–137): rephrase "readiness gate" / "generation caps" without referencing cycles:
-   - `'Configure Question Limits per level — minimum number of published questions per skill+level required to build an assessment.'`
-   - `'Configure generation caps — maximum questions per skill+level included when an assessment is built.'`
+- Parse `parsed.options` alongside `correctIndex`
+- Correct → `Correct answer selected: A) <option text>.`
+- Incorrect → `Incorrect. The correct answer was A) <option text>.`
+- Same enhancement in the `dimensions[0].comment` string
+- Fallback to current letter-only text if options can't be parsed
 
-6. **Review Cycles section** (lines 141–154): **delete entirely**.
-
-7. **Employee — My Skill Registry** (line 226): `'The Skill Registry is always available — no need to wait for an active review cycle.'` → `'The Skill Registry is always available — submit anytime.'`
-
-8. **"How the Platform Works" chip strip** (line 315): rename `'Auto-Generated Assessment'` → `'Assigned Assessment'`.
-
-### `src/stores/onboardingStore.ts`
-
-1. **Templates step** (line 42): `'Templates are the blueprint a Review Cycle uses to generate assessments.'` → `'Templates are the blueprint admins use when assigning assessments to employees.'`
-
-2. **`cycles` core tour step** (lines 52–56): **delete entirely**.
-
-3. **`admin-templates` extra step** (line 94): `'Required before activating a cycle.'` → `'Required before assigning an assessment.'`
+This only affects newly generated evaluations. Existing stored feedback strings will remain letter-only (acceptable; the EvalResults UI already shows the full correct answer with text in the answer box).
 
 ## Out of scope
-- No DB changes.
-- The Review Cycles page/route (if any) remains — only User Guide & Tour content is updated.
+
+- Non-MCQ question types (scenario/coding) — unchanged
+- Re-evaluating historical attempts
