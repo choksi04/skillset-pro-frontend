@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, ChevronDown, ChevronRight, Check, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
 import { useQuestionStore } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
 import {
@@ -51,6 +51,8 @@ export default function QuestionPickerSheet({
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // Reset buffered state when sheet opens
   useEffect(() => {
@@ -61,8 +63,14 @@ export default function QuestionPickerSheet({
       setLevelFilter("all");
       setTypeFilter("all");
       setExpanded(new Set());
+      setPage(1);
     }
   }, [open, initialSelectedIds]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, skillFilter, levelFilter, typeFilter]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
@@ -90,6 +98,15 @@ export default function QuestionPickerSheet({
       return display.includes(term) || skillName.includes(term);
     });
   }, [published, search, skillFilter, levelFilter, typeFilter, skillMap]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
+  const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, filtered.length);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -209,7 +226,7 @@ export default function QuestionPickerSheet({
             </p>
           ) : (
             <div className="space-y-2">
-              {filtered.map((q) => {
+              {pageItems.map((q) => {
                 const isOpen = expanded.has(q.id);
                 const isChecked = selected.has(q.id);
                 const formatted = formatQuestionForDisplay(q);
@@ -293,10 +310,41 @@ export default function QuestionPickerSheet({
           )}
         </div>
 
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between gap-2 px-6 py-2 border-t border-border bg-muted/20">
+            <span className="text-[11px] text-muted-foreground">
+              Showing {rangeStart}–{rangeEnd} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft size={13} />
+              </Button>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                Page {safePage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight size={13} />
+              </Button>
+            </div>
+          </div>
+        )}
+
         <SheetFooter className="px-6 py-3 border-t border-border bg-card">
           <div className="flex items-center justify-between w-full">
             <span className="text-xs text-muted-foreground">
-              {filtered.length} shown · {selected.size} selected
+              {filtered.length} match · {selected.size} selected
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
