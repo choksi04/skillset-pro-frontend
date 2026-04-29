@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
 import TemplateAssignmentsSheet from '@/components/templates/TemplateAssignmentsSheet';
 import { useAssignmentStore } from '@/stores/assignmentStore';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function AssessmentTemplatesPage() {
   const navigate = useNavigate();
@@ -25,12 +27,24 @@ export default function AssessmentTemplatesPage() {
   const [confirmDelete, setConfirmDelete] = useState<AssessmentTemplate | null>(null);
   const [assignFor, setAssignFor] = useState<AssessmentTemplate | null>(null);
   const [viewAssignmentsFor, setViewAssignmentsFor] = useState<AssessmentTemplate | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchTemplates();
     fetchDomains();
     fetchAssignments();
+    supabase.from('users').select('id, full_name').is('deleted_on', null).then(({ data }) => {
+      const m: Record<string, string> = {};
+      (data || []).forEach((u: any) => { m[u.id] = u.full_name; });
+      setUserMap(m);
+    });
   }, []);
+
+  const userName = (id: string | null) => (id && userMap[id]) || 'Unknown';
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return '—';
+    try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return '—'; }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -136,6 +150,14 @@ export default function AssessmentTemplatesPage() {
                         : 'Fixed question list'}
                       {' · '}
                       {t.duration_minutes} min · max {t.max_attempts} attempt{t.max_attempts > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/80 mt-1.5">
+                      Created by <span className="font-medium text-muted-foreground">{userName(t.created_by)}</span> {fmtDate(t.created_at)}
+                      {t.modified_at && (
+                        <>
+                          {' · '}Last updated by <span className="font-medium text-muted-foreground">{userName(t.modified_by)}</span> {fmtDate(t.modified_at)}
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
