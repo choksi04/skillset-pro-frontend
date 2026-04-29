@@ -125,6 +125,10 @@ export default function AssessmentsPage() {
             const status = getEffectiveStatus(a, attempt, review);
             const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
 
+            const assignment = getAssignmentByAssessmentId(a.id);
+            const assignerName = assignment?.assigned_by ? assignerNames[assignment.assigned_by] : null;
+            const assignedDate = assignment?.assigned_at ? new Date(assignment.assigned_at).toLocaleDateString() : null;
+
             return (
               <div
                 key={a.id}
@@ -145,6 +149,11 @@ export default function AssessmentsPage() {
                           : `${a.assessment_questions.length} questions`}
                       {' · '}{a.duration_minutes} min · {new Date(a.created_at).toLocaleDateString()}
                     </p>
+                    {assignedDate && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {assignerName ? `Assigned by ${assignerName} on ${assignedDate}` : `Assigned on ${assignedDate}`}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {attempt?.total_ai_score != null && (
