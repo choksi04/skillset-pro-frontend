@@ -512,6 +512,7 @@ export default function AssessmentTemplateEditPage() {
                               skillName={q ? skillNameMap.get(q.skill_id) : undefined}
                               levelLabel={q ? levelLabels[q.competency_level] : undefined}
                               onRemove={() => togglePickedQuestion(qid)}
+                              onClick={q ? () => setDetailQuestion(q) : undefined}
                             />
                           );
                         })}
