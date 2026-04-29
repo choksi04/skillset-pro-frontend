@@ -80,6 +80,7 @@ export default function AssessmentTemplateEditPage() {
     fetchDomains();
     fetchSkills();
     fetchQuestions();
+    fetchLevels();
     if (isNew) {
       fetchTemplates();
       return;
