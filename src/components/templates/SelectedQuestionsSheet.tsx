@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { useQuestionStore } from "@/stores/questionStore";
+import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
 import {
   useCompetencyLevelStore,
@@ -18,6 +18,7 @@ import {
 } from "@/stores/competencyLevelStore";
 import { formatQuestionForDisplay } from "@/lib/questionFormat";
 import SelectedQuestionRow from "./SelectedQuestionRow";
+import QuestionDetailSheet from "@/components/questions/QuestionDetailSheet";
 
 interface Props {
   open: boolean;
