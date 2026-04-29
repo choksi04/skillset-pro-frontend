@@ -109,20 +109,26 @@ export default function AssessmentTemplateEditPage() {
     })();
   }, [templateId, isNew]);
 
+  // Live page title (breadcrumb)
+  useEffect(() => {
+    const trimmed = name.trim();
+    if (isNew) {
+      setPageTitle(trimmed || "New Assessment Template");
+    } else {
+      setPageTitle(trimmed || "Edit Template");
+    }
+    return () => setPageTitle(null);
+  }, [name, isNew, setPageTitle]);
+
   const skillsForDomain = useMemo(() => {
     if (!domainId) return [];
     const skillIds = new Set(mappings.filter((m) => m.domain_id === domainId).map((m) => m.skill_id));
     return skills.filter((s) => skillIds.has(s.id) && s.status === "active");
   }, [domainId, mappings, skills]);
 
-  const filteredQuestions = useMemo(() => {
-    const q = questionSearch.trim().toLowerCase();
-    return questions
-      .filter((qq) => qq.status === "published")
-      .filter((qq) => !q || qq.question_text.toLowerCase().includes(q));
-  }, [questions, questionSearch]);
-
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
+  const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
+  const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
   // Validation
   const errors: string[] = [];
