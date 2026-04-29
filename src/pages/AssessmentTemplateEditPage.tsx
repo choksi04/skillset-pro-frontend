@@ -21,6 +21,7 @@ import { usePageTitleStore } from "@/stores/pageTitleStore";
 import QuestionPickerSheet from "@/components/templates/QuestionPickerSheet";
 import SelectedQuestionsSheet from "@/components/templates/SelectedQuestionsSheet";
 import SelectedQuestionRow from "@/components/templates/SelectedQuestionRow";
+import QuestionDetailSheet from "@/components/questions/QuestionDetailSheet";
 
 const ALL_QUESTION_TYPES = [
   { value: "mcq", label: "MCQ" },
