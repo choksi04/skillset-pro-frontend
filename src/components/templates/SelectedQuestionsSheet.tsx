@@ -100,6 +100,7 @@ export default function SelectedQuestionsSheet({
                 skillName={q ? skillMap.get(q.skill_id) : undefined}
                 levelLabel={q ? levelLabels[q.competency_level] : undefined}
                 onRemove={() => onRemove(id)}
+                onClick={q ? () => setDetailQuestion(q) : undefined}
               />
             ))
           )}
@@ -111,6 +112,16 @@ export default function SelectedQuestionsSheet({
           </Button>
         </SheetFooter>
       </SheetContent>
+
+      {detailQuestion && (
+        <QuestionDetailSheet
+          question={detailQuestion}
+          skillName={skillMap.get(detailQuestion.skill_id) ?? "Unknown"}
+          topicName={null}
+          onClose={() => setDetailQuestion(null)}
+          levelLabels={levelLabels}
+        />
+      )}
     </Sheet>
   );
 }
