@@ -1,60 +1,126 @@
-# Redesign Team Registry listing page
+# Redesign Team Registry Detail page
 
-Convert `src/pages/TeamRegistryPage.tsx` from the current card-list layout into a structured table that matches the attached mockup, while keeping all existing data sources, role-based scoping, and navigation behaviour intact.
+Rebuild `src/pages/TeamRegistryDetailPage.tsx` to match the attached mockup: a manager-facing review of an employee's submitted Skill Registry, with a per-skill side-by-side comparison of the employee self-assessment and the manager's evaluation, plus a single "Approve & Finalize" action.
 
-## Layout
+The "Request Changes" button is **hidden** for this iteration (mockup includes it as a secondary action; we'll leave a comment in code for future wiring).
+
+## Layout (top to bottom)
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Team Registries                                          [ Search… ]   [ Filter ]          │
-│ Review and manage skill assessments submitted by your team.                                │
-├────────────────────────────────────────────────────────────────────────────────────────────┤
-│ TEAM MEMBER          REGISTRY SUBJECT     STATUS         COMPLETION         AVG    ACTIONS│
-│ ◐ Alice Chen         Frontend Engineering [Up to date]   12/12 Rated 100%   ★ 4.8  Review▸│
-│   Senior Frontend…   Updated 1 day ago                   ▰▰▰▰▰▰▰▰▰▰                       │
-│ ...                                                                                        │
-└────────────────────────────────────────────────────────────────────────────────────────────┘
+← Back to Team Registries
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ ◐ Alice Chen   [Pending Review]                  [ Approve & Finalize ]      │
+│   Senior Frontend Eng · Frontend Engineering Registry                         │
+│                                                                              │
+│ TOTAL SKILLS  |  COMPLETION       |  EMPLOYEE AVG  |  MANAGER AVG (DRAFT)    │
+│      12       |  100% (12/12)     |     ★ 4.2      |        ★ 4.0            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Skill Review Breakdown
+Compare employee self-assessments with your evaluation.
+
+┌────────── JavaScript / TypeScript ───────────────────────────────────────────┐
+│  Languages                                                                   │
+│ ┌─────────── Employee Assessment ────────┬───── Manager Review ────────────┐ │
+│ │ ◐ Employee Assessment      4.5 / 5.0   │ ◯ Manager Review   Score: [4.5▾]│ │
+│ │ ▰▰▰▰▰▰▰▰▰▱                             │                                 │ │
+│ │ "Strong proficiency in ES6+, ..."      │ Agreed. Consistent high-quality │ │
+│ │                                        │ contributions in our React code.│ │
+│ └────────────────────────────────────────┴─────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+... one card per skill, grouped under category subtitles ...
 ```
 
-## Columns
+Alogn with TOTAL SKILLS  |  COMPLETION       |  EMPLOYEE AVG  |  MANAGER AVG (DRAFT) , show two more data, such as "Top Rated Skill, and Lowest Rated Skill with rates"
 
-1. **Team Member** — circular avatar (initials chip, `bg-primary/10 text-primary`), full name, designation as muted subtext.
-2. **Registry Subject** — domain name (foreground, semibold), `Updated {relative time}` muted subtext below.
-3. **Status** — pill badge derived from latest registry version:
-   - `submitted` and is the latest version → `Up to date` (success).
-   - `draft` exists for that employee → `In Progress` (info / blue tint).
-   - `submitted` but not latest expected (no current draft, but version count behind cycle) → `Needs Review` (warning).  *MVP rule: treat `submitted` with completion < 100% as `Needs Review`; otherwise `Up to date`.*
-4. **Completion** — `X / Y Rated` + `%` aligned right, `Progress` bar below. Bar turns `bg-success` when 100%, `bg-primary` otherwise. Y is the count of skills mapped to the registry's domain (from `domainStore.mappings`).
-5. **Avg Rating** — star icon + score scaled to **/5** (`avg / maxLevel * 5`, one decimal), consistent with My Registry. Use competency level count from `competencyLevelStore` (already loaded elsewhere; fetch here too).
-6. **Actions** — `Review ›` text-only link button → navigates to `/team-registry/{latestRegistryId}` (existing route).
+## Header band
 
-## Header
+- Back link: `← Back to Team Registries`.
+- Avatar (initials chip) + employee name + status pill:
+  - `Pending Review` (warning) if registry is submitted and not yet approved.
+  - `Approved` (success) once finalized.
+- Subtitle: `{designation} · {Domain} Registry`.
+- Right side: only `Approve & Finalize` (primary). `Request Changes` is **omitted** for now (TODO comment left in code).
+- Stat strip below header (4 small KPIs, no card backgrounds, label uppercase + value):
+  1. **Total Skills** — count of skills mapped to the registry's domain.
+  2. **Completion** — `% (X/Y)`.
+  3. **Employee Avg** — star + value scaled to /5 (`avg / maxLevel * 5`).
+  4. **Manager Avg (Draft)** — star + value computed from currently entered manager scores; falls back to employee avg if manager hasn't rated yet.
 
-- Page title `Team Registries` and the description from the mockup.
-- Right-aligned `Search` input (`Search members or roles…`) — filters by employee name and designation, case-insensitive.
-- `Filter` button opens a `Popover` with two `Select`s: **Status** (All / Up to date / Needs Review / In Progress) and **Domain** (All / each domain visible to the user).
+## Per-skill cards
 
-## Data & logic
+- Skills are grouped by category. Render each skill as a single rounded card with:
+  - **Title row**: `Skill name` (bold), category subtitle muted.
+  - **Two-column body** (1fr / 1fr; stacks on small screens):
+    - **Employee Assessment** (left): icon + label, score on the right (`X.X / 5.0`), thin progress bar below, then employee's comment as italic muted text. Read-only.
+    - **Manager Review** (right): icon + label, `Score:` label + numeric `Select` dropdown on the right (options pulled from `competency_levels`, displayed as numeric levels — same shape as employee scale). Below: editable single-line `Input` for the manager's comment, placeholder `+ Add Notes` styled muted when empty (renders as a button-link that focuses the input on click).
+- Save behaviour: debounced auto-save per field (score on change; comment 600 ms after typing stops). Show subtle "Saved" state via toast suppression — just rely on store-driven values.
 
-- Reuse `useSkillRegistryStore`, `useDomainStore`, `useCompetencyLevelStore`, `useSkillStore` (skills not strictly needed; domain mappings give the denominator).
-- Group registries by `employee_id`, pick the highest `version_number` per employee (existing logic).
-- Batch-fetch employee `full_name` and `designation` from `users` for ids not already cached.
-- Completion denominator = count of `domain_skill_mappings` for `latest.domain_id`. Numerator = `items.get(latest.id).length`.
-- Avg = mean of `self_score` across the latest registry's items, then scaled to `/5` using `competencyLevels.length` (fallback 5).
-- "Updated" timestamp = `submitted_at ?? modified_at ?? created_at`, rendered with the existing `formatRelative` helper (copy from `SkillRegistryPage.tsx`).
-- Role scoping unchanged: admins see everyone; managers see only their own `domain_id`.
+## Approve & Finalize
 
-## States
+- Confirms in an `AlertDialog`: `Finalize this registry review? Your scores and notes will be saved as the manager-validated record. This cannot be undone.`.
+- On confirm: updates the registry to `approved`, persists final manager scores/comments, sends a notification to the employee, and navigates back to `/team-registry`.
+- Disabled if the registry is not `submitted` or already approved.
 
-- **Loading**: render 4–5 skeleton rows that mirror the table layout.
-- **Empty (no registries)**: keep current empty-state copy, centered inside the table card.
-- **Empty after filter**: small inline message inside the table body — `No team members match your filters.`
+## Data model — new tables
 
-## Technical details
+Two new tables are needed. Manager edits are persisted at the granularity of a registry version, so a returning manager can resume their draft.
 
-- File touched: `src/pages/TeamRegistryPage.tsx` only (single component rewrite).
-- Components used: existing `Table*`, `Input`, `Button`, `Badge`, `Progress`, `Popover`, `Select`, `Skeleton`, `Card` — all already in the project.
-- Icons: `Search`, `Filter`, `Star`, `ChevronRight`, `Users` from `lucide-react`.
-- Avatar: derive 2-letter initials from `full_name`; render in a `rounded-full` div using semantic tokens (`bg-primary/10 text-primary`) — no hardcoded colours.
-- The whole row stays clickable (navigates to detail), with the explicit `Review` link as the visible affordance.
-- No store, route, or DB changes. No new dependencies.
+1. `registry_reviews` — one per `skill_registries.id`:
+  - `id uuid PK`
+  - `tenant_id text not null`
+  - `registry_id uuid not null` (FK-by-convention to `skill_registries.id`)
+  - `reviewer_id text not null`
+  - `status text not null default 'pending'` (`pending` | `approved`)
+  - `overall_comment text default ''`
+  - `created_by`, `created_at`, `modified_by`, `modified_at`, `deleted_by`, `deleted_on` — standard audit columns
+  - `completed_at timestamptz`
+  - **Unique** `(registry_id)` so only one active review per version.
+  - RLS: `Allow all` (MVP convention).
+2. `registry_review_items` — one per skill in that review:
+  - `id uuid PK`
+  - `review_id uuid not null` (FK-by-convention to `registry_reviews.id`)
+  - `skill_id text not null`
+  - `manager_score integer` (nullable until set; 1..maxLevel)
+  - `manager_comment text default ''`
+  - `created_at`, `modified_at`
+  - **Unique** `(review_id, skill_id)`.
+  - RLS: `Allow all`.
+
+A registry is considered "approved" when `registry_reviews.status = 'approved'`. The status pill in the header reads from this row; if no row exists yet, the manager is starting fresh and we lazy-create the review row on first edit.
+
+The previous `manager_reviews` table (assessment-driven) stays untouched — it's a different flow (assessment scoring), not registry approval.
+
+## Store changes
+
+Add `src/stores/registryReviewStore.ts` (Zustand) with:
+
+- `fetchReviewForRegistry(registryId)` — selects the review row + items.
+- `ensureReview(registryId, reviewerId, tenantId)` — returns existing or inserts new pending row.
+- `setItemScore(reviewId, skillId, score)` — upsert into `registry_review_items`.
+- `setItemComment(reviewId, skillId, comment)` — upsert.
+- `approveReview(reviewId, employeeId, tenantId)` — set status `approved`, completed_at; insert a `notifications` row for the employee.
+
+State is kept in maps keyed by `registry_id` so the page can re-mount without refetching.
+
+## Page wiring (`TeamRegistryDetailPage.tsx`)
+
+- Replace the current accordion layout with the design above.
+- On mount: fetch employee meta (`full_name`, `designation`), domains, skills, registry items, and the `registry_review` row.
+- Maintain local `managerScores` and `managerComments` mirrors of the store; debounce writes.
+- Manager Avg (draft) recomputes live from the local mirrors.
+- Approve action triggers `AlertDialog`, then `approveReview`.
+- Hide the Score select / comment input when the registry is already `approved`; show the saved manager values as read-only chips.
+
+## Technical notes
+
+- Files added:
+  - `src/stores/registryReviewStore.ts`
+- Files modified:
+  - `src/pages/TeamRegistryDetailPage.tsx` — full rewrite
+- Migrations:
+  - Create `registry_reviews` and `registry_review_items` tables with `Allow all` RLS, audit columns, and the unique constraints listed above.
+- No route, navigation, or other store changes.
+- Reuses existing primitives: `Card`, `Badge`, `Select`, `Input`, `Button`, `AlertDialog`, `Progress`, `Tooltip`. No new deps.
+- Avatar uses initials in `bg-primary/10 text-primary`. All colors via semantic tokens (no raw hex).
+- A new memory note will be added: `mem://features/team-registry/manager-review-of-registry` describing this approval flow (distinct from the assessment-driven `manager_reviews`).
