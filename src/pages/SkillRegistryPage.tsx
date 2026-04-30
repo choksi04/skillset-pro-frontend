@@ -327,7 +327,17 @@ export default function SkillRegistryPage() {
             </div>
 
             {/* Footer action */}
-            <div className="flex justify-end pt-4 border-t border-border">
+            <div className="flex justify-end items-center gap-2 pt-4 border-t border-border">
+              {featured.status === 'draft' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDiscardOpen(true)}
+                >
+                  <Trash2 size={14} /> Discard Draft
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="gap-1.5"
