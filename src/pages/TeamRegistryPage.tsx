@@ -15,7 +15,7 @@ export default function TeamRegistryPage() {
   const { registries, fetchRegistries, items, fetchItemsForRegistries, loading, initialized } = useSkillRegistryStore();
   const { domains, fetchDomains } = useDomainStore();
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const [namesLoading, setNamesLoading] = useState(true);
+  const [namesLoading, setNamesLoading] = useState(false);
 
   useEffect(() => {
     fetchRegistries();
@@ -33,16 +33,19 @@ export default function TeamRegistryPage() {
   useEffect(() => {
     if (!initialized) return;
     const employeeIds = [...new Set(teamRegistries.map((r) => r.employee_id))];
-    if (employeeIds.length === 0) {
+    const missing = employeeIds.filter((id) => !(id in userNames));
+    if (missing.length === 0) {
       setNamesLoading(false);
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name').in('id', employeeIds).then(({ data }) => {
+    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
       if (data) {
-        const map: Record<string, string> = {};
-        data.forEach((u: any) => { map[u.id] = u.full_name; });
-        setUserNames(map);
+        setUserNames((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.full_name; });
+          return next;
+        });
       }
       setNamesLoading(false);
     }, () => setNamesLoading(false));
@@ -85,7 +88,7 @@ export default function TeamRegistryPage() {
         <p className="text-sm text-muted-foreground mt-1">Monitor your team's skill self-assessments and version history.</p>
       </div>
 
-      {(loading && !initialized) || namesLoading ? (
+      {!initialized || namesLoading || teamRegistries.some((r) => !(r.employee_id in userNames)) ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="border-border">
