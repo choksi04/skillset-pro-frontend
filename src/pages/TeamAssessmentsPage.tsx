@@ -32,7 +32,7 @@ export default function TeamAssessmentsPage() {
   const navigate = useNavigate();
 
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const [namesLoading, setNamesLoading] = useState(true);
+  const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
 
@@ -43,16 +43,19 @@ export default function TeamAssessmentsPage() {
   useEffect(() => {
     if (!initialized) return;
     const ids = [...new Set(assessments.map((a) => a.employee_id))];
-    if (ids.length === 0) {
+    const missing = ids.filter((id) => !(id in userNames));
+    if (missing.length === 0) {
       setNamesLoading(false);
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name').in('id', ids).then(({ data }) => {
+    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
       if (data) {
-        const map: Record<string, string> = {};
-        data.forEach((u: any) => { map[u.id] = u.full_name; });
-        setUserNames(map);
+        setUserNames((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.full_name; });
+          return next;
+        });
       }
       setNamesLoading(false);
     }, () => setNamesLoading(false));
