@@ -75,6 +75,48 @@ export default function SkillRegistryPage() {
     if (reg) navigate(`/skill-registry/${reg.id}`);
   };
 
+  const isInitialLoading = (loading && !initialized) || !domainsInitialized || !skillsInitialized;
+
+  // Initial loading skeleton
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
+          <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-8 w-32" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // No domain warning
   if (!assignedDomain) {
     return (
