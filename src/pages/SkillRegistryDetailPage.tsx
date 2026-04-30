@@ -511,6 +511,58 @@ export default function SkillRegistryDetailPage() {
               {ratedItems.length > 0 ? avgOnFive.toFixed(1) : '—'}
             </p>
           </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Top Rated Skill</p>
+            <div className="mt-1 text-sm font-semibold text-success flex items-center gap-1.5 flex-wrap">
+              {ratedItems.length > 0 ? (
+                <>
+                  <span className="truncate">{topRatedNames[0]} (L{maxScore})</span>
+                  {topRatedNames.length > 1 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="text-[10px] cursor-help">+{topRatedNames.length - 1}</Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-0.5">
+                            {topRatedNames.slice(1).map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground font-normal">—</span>
+              )}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Lowest Rated Skill</p>
+            <div className="mt-1 text-sm font-semibold text-warning flex items-center gap-1.5 flex-wrap">
+              {ratedItems.length > 0 ? (
+                <>
+                  <span className="truncate">{lowestRatedNames[0]} (L{minScore})</span>
+                  {lowestRatedNames.length > 1 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="text-[10px] cursor-help">+{lowestRatedNames.length - 1}</Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-0.5">
+                            {lowestRatedNames.slice(1).map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground font-normal">—</span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
