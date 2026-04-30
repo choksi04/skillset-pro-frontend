@@ -17,16 +17,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
+  CheckCircle, Lock, Send, Search, Info, Tag,
   ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
 } from 'lucide-react';
 import {
