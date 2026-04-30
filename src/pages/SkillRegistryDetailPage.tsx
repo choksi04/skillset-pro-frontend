@@ -17,16 +17,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
+  CheckCircle, Lock, Send, Search, Info, Tag,
   ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
 } from 'lucide-react';
 import {
@@ -138,10 +135,15 @@ export default function SkillRegistryDetailPage() {
     }, 2000);
   }, [isDraft, submissionId, ratings, comments, saveDraft]);
 
-  const handleRatingChange = useCallback((skillId: string, rating: RatingLevel) => {
+  const handleRatingChange = useCallback((skillId: string, rating: RatingLevel | null) => {
     if (!isDraft) return;
     setRatings((prev) => {
-      const next = { ...prev, [skillId]: rating };
+      const next = { ...prev };
+      if (rating == null) {
+        delete next[skillId];
+      } else {
+        next[skillId] = rating;
+      }
       setTimeout(() => triggerAutoSave(), 0);
       return next;
     });
@@ -182,6 +184,22 @@ export default function SkillRegistryDetailPage() {
     });
     return map;
   }, [filteredSkills]);
+
+  const handleSaveDraftNow = useCallback(async () => {
+    if (!submissionId || !isDraft) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    setSaveStatus('saving');
+    const itemsList = Object.entries(ratings).map(([skill_id, self_score]) => ({
+      skill_id,
+      self_score,
+      comment: comments[skill_id] || null,
+    }));
+    await saveDraft(submissionId, itemsList);
+    isDirtyRef.current = false;
+    setSaveStatus('saved');
+    toast.success('Draft saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  }, [submissionId, isDraft, ratings, comments, saveDraft]);
 
   const handleSubmit = () => {
     if (!allRated) { toast.error('Please rate all skills before submitting'); return; }
@@ -240,17 +258,19 @@ export default function SkillRegistryDetailPage() {
   const allItems = useSkillRegistryStore.getState().items.get(registry.id) ?? [];
 
 
-  // Header used in DRAFT view (kept compact, original style)
+  // Header used in DRAFT view
   const draftHeader = (
     <div className="space-y-1">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
-        <ArrowLeft size={14} /> Back to My Registry
+      <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-primary hover:text-primary mb-1">
+        <ArrowLeft size={14} /> Back to Registries
       </Button>
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-        <Badge className="text-xs bg-warning/15 text-warning border-warning/20">Draft</Badge>
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Your Skillset Registry'}</h1>
+        <Badge className="text-xs bg-warning/15 text-warning border-warning/20 hover:bg-warning/15">Draft · v{registry.version_number}</Badge>
       </div>
-      <p className="text-xs text-muted-foreground">v{registry.version_number} · {pageDescription}</p>
+      {assignedDomain?.description && (
+        <p className="text-sm text-muted-foreground">{assignedDomain.description}</p>
+      )}
     </div>
   );
 
@@ -274,7 +294,9 @@ export default function SkillRegistryDetailPage() {
           onRatingChange={handleRatingChange}
           onCommentChange={handleCommentChange}
           onSubmit={handleSubmit}
+          onSaveDraft={handleSaveDraftNow}
           skills={skills}
+          maxLevel={maxLevel}
         />
 
         {/* Confirm Dialog */}
@@ -502,7 +524,7 @@ export default function SkillRegistryDetailPage() {
 function SelfReviewForm({
   domainSkills, filteredSkills, groupedSkills, ratings, comments, previousRatings,
   ratedCount, allRated, search, saveStatus,
-  onSearchChange, onRatingChange, onCommentChange, onSubmit, skills,
+  onSearchChange, onRatingChange, onCommentChange, onSubmit, onSaveDraft, skills, maxLevel,
 }: {
   domainSkills: Skill[];
   filteredSkills: Skill[];
@@ -515,126 +537,245 @@ function SelfReviewForm({
   search: string;
   saveStatus: 'idle' | 'saving' | 'saved';
   onSearchChange: (v: string) => void;
-  onRatingChange: (skillId: string, rating: RatingLevel) => void;
+  onRatingChange: (skillId: string, rating: RatingLevel | null) => void;
   onCommentChange: (skillId: string, comment: string) => void;
   onSubmit: () => void;
+  onSaveDraft: () => void;
   skills: Skill[];
+  maxLevel: number;
 }) {
+  const [activeSkillId, setActiveSkillId] = useState<string | null>(null);
+
+  // Average across rated items, scaled to /5
+  const ratedValues = Object.values(ratings);
+  const avgRaw = ratedValues.length > 0 ? ratedValues.reduce((s, v) => s + v, 0) / ratedValues.length : 0;
+  const avgOnFive = maxLevel > 0 ? (avgRaw / maxLevel) * 5 : 0;
+  const completionPct = domainSkills.length > 0 ? Math.round((ratedCount / domainSkills.length) * 100) : 0;
+
+  // Stars for /5 display
+  const starFull = Math.floor(avgOnFive);
+  const starHalf = avgOnFive - starFull >= 0.5;
+
+  const scrollToCategory = (cat: string) => {
+    const el = document.getElementById(`reg-cat-${cat}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Progress value={domainSkills.length > 0 ? (ratedCount / domainSkills.length) * 100 : 0} className="h-2 w-40" />
-            <span className="text-xs text-muted-foreground font-medium">{ratedCount} of {domainSkills.length} skills rated</span>
-            {saveStatus === 'saving' && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Saving...</span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="text-xs text-success flex items-center gap-1"><CheckCircle size={12} /> Saved</span>
-            )}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+        {/* LEFT: Categories + skill cards */}
+        <div className="space-y-8 min-w-0">
+          {/* Search */}
           {domainSkills.length > 0 && (
-            <div className="relative max-w-xs">
+            <div className="relative max-w-md">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search skills..." value={search} onChange={(e) => onSearchChange(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
+              <Input
+                placeholder="Search skills..."
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-8 h-9 text-sm"
+                maxLength={100}
+              />
             </div>
           )}
-        </div>
 
-        {domainSkills.length === 0 ? (
-          <div className="text-center py-12 text-sm text-muted-foreground">No skills mapped to this domain yet.</div>
-        ) : groupedSkills.size === 0 ? (
-          <div className="text-center py-12 text-sm text-muted-foreground">No skills match your search.</div>
-        ) : (
-          <Accordion type="multiple" defaultValue={[]} className="space-y-3">
-            {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => {
-              const catRatedCount = catSkills.filter((s) => ratings[s.id] != null).length;
-              const allCatRated = catRatedCount === catSkills.length;
-              return (
-                <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
-                  <AccordionTrigger className="px-5 py-3 hover:no-underline">
-                    <div className="flex items-center gap-3 text-left flex-1">
-                      <FolderOpen size={16} className="text-primary shrink-0" />
-                      <div className="flex-1">
-                        <span className="font-semibold text-card-foreground">{catName}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">({catSkills.length} skill{catSkills.length !== 1 ? 's' : ''})</span>
-                      </div>
-                      <div className="flex items-center gap-2 mr-2">
-                        <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${catSkills.length > 0 ? (catRatedCount / catSkills.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className={`text-xs font-medium ${allCatRated ? 'text-success' : 'text-muted-foreground'}`}>{catRatedCount}/{catSkills.length}</span>
-                        {allCatRated && <CheckCircle size={14} className="text-success" />}
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-0 pb-0">
-                    <div className="divide-y divide-border">
-                      {catSkills.map((skill) => (
-                        <div key={skill.id} className="px-5 py-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-medium text-card-foreground">{skill.skill_name}</p>
-                                {skill.skill_description && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild><Info size={13} className="text-muted-foreground cursor-help shrink-0" /></TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs text-xs">{skill.skill_description}</TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </div>
-                              {(skill.tags || []).length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {skill.tags.map((tag) => (
-                                    <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5"><Tag size={9} />{tag}</span>
-                                  ))}
-                                </div>
+          {domainSkills.length === 0 ? (
+            <div className="text-center py-12 text-sm text-muted-foreground">No skills mapped to this domain yet.</div>
+          ) : groupedSkills.size === 0 ? (
+            <div className="text-center py-12 text-sm text-muted-foreground">No skills match your search.</div>
+          ) : (
+            Array.from(groupedSkills.entries()).map(([catName, catSkills]) => (
+              <section key={catName} id={`reg-cat-${catName}`} className="space-y-4 scroll-mt-6">
+                {/* Category header */}
+                <div className="space-y-1 border-b border-border pb-2">
+                  <h3 className="text-base font-semibold text-foreground">{catName}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {catSkills.length} skill{catSkills.length !== 1 ? 's' : ''} in this category.
+                  </p>
+                </div>
+
+                {/* Skill cards */}
+                <div className="space-y-4">
+                  {catSkills.map((skill) => {
+                    const isActive = activeSkillId === skill.id;
+                    const isRated = ratings[skill.id] != null;
+                    return (
+                      <div
+                        key={skill.id}
+                        onClick={() => setActiveSkillId(skill.id)}
+                        className={`rounded-xl border bg-card p-5 space-y-4 transition-all ${
+                          isActive ? 'ring-1 ring-primary/40 border-primary/40' : 'border-border hover:border-primary/20'
+                        }`}
+                      >
+                        {/* Title row */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold text-foreground">{skill.skill_name}</p>
+                              {skill.skill_description && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info size={13} className="text-muted-foreground cursor-help shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs text-xs">{skill.skill_description}</TooltipContent>
+                                </Tooltip>
+                              )}
+                              {isRated && (
+                                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">Rated</Badge>
                               )}
                             </div>
-                            {ratings[skill.id] != null && (
-                              <Badge variant="secondary" className="text-xs ml-3 shrink-0">L{ratings[skill.id]} — {getRatingLabels(useCompetencyLevelStore.getState().levels)[ratings[skill.id]] ?? `Level ${ratings[skill.id]}`}</Badge>
+                            {(skill.tags || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {skill.tags.map((tag) => (
+                                  <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                                    <Tag size={9} />{tag}
+                                  </span>
+                                ))}
+                              </div>
                             )}
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Assess your current proficiency. Click a level again to clear it.
+                            </p>
                           </div>
+                        </div>
+
+                        {/* Proficiency Level */}
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-foreground">Proficiency Level</p>
                           <RatingSlider
                             value={ratings[skill.id] ?? null}
                             onChange={(rating) => onRatingChange(skill.id, rating)}
                             disabled={false}
                             previousRating={previousRatings[skill.id]}
+                            variant="card"
+                            allowUnselect
                           />
-                          <Collapsible className="mt-2">
-                            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                              <MessageSquare size={12} />
-                              {comments[skill.id] ? 'Edit comment' : 'Add comment'}
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="mt-2">
-                              <Textarea
-                                placeholder="Optional notes about your experience with this skill..."
-                                value={comments[skill.id] || ''}
-                                onChange={(e) => onCommentChange(skill.id, e.target.value)}
-                                className="text-xs min-h-[60px]"
-                                maxLength={500}
-                              />
-                            </CollapsibleContent>
-                          </Collapsible>
                         </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        )}
 
-        {domainSkills.length > 0 && (
-          <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{ratedCount}/{domainSkills.length} skills rated</p>
-            <Button size="sm" onClick={onSubmit} disabled={!allRated} className="gap-1.5">
-              <Send size={14} /> Submit Registry
-            </Button>
+                        {/* Supporting Details (collapsible) */}
+                        <Collapsible defaultOpen={!!comments[skill.id]}>
+                          <div className="flex items-center justify-between">
+                            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors">
+                              <MessageSquare size={12} />
+                              Supporting Details
+                            </CollapsibleTrigger>
+                            <span className="text-[10px] text-muted-foreground">Optional, but recommended</span>
+                          </div>
+                          <CollapsibleContent className="mt-2">
+                            <Textarea
+                              placeholder="Add context, recent projects, or examples to support your rating..."
+                              value={comments[skill.id] || ''}
+                              onChange={(e) => onCommentChange(skill.id, e.target.value)}
+                              onFocus={() => setActiveSkillId(skill.id)}
+                              className="text-xs min-h-[70px]"
+                              maxLength={500}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          )}
+        </div>
+
+        {/* RIGHT: Registry Summary (sticky) */}
+        <aside className="lg:sticky lg:top-6 lg:self-start space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Registry Summary</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Your progress at a glance</p>
+            </div>
+
+            {/* Current Average */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-center space-y-2">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Current Average</p>
+              <p className="text-3xl font-semibold text-foreground leading-none">
+                {ratedCount > 0 ? avgOnFive.toFixed(1) : '—'}
+                <span className="text-sm font-normal text-muted-foreground"> / 5.0</span>
+              </p>
+              <div className="flex items-center justify-center gap-0.5">
+                {[0, 1, 2, 3, 4].map((i) => {
+                  if (i < starFull) return <Star key={i} size={14} className="fill-amber-400 text-amber-400" />;
+                  if (i === starFull && starHalf) return (
+                    <span key={i} className="relative inline-block w-[14px] h-[14px]">
+                      <Star size={14} className="absolute inset-0 text-amber-400" />
+                      <span className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                        <Star size={14} className="fill-amber-400 text-amber-400" />
+                      </span>
+                    </span>
+                  );
+                  return <Star key={i} size={14} className="text-muted-foreground/40" />;
+                })}
+              </div>
+            </div>
+
+            {/* Completion */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-medium text-foreground">Completion</p>
+                <p className="text-[11px] font-semibold text-primary">{completionPct}%</p>
+              </div>
+              <Progress value={completionPct} className="h-1.5" />
+              <p className="text-[11px] text-muted-foreground">{ratedCount} of {domainSkills.length} skills rated</p>
+            </div>
+
+            {/* Categories */}
+            {groupedSkills.size > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium text-foreground">Categories</p>
+                <div className="space-y-1">
+                  {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => {
+                    const rated = catSkills.filter((s) => ratings[s.id] != null).length;
+                    const done = rated === catSkills.length;
+                    return (
+                      <button
+                        key={catName}
+                        onClick={() => scrollToCategory(catName)}
+                        className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          {done ? (
+                            <CheckCircle size={12} className="text-success shrink-0" />
+                          ) : (
+                            <span className="w-3 h-3 rounded-full border border-muted-foreground/40 shrink-0" />
+                          )}
+                          <span className="truncate text-foreground">{catName}</span>
+                        </span>
+                        <span className={`text-[10px] font-medium shrink-0 ${done ? 'text-success' : 'text-muted-foreground'}`}>
+                          {rated}/{catSkills.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Save status */}
+            <div className="min-h-[16px] text-[11px]">
+              {saveStatus === 'saving' && (
+                <span className="text-muted-foreground flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Saving…</span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-success flex items-center gap-1"><CheckCircle size={11} /> All changes saved</span>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-1">
+              <Button size="sm" onClick={onSubmit} disabled={!allRated} className="w-full gap-1.5">
+                <Send size={14} /> Submit Registry
+              </Button>
+              <Button size="sm" variant="outline" onClick={onSaveDraft} className="w-full">
+                Save as Draft
+              </Button>
+            </div>
           </div>
-        )}
+        </aside>
       </div>
     </TooltipProvider>
   );
