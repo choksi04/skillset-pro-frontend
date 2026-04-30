@@ -188,6 +188,22 @@ export default function SkillRegistryDetailPage() {
     return map;
   }, [filteredSkills]);
 
+  const handleSaveDraftNow = useCallback(async () => {
+    if (!submissionId || !isDraft) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    setSaveStatus('saving');
+    const itemsList = Object.entries(ratings).map(([skill_id, self_score]) => ({
+      skill_id,
+      self_score,
+      comment: comments[skill_id] || null,
+    }));
+    await saveDraft(submissionId, itemsList);
+    isDirtyRef.current = false;
+    setSaveStatus('saved');
+    toast.success('Draft saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  }, [submissionId, isDraft, ratings, comments, saveDraft]);
+
   const handleSubmit = () => {
     if (!allRated) { toast.error('Please rate all skills before submitting'); return; }
     setConfirmOpen(true);
