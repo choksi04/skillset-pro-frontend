@@ -1,55 +1,73 @@
-# Redesign My Registry → Detail Page
+# Redesign: My Registry — Editing (Draft) Page
 
-Restyle `src/pages/SkillRegistryDetailPage.tsx` to match the mockup. Only the **submitted (read-only)** view is redesigned. The draft self-review form (`SelfReviewForm`) is unchanged in behavior, only entered via the new "Edit Ratings" action. Routes, store calls, and submit flow are untouched.
+Restructure the draft self-review form to match the mockup's two-column layout. Existing labels, terminology (skill, level, registry), and data model stay unchanged — only the UI shell, grouping treatment, and side panel change.
 
-## Visual changes (submitted view)
+## Layout
 
-### Header row
+```text
+┌──────────────────────────────────────────────────────┬──────────────────┐
+│ ← Back to Registries                                 │  Registry Summary│
+│ <Domain Name>                                        │                  │
+│                                                      │  CURRENT AVERAGE │
+│ ── <Category 1> ─────────────────────────────────    │     4.3 / 5.0    │
+│ <category description / skill count>                 │     ★★★★½        │
+│                                                      │                  │
+│  ┌─ Skill Card ─────────────────────────────────┐    │  Completion 75%  │
+│  │ Skill name        [optional level pill]      │    │  ▓▓▓▓▓▓▓░░       │
+│  │ short prompt text                            │    │  6 of 8 rated    │
+│  │ Proficiency Level                            │    │                  │
+│  │ [ 1 ][ 2 ][ 3 ][ 4* ][ 5 ]   (segmented)     │    │  Skills          │
+│  │ Supporting Details   (Optional)              │    │  ✓ Languages 4/4 │
+│  │ [ textarea ]                                 │    │  ○ Frameworks 2/4│
+│  └──────────────────────────────────────────────┘    │                  │
+│                                                      │  [Submit Reg.]   │
+│  ┌─ Skill Card ─────────────────────────────────┐    │  [Save as Draft] │
+│  │ ...                                          │    │                  │
+│                                                      │ (sticky)         │
+│ ── <Category 2> ─────────────────────────────────    │                  │
+│  ...                                                 │                  │
+└──────────────────────────────────────────────────────┴──────────────────┘
+```
 
-- Replace current "Your Skillset Registry" title block with:
-  - **"← Back to Registries"** ghost link (replaces current "Back to My Registry" — points to `/skill-registry`).
-  - Title row: bold **{domain.name}** + green **"Up to date"** pill (or amber **Draft** when applicable).
-  - Subtitle: domain description (`assignedDomain.description`); fallback to a generic line if empty.
-  - Right side: **"Viewing: Version N (Latest)"** dropdown built with shadcn `DropdownMenu` (or `Select`), listing all submitted versions for this employee. Selecting an item navigates to that registry's detail page. The current version is marked "(Latest)" if it equals the highest version_number.
-- Thin divider below the header.
+## Changes — `src/pages/SkillRegistryDetailPage.tsx` (`SelfReviewForm` only)
 
-### Stats strip
+### Page shell
 
-A single horizontal flex row (no card borders), 3 stats separated by spacing. Each stat:
+- Replace the single-column accordion layout with a `grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8` wrapper.
+- Keep the existing top header (back link, domain title, draft badge) above the grid; move the small progress + search controls into the right panel and the top of the left column respectively.
 
-- Uppercase muted label (`TOTAL SKILLS`, `COMPLETION`, `AVG RATING`).
-- Value below in larger text:
-  - **Total Skills**: `{domainSkills.length}` (count of skills mapped to the domain).
-  - **Completion**: `{percentage}% ({rated}/{total})` — percentage in primary blue.
-  - **Avg Rating**: amber star icon + `{avg.toFixed(1)}` (mapped to /5 scale using maxLevel).
-  - **Top Rated:** Show the top rated skill with rate
-    **Lowest Rated:** Show the least rated skill with rate  
+### Left column — categories and skill cards
 
-- Thin divider below the strip.
+- Render each category as an open section (no accordion / no collapse): a section header showing category name, optional one-line description (skill count), and a thin divider.
+- Below the header, render each skill as an always-expanded **Skill Card** (`rounded-xl border bg-card p-5 space-y-4`). No accordions, no separate "Add comment" collapsible.
+- Skill Card contents (top to bottom):
+  1. Title row: skill name (semibold), optional info tooltip, tags, and a small right-aligned status pill (e.g. "Initial rating" / "Updated") when applicable.
+  2. Short prompt line: keep current copy ("Assess your current proficiency...") in muted text.
+  3. **Proficiency Level** label + segmented 5-button selector. Reuse `RatingSlider` but switch to a taller card-like button: each button shows the level number prominently with the short label below (derived from `getRatingLabels(levels)`). Selected button gets primary border + soft primary background; unselected stays neutral. The selected-state description block stays below.
+  4. Allow unselect as well.
+  5. **Supporting Details** label with `Optional, but recommended` muted hint on the right; always-visible `Textarea` (collapsible).
+- Active card emphasis: the card the user is currently rating gets a `ring-1 ring-primary/40 border-primary/40` treatment (driven by a local `activeSkillId` state set on focus / click).
 
-### Skill Breakdown section
+### Right column — Registry Summary (sticky)
 
-- Section header row: **"Skill Breakdown"** title + right-aligned **"Edit Ratings"** outline button (pencil icon). Clicking creates/opens a draft via `createNewVersion` and navigates to it (only enabled when viewing latest submitted version; hidden for drafts since edit mode already shows the form).
-- Table-style list inside a rounded bordered container. Columns:
-  1.  **SKILL / Category**— skill name (medium), category name muted below.
-  2. **RATING** — `{score}.0 / {max}.0` text + horizontal `Progress` bar (primary fill).
-  3. **SELF-ASSESSMENT DETAILS** — comment text in muted color (italic empty placeholder when missing).
-- Rows separated by `divide-y`. Skills are listed flat (no accordion); sorted by category then skill name to keep grouping visible.
-- For drafts, the existing `SelfReviewForm` continues to render (no change).
+- `sticky top-6 self-start rounded-xl border bg-card p-5 space-y-5` panel.
+- Sections, top to bottom:
+  - Title "Registry Summary" + small caption "Your progress at a glance".
+  - **Current Average** tile: large numeric average on the 5.0 scale (`avgOnFive.toFixed(1)`), `/ 5.0` muted, half-star row underneath (reuse the same star-rendering pattern already used on the Registry list page).
+  - **Completion**: percentage on the right, progress bar, "X of Y skills rated" line.
+  - **Categories** list: one row per category with a check icon (success) when fully rated or empty circle when partial, label, and `rated/total` count on the right. Clicking a row scrolls the matching category section into view (`element.scrollIntoView({ behavior: 'smooth' })`).
+  - Action buttons stacked: primary `Submit Registry` (disabled when not all rated) and a secondary `Save as Draft` outline button that flushes the pending auto-save immediately and shows a toast.
+- Auto-save indicator (Saving… / Saved) moves to a small line above the action buttons.
 
-### Removed/relocated
+### Behavior preserved
 
-- Remove the 3-card "Average / Top / Lowest" summary block (replaced by stats strip).
-- Remove the read-only Accordion grouping (replaced by flat table).
-- Search input is removed from the read-only view (not in mockup).
+- Auto-save debounce, `handleRatingChange`, `handleCommentChange`, search (kept as a small input above the first category), submit confirm dialog — all unchanged.
+- `previousRatings` "Last cycle" hint continues to appear inside `RatingSlider` (no behavior change).
+- Submitted (read-only) view is **not** touched.
 
-## Technical details
+## Technical notes
 
-- File touched: `src/pages/SkillRegistryDetailPage.tsx` only.
-- Use `useCompetencyLevelStore().levels.length` (fallback 5) for max level; render rating as `(score / max * 5)` for the `/5.0` display + Progress bar percentage = `score/max*100`.
-- Version dropdown: filter `registries` for `employee_id === employeeId && status === 'submitted'`, sort desc by version_number. Use shadcn `DropdownMenu` with `Button variant="outline"` trigger.
-- Star icon: lucide `Star` filled with `fill-amber-400 text-amber-400`.
-- "Back to Registries" → label updated; route unchanged.
-- Skeleton/loading states: existing `if (!registry)` fallback retained; add a small skeleton block when items aren't loaded yet (avoid 0/0 flash) by gating the stats/table on `itemsLoaded`.
-- No store/schema/route changes. No new dependencies.
-- Update memory `mem://features/skill-registry/detail-view-design` after implementation to note: header with version switcher, horizontal stats strip, flat skill breakdown table with progress bars and comment column, "Edit Ratings" entry point.
+- All edits in `src/pages/SkillRegistryDetailPage.tsx`. Minor variant tweak inside `src/components/registry/RatingSlider.tsx` to render number-on-top + label-below buttons, gated by an optional `variant?: 'compact' | 'card'` prop so other usages stay unchanged.
+- Use only existing semantic tokens (`bg-card`, `border-border`, `text-primary`, `text-success`, `text-muted-foreground`). No raw colors.
+- No new dependencies, no DB or store changes, no routing changes.
+- Responsive: on `<lg`, the grid collapses to one column and the summary panel renders inline above the categories (non-sticky).
