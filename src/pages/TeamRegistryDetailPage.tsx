@@ -398,14 +398,28 @@ export default function TeamRegistryDetailPage() {
                               onValueChange={(v) => handleScoreChange(skill.id, v)}
                               disabled={!isReviewable}
                             >
-                              <SelectTrigger className="h-8 w-20 text-xs">
-                                <SelectValue placeholder="—" />
+                              <SelectTrigger className="h-8 w-44 text-xs">
+                                <SelectValue placeholder="Select level">
+                                  {mgrScore != null
+                                    ? (() => {
+                                        const lvl = scoreOptions.find((l) => l.level === mgrScore);
+                                        return lvl
+                                          ? `L${lvl.level} · ${lvl.label ?? lvl.name ?? ""}`.trim()
+                                          : `L${mgrScore}`;
+                                      })()
+                                    : null}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {scoreOptions.map((l) => (
                                   <SelectItem key={l.id} value={String(l.level)}>
-                                    {/* /* {((l.name / maxLevel) * 5).toFixed(1)} */ */}
-                                    {l.label} + {l.name}
+                                    <span className="font-medium">L{l.level}</span>
+                                    {l.label ? (
+                                      <span className="text-muted-foreground"> — {l.label}</span>
+                                    ) : null}
+                                    {l.name ? (
+                                      <span className="text-muted-foreground"> ({l.name})</span>
+                                    ) : null}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

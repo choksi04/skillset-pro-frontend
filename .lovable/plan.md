@@ -1,31 +1,77 @@
-# Add Top Rated / Lowest Rated Skill stats to My Registry detail
+## Problem
 
-The **My Registry detail** page (`src/pages/SkillRegistryDetailPage.tsx`, submitted/read-only view) currently shows three KPIs in its stats strip: **Total Skills**, **Completion**, and **Avg Rating**. Add two more on the same row: **Top Rated Skill** and **Lowest Rated Skill**.
+On the **Team Registry Detail Page**, when a manager picks a score for a skill, the dropdown items render as `NaN` (or a confusing `label + name` string with a literal "+" character). Root cause is in `src/pages/TeamRegistryDetailPage.tsx` around line 405–409:
 
-The Team Registry detail page already has these (added in the previous turn) — this brings the employee-facing view in line.
-
-## Layout
-
-Same horizontal stats strip, two extra cells appended:
-
-```text
-TOTAL SKILLS  COMPLETION         AVG RATING   TOP RATED SKILL          LOWEST RATED SKILL
-    12        100% (12/12)        ★ 4.2       React (L5)               Jest (L3)
-                                              +2 more (tooltip)
+```tsx
+<SelectItem key={l.id} value={String(l.level)}>
+  {/* /* {((l.name / maxLevel) * 5).toFixed(1)} */ */}
+  {l.label} + {l.name}
+</SelectItem>
 ```
 
-## Behaviour
+- `l.name` is a string, so any prior arithmetic on it produced `NaN`.
+- The leftover `+` between `label` and `name` renders as literal text.
+- The `SelectTrigger` is `w-20` — too narrow to display a level + label cleanly when selected.
 
-- **Top Rated Skill**: skill(s) with the highest `self_score` in the current submitted version. Display first skill name + `(L{score})`. If multiple skills tie at the max, show a `+N` chip (with tooltip listing the rest), matching the existing pattern used on the Team Registry detail page.
-- **Lowest Rated Skill**: same shape, for the lowest `self_score`. Ties handled identically.
-- If the registry has no rated items, both cells render `—` (consistent with Avg Rating's empty state).
-- Values stay text-based (no extra cards) so the strip keeps its current minimalist look. Top/Lowest values get subtle color hints — `text-success` and `text-warning` respectively — to visually echo "best/worst" without adding icons or chrome.
-- Strip uses `flex-wrap` already, so the two new cells flow to a second row on narrow viewports.
+## Fix
 
-## Technical notes
+Update the manager score `Select` in `src/pages/TeamRegistryDetailPage.tsx` to show competency levels properly, sourced dynamically from `competency_levels` (per the project's dynamic competency levels rule).
 
-- Files modified:
-  - `src/pages/SkillRegistryDetailPage.tsx` — extend the existing stats block (around lines 396 and 489–508).
-- Compute `maxScore` / `minScore` from `ratedItems` and resolve names via the existing `skills` store. No new fetches, no schema changes.
-- Reuse the inline tie-tooltip pattern already present in `TeamRegistryDetailPage.tsx` (small `+N` `Badge` with `Tooltip` listing the remaining skill names) so behaviour matches across both pages.
-- Documentation (`mem://features/skill-registry/summary-metrics`) gets a one-line update noting that the submitted-view stats now include Top/Lowest Rated alongside Avg Rating.
+### Changes
+
+1. **Dropdown items** — render each option as:
+   ```
+   L{level} — {label} ({name})
+   ```
+   Example: `L3 — Proficient (Independent)`
+
+2. **Selected value (trigger)** — show a compact form:
+   ```
+   L{level} · {label}
+   ```
+   Example: `L3 · Proficient`
+   Use a custom child inside `<SelectValue>` so the trigger shows the friendly label rather than the raw numeric value.
+
+3. **Trigger width** — widen `SelectTrigger` from `w-20` to `w-44` (or `min-w-[11rem]`) so the level + label fits without truncation. Keep `text-xs` and `h-8`.
+
+4. **Fallback** — if `label` or `name` is missing on a level row, gracefully fall back to just `L{level}`.
+
+### Technical snippet (target shape)
+
+```tsx
+<Select
+  value={mgrScore != null ? String(mgrScore) : ""}
+  onValueChange={(v) => handleScoreChange(skill.id, v)}
+  disabled={!isReviewable}
+>
+  <SelectTrigger className="h-8 w-44 text-xs">
+    <SelectValue placeholder="Select level">
+      {mgrScore != null
+        ? (() => {
+            const lvl = scoreOptions.find((l) => l.level === mgrScore);
+            return lvl ? `L${lvl.level} · ${lvl.label}` : `L${mgrScore}`;
+          })()
+        : null}
+    </SelectValue>
+  </SelectTrigger>
+  <SelectContent>
+    {scoreOptions.map((l) => (
+      <SelectItem key={l.id} value={String(l.level)}>
+        <span className="font-medium">L{l.level}</span>
+        <span className="text-muted-foreground"> — {l.label}</span>
+        {l.name ? <span className="text-muted-foreground"> ({l.name})</span> : null}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+### Files touched
+
+- `src/pages/TeamRegistryDetailPage.tsx` — fix the SelectItem rendering, add controlled SelectValue child, widen the trigger.
+
+### Out of scope
+
+- No DB/schema changes. `competency_levels` already provides `level`, `label`, `name`.
+- No changes to the score persistence logic (`handleScoreChange`) — value sent stays as the numeric level.
+- No changes to the Self-Rated side or Approved (read-only) view.
