@@ -24,6 +24,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import SearchableSelect from '@/components/ui/searchable-select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   ClipboardCheck, CheckCircle, MessageSquare,
@@ -315,7 +316,7 @@ function ReviewCard({ review }: { review: ManagerReview }) {
 }
 
 export default function ReviewsPage() {
-  const { reviews, fetchReviews } = useReviewStore();
+  const { reviews, fetchReviews, loading: reviewsLoading, initialized: reviewsInitialized } = useReviewStore();
   const { currentRole, user } = useAuth();
   const { fetchAssessments } = useAssessmentStore();
   const { fetchAttempts } = useAttemptStore();
@@ -354,7 +355,26 @@ export default function ReviewsPage() {
         </div>
       )}
 
-      {isManager && filteredReviews.length === 0 && (
+      {isManager && reviewsLoading && !reviewsInitialized && (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isManager && reviewsInitialized && filteredReviews.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20">
           <ClipboardCheck size={32} className="text-muted-foreground mb-3" />
           <h2 className="text-lg font-semibold text-foreground mb-1">No Reviews Pending</h2>

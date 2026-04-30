@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +39,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function AssessmentTemplatesPage() {
   const navigate = useNavigate();
-  const { templates, fetchTemplates, deleteTemplate, setTemplateStatus, loading } = useTemplateStore();
+  const { templates, fetchTemplates, deleteTemplate, setTemplateStatus, loading, initialized } = useTemplateStore();
   const { domains, fetchDomains } = useDomainStore();
   const { assignments, fetchAssignments, getAssignmentsForTemplate } = useAssignmentStore();
   const [search, setSearch] = useState("");
@@ -125,8 +126,33 @@ export default function AssessmentTemplatesPage() {
         />
       </div>
 
-      {loading && filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Loading templates…</p>
+      {loading && !initialized ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-4 w-16 rounded-full" />
+                      <Skeleton className="h-4 w-14 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-8 w-12" />
+                    <Skeleton className="h-8 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <Card className="border-dashed border-2 border-muted-foreground/20">
           <CardContent className="p-8 flex flex-col items-center text-center">

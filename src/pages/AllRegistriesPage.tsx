@@ -15,6 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3 } from 'lucide-react';
 
 interface SkillAgg {
@@ -70,7 +71,7 @@ function downloadCSV(csv: string, filename: string) {
 
 export default function AllRegistriesPage() {
   const navigate = useNavigate();
-  const { registries, fetchRegistries, fetchItems } = useSkillRegistryStore();
+  const { registries, fetchRegistries, fetchItems, loading: regsLoading, initialized: regsInit } = useSkillRegistryStore();
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
 
@@ -241,7 +242,23 @@ export default function AllRegistriesPage() {
         </Select>
       </div>
 
-      {viewMode === 'skills' && (
+      {regsLoading && !regsInit ? (
+        <div className="rounded-lg border border-border p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-4 w-12" />
+            </div>
+          ))}
+        </div>
+      ) : viewMode === 'skills' && (
         filteredSkills.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
@@ -281,7 +298,7 @@ export default function AllRegistriesPage() {
         )
       )}
 
-      {viewMode === 'employees' && (
+      {!(regsLoading && !regsInit) && viewMode === 'employees' && (
         filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />

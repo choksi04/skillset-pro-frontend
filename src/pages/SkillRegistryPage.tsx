@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -29,9 +30,9 @@ export default function SkillRegistryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading } = useSkillRegistryStore();
-  const { domains, mappings, fetchDomains } = useDomainStore();
-  const { skills, fetchSkills } = useSkillStore();
+  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized } = useSkillRegistryStore();
+  const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
+  const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
@@ -73,6 +74,48 @@ export default function SkillRegistryPage() {
     const reg = await createNewVersion(employeeId, tenantId, assignedDomain.id);
     if (reg) navigate(`/skill-registry/${reg.id}`);
   };
+
+  const isInitialLoading = (loading && !initialized) || !domainsInitialized || !skillsInitialized;
+
+  // Initial loading skeleton
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
+          <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-8 w-32" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // No domain warning
   if (!assignedDomain) {

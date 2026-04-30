@@ -41,6 +41,7 @@ import {
   AlertTriangle, Copy, Eye, Bot, User, CheckSquare, ChevronLeft,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
@@ -132,6 +133,7 @@ export default function QuestionBankPage() {
   const {
     questions, counts, fetchQuestions, fetchQuestionCounts,
     toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
+    loading: questionsLoading, initialized: questionsInitialized,
   } = useQuestionStore();
   const { levels: clSettings, fetchLevels } = useCompetencyLevelStore();
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
@@ -650,7 +652,21 @@ export default function QuestionBankPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedQuestions.length === 0 ? (
+            {questionsLoading && !questionsInitialized ? (
+              [1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={`skel-${i}`}>
+                  {canEdit && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-14 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16 rounded-full" /></TableCell>
+                  {canEdit && <TableCell><Skeleton className="h-6 w-6" /></TableCell>}
+                </TableRow>
+              ))
+            ) : paginatedQuestions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={canEdit ? 10 : 7} className="text-center py-16 text-sm text-muted-foreground">
                   No questions found matching your filters.

@@ -5,13 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Users, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function TeamRegistryPage() {
   const { user, currentRole } = useAuth();
   const navigate = useNavigate();
-  const { registries, fetchRegistries, items, fetchItemsForRegistries } = useSkillRegistryStore();
+  const { registries, fetchRegistries, items, fetchItemsForRegistries, loading, initialized } = useSkillRegistryStore();
   const { domains, fetchDomains } = useDomainStore();
   const [userNames, setUserNames] = useState<Record<string, string>>({});
 
@@ -77,7 +78,31 @@ export default function TeamRegistryPage() {
         <p className="text-sm text-muted-foreground mt-1">Monitor your team's skill self-assessments and version history.</p>
       </div>
 
-      {groupedByEmployee.size === 0 ? (
+      {loading && !initialized ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="border-border">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Skeleton className="h-9 w-9 rounded-full" />
+                    <div className="space-y-2 min-w-0">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-3 w-44" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6 shrink-0">
+                    <Skeleton className="h-10 w-12" />
+                    <Skeleton className="h-10 w-12" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : groupedByEmployee.size === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
           <Users size={32} className="text-muted-foreground mb-3" />
           <h3 className="text-lg font-semibold text-foreground mb-1">No Registries Yet</h3>
