@@ -88,7 +88,7 @@ export default function TeamRegistryPage() {
         <p className="text-sm text-muted-foreground mt-1">Monitor your team's skill self-assessments and version history.</p>
       </div>
 
-      {(loading && !initialized) || namesLoading ? (
+      {!initialized || namesLoading || teamRegistries.some((r) => !(r.employee_id in userNames)) ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="border-border">
