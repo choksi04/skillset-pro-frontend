@@ -1,54 +1,43 @@
-## Goal
+## Problem
 
-Eliminate the "no data" → "data appears" flash on listing pages by showing skeleton loaders while the initial fetch is in flight. Reuse the pattern already established in `DomainsPage` and `SkillFrameworkPage` (which gate on `loading && !initialized`).
+On **Team Registry** and **Team Assessments** listing pages, after the skeleton disappears the rows briefly show the raw `employee_id` (a UUID-like string) before flashing to the actual employee name.
 
-## Pages to update
+Root cause: both pages fetch user names in a separate `useEffect` *after* the registries/assessments resolve. Until that second query returns, the render falls back to the raw ID:
 
-All listing pages that currently render an empty-state or jump straight to data without a skeleton:
+- `TeamRegistryPage.tsx` → `userNames[empId] || empId`
+- `TeamAssessmentsPage.tsx` → `getName(id)` returns `userNames[id] || id`
 
-1. `src/pages/AssessmentTemplatesPage.tsx` — currently shows "Loading templates…" text only.
-2. `src/pages/SkillRegistryPage.tsx` — no loading guard; flashes "Start Your First Registry" empty card.
-3. `src/pages/QuestionBankPage.tsx`
-4. `src/pages/AssessmentsPage.tsx`
-5. `src/pages/TeamRegistryPage.tsx`
-6. `src/pages/TeamAssessmentsPage.tsx`
-7. `src/pages/ReviewsPage.tsx`
-8. `src/pages/AllRegistriesPage.tsx`
-9. `src/pages/UsersPage.tsx` — already has a `loading` flag; replace its current placeholder with skeleton rows.
+## Fix
 
-(Already correct: `DomainsPage`, `SkillFrameworkPage`. No changes needed.)
+Treat the user-name lookup as part of the initial-load gate, and never render a raw ID as a fallback.
 
-## Approach
+### `src/pages/TeamRegistryPage.tsx`
 
-For each page above:
+1. Add a `namesLoading` state, defaulting to `true` whenever there are employee IDs to resolve.
+2. In the `useEffect` that fetches users:
+   - If `employeeIds.length === 0` → set `namesLoading` to `false` immediately.
+   - Otherwise, set `namesLoading` to `true` before the query, and `false` in the `.then(...)` after `userNames` is set (including on error).
+3. Extend the skeleton condition from `loading && !initialized` to `(loading && !initialized) || namesLoading`. This keeps the existing skeleton rows visible until the names are ready, so users never see a row appear with a raw ID.
+4. Replace the fallback `userNames[empId] || empId` with `userNames[empId] || '—'` as a safety net (the gate above means this should rarely render, but if a user record is missing we show a neutral placeholder instead of a UUID).
 
-- Read `loading` and `initialized` from the relevant store (all listed stores already expose both flags). For `UsersPage`, use the local `loading` state already present.
-- Wrap the list/table/card grid in:
-  ```text
-  {loading && !initialized
-     ? <SkeletonList />
-     : items.length === 0
-        ? <EmptyState />
-        : <ActualList />}
-  ```
-- Skeleton should visually mirror each page's row/card shape (3–5 placeholder rows) using the existing `Skeleton` component from `@/components/ui/skeleton`. Reuse the table-row skeleton pattern from `DomainsPage` for table-style pages, and a card skeleton variant for card-style pages (Assessment Templates, Skill Registry, Assessments, Team Registry, Reviews).
-- Keep page header, search/filter bar, and action buttons rendered above the skeleton so layout doesn't jump.
+### `src/pages/TeamAssessmentsPage.tsx`
 
-## Skeleton variants (two reusable shapes)
+1. Add the same `namesLoading` state, managed inside the existing `useEffect` that fetches users by `assessments.map(a => a.employee_id)`.
+2. Extend the skeleton condition from `loading && !initialized` to `(loading && !initialized) || namesLoading`.
+3. Update `getName` to return `userNames[id] || '—'` instead of `userNames[id] || id`.
 
-- **Table rows** (Users, Question Bank, All Registries, Team Registry, Team Assessments, Reviews): rounded card → 4–5 rows of `Skeleton h-5` bars matching column widths.
-- **Stacked cards** (Assessment Templates, Skill Registry, Assessments): 3 placeholder cards each containing a title bar, two text bars, and a row of small action-button bars on the right.
+### Notes
 
-These can be defined inline per page (matching existing `DomainsPage` style) — no need for a shared component, keeping the change minimal and localized.
+- No store changes — the fix is local to the two pages.
+- Skeleton visuals remain identical; only their dismiss timing changes.
+- Subsequent refreshes (after assessments/registries already loaded once) won't re-trigger the skeleton because `initialized` stays true; the small `namesLoading` window only occurs when new employee IDs appear, which is acceptable and doesn't show raw IDs.
 
-## Edge cases
+## Files to edit
 
-- Pages that fetch from multiple stores (e.g. `SkillRegistryPage` fetches registries + domains + skills): gate skeleton on the primary store's `initialized` flag (`useSkillRegistryStore`), which is what determines whether the listing has data.
-- Pages where `fetchX` is called unconditionally on mount: the `initialized` flag remains false until the first fetch resolves, so the skeleton will display for any first-paint, including refreshes.
-- Subsequent refetches (e.g. after create/delete) must NOT show the skeleton again — the `&& !initialized` guard ensures this; data stays visible during background refresh.
+- `src/pages/TeamRegistryPage.tsx`
+- `src/pages/TeamAssessmentsPage.tsx`
 
 ## Out of scope
 
-- Detail pages (`AssessmentDetailPage`, `SkillRegistryDetailPage`, etc.) — only listing pages are affected by this request.
-- Loader behaviour inside dialogs/sheets.
-- Changing store APIs or fetch logic.
+- Other listing pages (already handled in earlier skeleton work and don't show user IDs).
+- Refactoring user-name resolution into a shared store/hook (could be a follow-up but is not needed for this fix).

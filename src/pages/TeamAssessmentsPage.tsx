@@ -32,6 +32,7 @@ export default function TeamAssessmentsPage() {
   const navigate = useNavigate();
 
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [namesLoading, setNamesLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
 
@@ -40,18 +41,24 @@ export default function TeamAssessmentsPage() {
   }, []);
 
   useEffect(() => {
+    if (!initialized) return;
     const ids = [...new Set(assessments.map((a) => a.employee_id))];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      setNamesLoading(false);
+      return;
+    }
+    setNamesLoading(true);
     supabase.from('users').select('id, full_name').in('id', ids).then(({ data }) => {
       if (data) {
         const map: Record<string, string> = {};
         data.forEach((u: any) => { map[u.id] = u.full_name; });
         setUserNames(map);
       }
-    });
-  }, [assessments]);
+      setNamesLoading(false);
+    }, () => setNamesLoading(false));
+  }, [assessments, initialized]);
 
-  const getName = (id: string) => userNames[id] || id;
+  const getName = (id: string) => userNames[id] || '—';
   const getAssessmentName = (a: Assessment) => {
     if (a.template_id) {
       const t = templates.find((x) => x.id === a.template_id);
@@ -103,7 +110,7 @@ export default function TeamAssessmentsPage() {
         />
       </div>
 
-      {loading && !initialized ? (
+      {(loading && !initialized) || namesLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-xl border border-border bg-card px-5 py-4">
