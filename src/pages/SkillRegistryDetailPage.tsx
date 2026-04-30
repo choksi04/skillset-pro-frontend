@@ -319,6 +319,7 @@ export default function SkillRegistryDetailPage() {
           onCommentChange={handleCommentChange}
           onSubmit={handleSubmit}
           onSaveDraft={handleSaveDraftNow}
+          onDiscard={() => setDiscardOpen(true)}
           skills={skills}
           maxLevel={maxLevel}
         />
