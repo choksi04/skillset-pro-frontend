@@ -305,4 +305,29 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
       ),
     }));
   },
+
+  discardDraft: async (registryId: string) => {
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('skill_registries')
+      .update({ deleted_on: now, deleted_by: userId })
+      .eq('id', registryId)
+      .eq('status', 'draft');
+
+    if (error) {
+      console.error('Failed to discard draft:', error);
+      throw error;
+    }
+
+    set((state) => {
+      const newItems = new Map(state.items);
+      newItems.delete(registryId);
+      return {
+        registries: state.registries.filter((r) => r.id !== registryId),
+        items: newItems,
+      };
+    });
+  },
 }));
