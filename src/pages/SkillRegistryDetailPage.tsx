@@ -799,6 +799,14 @@ function SelfReviewForm({
               <Button size="sm" variant="outline" onClick={onSaveDraft} className="w-full">
                 Save as Draft
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onDiscard}
+                className="w-full gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 size={14} /> Discard Draft
+              </Button>
             </div>
           </div>
         </aside>
