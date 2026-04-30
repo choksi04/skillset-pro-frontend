@@ -15,6 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3 } from 'lucide-react';
 
 interface SkillAgg {
@@ -70,7 +71,7 @@ function downloadCSV(csv: string, filename: string) {
 
 export default function AllRegistriesPage() {
   const navigate = useNavigate();
-  const { registries, fetchRegistries, fetchItems } = useSkillRegistryStore();
+  const { registries, fetchRegistries, fetchItems, loading: regsLoading, initialized: regsInit } = useSkillRegistryStore();
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
 
