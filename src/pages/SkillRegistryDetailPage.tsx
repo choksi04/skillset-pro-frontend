@@ -27,8 +27,11 @@ import {
 } from '@/components/ui/collapsible';
 import {
   CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
-  ArrowLeft, Loader2, MessageSquare,
+  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 export default function SkillRegistryDetailPage() {
@@ -36,9 +39,11 @@ export default function SkillRegistryDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry } = useSkillRegistryStore();
+  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry, createNewVersion } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
+  const { levels: competencyLevels } = useCompetencyLevelStore();
+  const maxLevel = competencyLevels.length || 5;
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
@@ -233,82 +238,27 @@ export default function SkillRegistryDetailPage() {
 
   // Summary stats
   const allItems = useSkillRegistryStore.getState().items.get(registry.id) ?? [];
-  const avgLevel = allItems.length > 0 ? Math.round((allItems.reduce((s, i) => s + i.self_score, 0) / allItems.length) * 10) / 10 : null;
-  const maxScore = allItems.length > 0 ? Math.max(...allItems.map((i) => i.self_score)) : 0;
-  const minScore = allItems.length > 0 ? Math.min(...allItems.map((i) => i.self_score)) : 0;
-  const topRatedItems = allItems.filter((i) => i.self_score === maxScore);
-  const lowestRatedItems = allItems.filter((i) => i.self_score === minScore);
-  const topRatedSkillNames = topRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
-  const lowestRatedSkillNames = lowestRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
 
-  const SkillListBadge = ({ names, score }: { names: string[]; score: number }) => {
-    if (names.length === 0) return <span className="text-muted-foreground">—</span>;
-    const first = names[0];
-    const rest = names.slice(1);
-    return (
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-sm font-medium text-foreground">{first} (L{score})</span>
-        {rest.length > 0 && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-[10px] cursor-help">+{rest.length}</Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <div className="space-y-0.5">
-                  {rest.map((n, i) => <p key={i} className="text-xs">{n}</p>)}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-    );
-  };
 
-  const header = (
+  // Header used in DRAFT view (kept compact, original style)
+  const draftHeader = (
     <div className="space-y-1">
       <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
         <ArrowLeft size={14} /> Back to My Registry
       </Button>
       <div className="flex items-center gap-3">
         <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-        <Badge className={`text-xs ${isDraft ? 'bg-warning/15 text-warning border-warning/20' : 'bg-success/15 text-success border-success/20'}`}>
-          {isDraft ? 'Draft' : 'Submitted'}
-        </Badge>
+        <Badge className="text-xs bg-warning/15 text-warning border-warning/20">Draft</Badge>
       </div>
       <p className="text-xs text-muted-foreground">v{registry.version_number} · {pageDescription}</p>
     </div>
   );
 
-  const summarySection = isSubmitted && allItems.length > 0 ? (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground mb-1">Average Level</p>
-          <p className="text-2xl font-bold text-foreground">{avgLevel}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground mb-1">Top Rated</p>
-          <SkillListBadge names={topRatedSkillNames} score={maxScore} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground mb-1">Lowest Rated</p>
-          <SkillListBadge names={lowestRatedSkillNames} score={minScore} />
-        </CardContent>
-      </Card>
-    </div>
-  ) : null;
-
   // ── DRAFT → Show Self Review Form ──
   if (isDraft) {
     return (
       <div className="space-y-6">
-        {header}
+        {draftHeader}
         <SelfReviewForm
           domainSkills={domainSkills}
           filteredSkills={filteredSkills}
@@ -360,55 +310,189 @@ export default function SkillRegistryDetailPage() {
     );
   }
 
-  // ── SUBMITTED → Read-only view ──
+  // ── SUBMITTED → Read-only redesigned view ──
+
+  // Submitted versions of this employee for this domain (for version switcher)
+  const submittedVersions = registries
+    .filter((r) => r.employee_id === employeeId && r.status === 'submitted' && r.domain_id === registry.domain_id)
+    .sort((a, b) => b.version_number - a.version_number);
+  const latestVersion = submittedVersions[0];
+  const isLatest = latestVersion ? latestVersion.id === registry.id : true;
+
+  // Stats
+  const totalSkills = domainSkills.length;
+  const ratedItems = allItems;
+  const completionPct = totalSkills > 0 ? Math.round((ratedItems.length / totalSkills) * 100) : 0;
+  const avgRaw = ratedItems.length > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedItems.length : 0;
+  const avgOnFive = maxLevel > 0 ? (avgRaw / maxLevel) * 5 : 0;
+
+  // Skill rows — flat, sorted by category then skill name; only skills that have a rating in this version
+  const skillRows = ratedItems
+    .map((item) => {
+      const skill = skills.find((s) => s.id === item.skill_id);
+      return {
+        id: item.skill_id,
+        name: skill?.skill_name ?? 'Unknown skill',
+        category: skill?.skill_category || 'Uncategorized',
+        score: item.self_score,
+        comment: item.comment ?? '',
+      };
+    })
+    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+
+  const handleEditRatings = async () => {
+    if (!assignedDomain) return;
+    // Look for an existing draft for this domain first
+    const existingDraft = registries.find(
+      (r) => r.employee_id === employeeId && r.status === 'draft' && r.domain_id === assignedDomain.id
+    );
+    if (existingDraft) {
+      navigate(`/skill-registry/${existingDraft.id}`);
+      return;
+    }
+    const draft = await createNewVersion(employeeId, tenantId, assignedDomain.id);
+    if (draft) navigate(`/skill-registry/${draft.id}`);
+  };
+
   return (
-    <div className="space-y-6">
-      {header}
-      {summarySection}
-      {/* Read-only skill list */}
-      <div className="space-y-3">
-        {groupedSkills.size === 0 && domainSkills.length > 0 && (
-          <div className="relative max-w-xs">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search skills..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+    <div className="space-y-8">
+      {/* Back link */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate('/skill-registry')}
+        className="gap-1.5 -ml-2 text-primary hover:text-primary"
+      >
+        <ArrowLeft size={14} /> Back to Registries
+      </Button>
+
+      {/* Title row + version switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
+            <Badge className="text-xs bg-success/15 text-success border-success/20 hover:bg-success/15">
+              {isLatest ? 'Up to date' : `Version ${registry.version_number}`}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {assignedDomain?.description || 'Submitted self-assessment for this domain.'}
+          </p>
+        </div>
+
+        {submittedVersions.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground">Viewing:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 min-w-[180px] justify-between">
+                  <span>
+                    Version {registry.version_number}
+                    {isLatest && ' (Latest)'}
+                  </span>
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[200px]">
+                {submittedVersions.map((v, idx) => (
+                  <DropdownMenuItem
+                    key={v.id}
+                    onClick={() => navigate(`/skill-registry/${v.id}`)}
+                    className={v.id === registry.id ? 'bg-muted' : ''}
+                  >
+                    Version {v.version_number}
+                    {idx === 0 && ' (Latest)'}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
-        {domainSkills.length > 4 && (
-          <div className="relative max-w-xs">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search skills..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+      </div>
+
+      <div className="border-t border-border" />
+
+      {/* Stats strip */}
+      {!itemsLoaded ? (
+        <div className="h-12 animate-pulse bg-muted/50 rounded" />
+      ) : (
+        <div className="flex flex-wrap items-start gap-x-12 gap-y-4">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Total Skills</p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{totalSkills}</p>
           </div>
-        )}
-        <Accordion type="multiple" defaultValue={Array.from(groupedSkills.keys())} className="space-y-3">
-          {Array.from(groupedSkills.entries()).map(([catName, catSkills]) => (
-            <AccordionItem key={catName} value={catName} className="rounded-xl border border-border bg-card overflow-hidden">
-              <AccordionTrigger className="px-5 py-3 hover:no-underline">
-                <div className="flex items-center gap-3 text-left flex-1">
-                  <FolderOpen size={16} className="text-primary shrink-0" />
-                  <span className="font-semibold text-card-foreground">{catName}</span>
-                  <span className="text-xs text-muted-foreground">({catSkills.length})</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-0 pb-0">
-                <div className="divide-y divide-border">
-                  {catSkills.map((skill) => (
-                    <div key={skill.id} className="px-5 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-card-foreground">{skill.skill_name}</p>
-                        {comments[skill.id] && (
-                          <p className="text-xs text-muted-foreground mt-0.5 italic">"{comments[skill.id]}"</p>
-                        )}
-                      </div>
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {ratings[skill.id] != null ? `L${ratings[skill.id]} — ${getRatingLabels(useCompetencyLevelStore.getState().levels)[ratings[skill.id]] ?? `Level ${ratings[skill.id]}`}` : '—'}
-                      </Badge>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Completion</p>
+            <p className="mt-1 text-xl font-semibold text-primary">
+              {completionPct}% <span className="text-sm font-medium text-primary/80">({ratedItems.length}/{totalSkills})</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Avg Rating</p>
+            <p className="mt-1 text-xl font-semibold text-foreground flex items-center gap-1.5">
+              <Star size={18} className="fill-amber-400 text-amber-400" />
+              {ratedItems.length > 0 ? avgOnFive.toFixed(1) : '—'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-border" />
+
+      {/* Skill Breakdown */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Skill Breakdown</h2>
+          {isLatest && (
+            <Button variant="outline" size="sm" onClick={handleEditRatings} className="gap-1.5 text-primary border-primary/40 hover:bg-primary/5 hover:text-primary">
+              <Pencil size={14} /> Edit Ratings
+            </Button>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-border overflow-hidden">
+          {/* Column headers */}
+          <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="col-span-4">Skill / Category</div>
+            <div className="col-span-3">Rating</div>
+            <div className="col-span-5">Self-Assessment Details</div>
+          </div>
+
+          {!itemsLoaded ? (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Loading…</div>
+          ) : skillRows.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">No rated skills in this version.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {skillRows.map((row) => {
+                const onFive = maxLevel > 0 ? (row.score / maxLevel) * 5 : 0;
+                const pct = maxLevel > 0 ? (row.score / maxLevel) * 100 : 0;
+                return (
+                  <div key={row.id} className="grid grid-cols-12 gap-4 px-5 py-4 items-center">
+                    <div className="col-span-4">
+                      <p className="text-sm font-medium text-foreground">{row.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{row.category}</p>
                     </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+                    <div className="col-span-3 space-y-1.5">
+                      <p className="text-sm text-foreground">
+                        <span className="font-semibold">{onFive.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground"> / 5.0</span>
+                      </p>
+                      <Progress value={pct} className="h-1.5" />
+                    </div>
+                    <div className="col-span-5">
+                      {row.comment ? (
+                        <p className="text-sm text-muted-foreground leading-relaxed">{row.comment}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground/60 italic">No notes provided.</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

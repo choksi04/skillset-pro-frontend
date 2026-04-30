@@ -1,54 +1,55 @@
-# Redesign "My Registry" Page
+# Redesign My Registry → Detail Page
 
-Restyle `src/pages/SkillRegistryPage.tsx` to match the provided mockup. Logic, data sources, and routes stay the same — only the **Current Registry** section's visual structure changes. Version History table and empty/no-domain/no-skills states remain.
+Restyle `src/pages/SkillRegistryDetailPage.tsx` to match the mockup. Only the **submitted (read-only)** view is redesigned. The draft self-review form (`SelfReviewForm`) is unchanged in behavior, only entered via the new "Edit Ratings" action. Routes, store calls, and submit flow are untouched.
 
-## Visual changes
+## Visual changes (submitted view)
 
-### Page header
+### Header row
 
-- Rename heading from **"Your Skillset Registry"** → **"My Registry"**.
-- Subtitle: **"Manage and track your assessed skill sets over time."**
-- Add a top-right **"Edit Details"** outline button (pencil icon) — wired to navigate to the draft (if any) or create a new version. Hidden if no domain/skills.
+- Replace current "Your Skillset Registry" title block with:
+  - **"← Back to Registries"** ghost link (replaces current "Back to My Registry" — points to `/skill-registry`).
+  - Title row: bold **{domain.name}** + green **"Up to date"** pill (or amber **Draft** when applicable).
+  - Subtitle: domain description (`assignedDomain.description`); fallback to a generic line if empty.
+  - Right side: **"Viewing: Version N (Latest)"** dropdown built with shadcn `DropdownMenu` (or `Select`), listing all submitted versions for this employee. Selecting an item navigates to that registry's detail page. The current version is marked "(Latest)" if it equals the highest version_number.
+- Thin divider below the header.
 
-### Current Registry hero card (replaces existing draft/latest/empty card)
+### Stats strip
 
-A single bordered card containing:
+A single horizontal flex row (no card borders), 3 stats separated by spacing. Each stat:
 
-1. **Title row**
-  - Large bold **domain name** (e.g. "Software Engineering"), `text-2xl font-bold`.
-  - Status pill next to it:
-    - Draft 
-    - Submitted
-    - No registry yet → gray "Not started" pill
-2. **Meta row** (small, muted, icons from lucide):
-  - History icon + `Updated {N} times` — count of submitted versions for this employee.
-  - Clock icon + `Last edit: {relative time}` — uses `submitted_at` (or `created_at` for draft). Format as "2 days ago" via a small inline relative-time helper (no new deps).
-3. **Two summary tiles** in a 2-col grid (`grid-cols-1 md:grid-cols-2 gap-4`):
-  - **Completion Status**
-    - Icon (CheckCircle2) + label.
-    - Big number `{rated}` / total `{domainSkills.length}` + `SKILLS RATED` caption.
-    - Progress bar underneath (`Progress` from `@/components/ui/progress`).
-  - **Overall Average Rating**
-    - Icon (BarChart3) + label.
-    - Big number (e.g. `4.2`) + 5-star row rendered with `Star` (filled, half, empty based on avg/maxLevel — use `useCompetencyLevelStore` max level, default 5) + caption `Out of {max}.0 possible`.
-    - When draft with no ratings yet → show `—` and empty stars.
-4. **Footer action row** (right-aligned, separated by a top border):
-  - Primary button **"View Detailed Breakdown →"** (ArrowRight icon) → navigates to `/skill-registry/{id}` of draft or latest.
-  - For draft state, button label switches to **"Continue Editing →"**.
-  - For "no registry yet" state, replace card body with the existing empty-state CTA ("Start Your First Registry" / "Start Self Review") rendered inside the same hero card shell.
+- Uppercase muted label (`TOTAL SKILLS`, `COMPLETION`, `AVG RATING`).
+- Value below in larger text:
+  - **Total Skills**: `{domainSkills.length}` (count of skills mapped to the domain).
+  - **Completion**: `{percentage}% ({rated}/{total})` — percentage in primary blue.
+  - **Avg Rating**: amber star icon + `{avg.toFixed(1)}` (mapped to /5 scale using maxLevel).
+  - **Top Rated:** Show the top rated skill with rate
+    **Lowest Rated:** Show the least rated skill with rate  
 
-### Version History
+- Thin divider below the strip.
 
-- Keep the existing table unchanged.
+### Skill Breakdown section
+
+- Section header row: **"Skill Breakdown"** title + right-aligned **"Edit Ratings"** outline button (pencil icon). Clicking creates/opens a draft via `createNewVersion` and navigates to it (only enabled when viewing latest submitted version; hidden for drafts since edit mode already shows the form).
+- Table-style list inside a rounded bordered container. Columns:
+  1.  **SKILL / Category**— skill name (medium), category name muted below.
+  2. **RATING** — `{score}.0 / {max}.0` text + horizontal `Progress` bar (primary fill).
+  3. **SELF-ASSESSMENT DETAILS** — comment text in muted color (italic empty placeholder when missing).
+- Rows separated by `divide-y`. Skills are listed flat (no accordion); sorted by category then skill name to keep grouping visible.
+- For drafts, the existing `SelfReviewForm` continues to render (no change).
+
+### Removed/relocated
+
+- Remove the 3-card "Average / Top / Lowest" summary block (replaced by stats strip).
+- Remove the read-only Accordion grouping (replaced by flat table).
+- Search input is removed from the read-only view (not in mockup).
 
 ## Technical details
 
-- File touched: `src/pages/SkillRegistryPage.tsx` only.
-- Compute averages from `items.get(registryId)` (already fetched via `fetchItemsForRegistries`). Reuse `computeAvg`.
-- For "Updated N times" use `submittedRegistries.length` (already derived).
-- Relative time: small inline `formatRelative(date)` returning "today", "yesterday", "N days ago", "N weeks ago", "N months ago".
-- Stars: render 5 `Star` icons; fill class `fill-amber-400 text-amber-400`; for half star use `StarHalf`. Compute `full = floor(avg)`, `half = avg - full >= 0.5`.
-- Max competency level: read from `useCompetencyLevelStore().levels.length` (fallback 5) to keep it dynamic per the dynamic-competency-levels rule.
-- Skeleton loader: extend existing skeleton block to match new hero card shape (title + meta + 2 tiles + footer button).
-- No store/schema changes. No new dependencies.
-- Update memory `mem://features/skill-registry/ux-patterns` after implementation to note "My Registry" rename and hero card layout.
+- File touched: `src/pages/SkillRegistryDetailPage.tsx` only.
+- Use `useCompetencyLevelStore().levels.length` (fallback 5) for max level; render rating as `(score / max * 5)` for the `/5.0` display + Progress bar percentage = `score/max*100`.
+- Version dropdown: filter `registries` for `employee_id === employeeId && status === 'submitted'`, sort desc by version_number. Use shadcn `DropdownMenu` with `Button variant="outline"` trigger.
+- Star icon: lucide `Star` filled with `fill-amber-400 text-amber-400`.
+- "Back to Registries" → label updated; route unchanged.
+- Skeleton/loading states: existing `if (!registry)` fallback retained; add a small skeleton block when items aren't loaded yet (avoid 0/0 flash) by gating the stats/table on `itemsLoaded`.
+- No store/schema/route changes. No new dependencies.
+- Update memory `mem://features/skill-registry/detail-view-design` after implementation to note: header with version switcher, horizontal stats strip, flat skill breakdown table with progress bars and comment column, "Edit Ratings" entry point.
