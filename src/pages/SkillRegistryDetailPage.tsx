@@ -549,7 +549,7 @@ export default function SkillRegistryDetailPage() {
 function SelfReviewForm({
   domainSkills, filteredSkills, groupedSkills, ratings, comments, previousRatings,
   ratedCount, allRated, search, saveStatus,
-  onSearchChange, onRatingChange, onCommentChange, onSubmit, onSaveDraft, skills, maxLevel,
+  onSearchChange, onRatingChange, onCommentChange, onSubmit, onSaveDraft, onDiscard, skills, maxLevel,
 }: {
   domainSkills: Skill[];
   filteredSkills: Skill[];
@@ -566,6 +566,7 @@ function SelfReviewForm({
   onCommentChange: (skillId: string, comment: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
+  onDiscard: () => void;
   skills: Skill[];
   maxLevel: number;
 }) {
