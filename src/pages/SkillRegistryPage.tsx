@@ -31,8 +31,8 @@ export default function SkillRegistryPage() {
   const navigate = useNavigate();
 
   const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized } = useSkillRegistryStore();
-  const { domains, mappings, fetchDomains } = useDomainStore();
-  const { skills, fetchSkills } = useSkillStore();
+  const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
+  const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
