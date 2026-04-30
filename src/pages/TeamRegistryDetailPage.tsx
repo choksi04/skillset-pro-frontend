@@ -398,30 +398,28 @@ export default function TeamRegistryDetailPage() {
                               onValueChange={(v) => handleScoreChange(skill.id, v)}
                               disabled={!isReviewable}
                             >
-                              <SelectTrigger className="h-8 w-44 text-xs">
+                              <SelectTrigger className="h-8 min-w-[14rem] text-xs">
                                 <SelectValue placeholder="Select level">
                                   {mgrScore != null
-                                    ? (() => {
-                                        const lvl = scoreOptions.find((l) => l.level === mgrScore);
-                                        return lvl
-                                          ? `L${lvl.level} · ${lvl.label ?? lvl.name ?? ""}`.trim()
-                                          : `L${mgrScore}`;
-                                      })()
+                                    ? (scoreOptions.find((l) => l.level === mgrScore)?.label ??
+                                      `L${mgrScore}`)
                                     : null}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
-                                {scoreOptions.map((l) => (
-                                  <SelectItem key={l.id} value={String(l.level)}>
-                                    <span className="font-medium">L{l.level}</span>
-                                    {l.label ? (
-                                      <span className="text-muted-foreground"> — {l.label}</span>
-                                    ) : null}
-                                    {l.name ? (
-                                      <span className="text-muted-foreground"> ({l.name})</span>
-                                    ) : null}
-                                  </SelectItem>
-                                ))}
+                                {scoreOptions.map((l) => {
+                                  const showName =
+                                    !!l.name &&
+                                    !l.label?.toLowerCase().includes(l.name.toLowerCase());
+                                  return (
+                                    <SelectItem key={l.id} value={String(l.level)}>
+                                      <span className="font-medium">{l.label}</span>
+                                      {showName ? (
+                                        <span className="text-muted-foreground"> ({l.name})</span>
+                                      ) : null}
+                                    </SelectItem>
+                                  );
+                                })}
                               </SelectContent>
                             </Select>
                           </div>
