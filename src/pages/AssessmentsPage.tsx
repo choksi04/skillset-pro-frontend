@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ClipboardCheck, Search, ArrowRight } from "lucide-react";
 import { getEffectiveStatus } from "@/lib/assessmentStatus";
 
@@ -25,7 +26,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 export default function AssessmentsPage() {
-  const { assessments, fetchAssessments } = useAssessmentStore();
+  const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
   const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
   const { fetchQuestions } = useQuestionStore();
   const { fetchSkills } = useSkillStore();
@@ -112,7 +113,25 @@ export default function AssessmentsPage() {
         />
       </div>
 
-      {filteredMy.length === 0 ? (
+      {loading && !initialized ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card px-5 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Skeleton className="h-5 w-12" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-4 w-4" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredMy.length === 0 ? (
         <EmptyState message="No assessments yet. Submit your skill registry to generate one." />
       ) : (
         <div className="space-y-3">
