@@ -38,6 +38,7 @@ interface SkillRegistryStore {
   fetchItemsForRegistries: (ids: string[]) => Promise<void>;
   saveDraft: (registryId: string, items: Omit<SkillRegistryItem, 'id' | 'registry_id'>[]) => Promise<void>;
   submitRegistry: (registryId: string, employeeName: string, domainLeadId: string | null) => Promise<void>;
+  discardDraft: (registryId: string) => Promise<void>;
 }
 
 export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
@@ -303,5 +304,30 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
         r.id === registryId ? { ...r, status: 'submitted' as const, submitted_at: now } : r
       ),
     }));
+  },
+
+  discardDraft: async (registryId: string) => {
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('skill_registries')
+      .update({ deleted_on: now, deleted_by: userId })
+      .eq('id', registryId)
+      .eq('status', 'draft');
+
+    if (error) {
+      console.error('Failed to discard draft:', error);
+      throw error;
+    }
+
+    set((state) => {
+      const newItems = new Map(state.items);
+      newItems.delete(registryId);
+      return {
+        registries: state.registries.filter((r) => r.id !== registryId),
+        items: newItems,
+      };
+    });
   },
 }));

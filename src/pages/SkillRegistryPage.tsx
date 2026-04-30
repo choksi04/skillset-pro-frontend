@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
@@ -13,10 +13,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  AlertTriangle, FileText, Plus, Edit, Eye, Play,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  AlertTriangle, FileText, Plus, Edit, Eye, Play, Trash2, Loader2,
   History, Clock, CheckCircle2, BarChart3, Star, StarHalf, ArrowRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -74,7 +79,7 @@ export default function SkillRegistryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized } = useSkillRegistryStore();
+  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized, discardDraft } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
   const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
@@ -126,6 +131,24 @@ export default function SkillRegistryPage() {
       navigate(`/skill-registry/${draft.id}`);
     } else {
       handleCreateNewVersion();
+    }
+  };
+
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  const handleDiscardDraft = async () => {
+    if (!draft) return;
+    setDiscarding(true);
+    try {
+      await discardDraft(draft.id);
+      setDiscardOpen(false);
+      toast.success('Draft discarded');
+    } catch (err) {
+      console.error('Failed to discard draft:', err);
+      toast.error('Failed to discard draft. Please try again.');
+    } finally {
+      setDiscarding(false);
     }
   };
 
@@ -304,7 +327,17 @@ export default function SkillRegistryPage() {
             </div>
 
             {/* Footer action */}
-            <div className="flex justify-end pt-4 border-t border-border">
+            <div className="flex justify-end items-center gap-2 pt-4 border-t border-border">
+              {featured.status === 'draft' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDiscardOpen(true)}
+                >
+                  <Trash2 size={14} /> Discard Draft
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="gap-1.5"
@@ -378,6 +411,29 @@ export default function SkillRegistryPage() {
           </div>
         </div>
       )}
+
+      {/* Discard Draft Confirmation */}
+      <AlertDialog open={discardOpen} onOpenChange={(o) => !discarding && setDiscardOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your unsaved changes{draft ? ` for v${draft.version_number}` : ''} will be permanently removed and cannot be restored. Your last submitted version will remain unchanged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={discarding}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDiscardDraft(); }}
+              disabled={discarding}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {discarding ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Trash2 size={14} className="mr-1.5" />}
+              {discarding ? 'Discarding…' : 'Discard Draft'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

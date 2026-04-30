@@ -1,73 +1,65 @@
-# Redesign: My Registry — Editing (Draft) Page
+# Discard Draft Registry
 
-Restructure the draft self-review form to match the mockup's two-column layout. Existing labels, terminology (skill, level, registry), and data model stay unchanged — only the UI shell, grouping treatment, and side panel change.
+Add the ability to discard a draft skill registry — soft-deleting it and returning the user to their last submitted version (or the empty state if none exists).
 
-## Layout
+## Behaviour
 
-```text
-┌──────────────────────────────────────────────────────┬──────────────────┐
-│ ← Back to Registries                                 │  Registry Summary│
-│ <Domain Name>                                        │                  │
-│                                                      │  CURRENT AVERAGE │
-│ ── <Category 1> ─────────────────────────────────    │     4.3 / 5.0    │
-│ <category description / skill count>                 │     ★★★★½        │
-│                                                      │                  │
-│  ┌─ Skill Card ─────────────────────────────────┐    │  Completion 75%  │
-│  │ Skill name        [optional level pill]      │    │  ▓▓▓▓▓▓▓░░       │
-│  │ short prompt text                            │    │  6 of 8 rated    │
-│  │ Proficiency Level                            │    │                  │
-│  │ [ 1 ][ 2 ][ 3 ][ 4* ][ 5 ]   (segmented)     │    │  Skills          │
-│  │ Supporting Details   (Optional)              │    │  ✓ Languages 4/4 │
-│  │ [ textarea ]                                 │    │  ○ Frameworks 2/4│
-│  └──────────────────────────────────────────────┘    │                  │
-│                                                      │  [Submit Reg.]   │
-│  ┌─ Skill Card ─────────────────────────────────┐    │  [Save as Draft] │
-│  │ ...                                          │    │                  │
-│                                                      │ (sticky)         │
-│ ── <Category 2> ─────────────────────────────────    │                  │
-│  ...                                                 │                  │
-└──────────────────────────────────────────────────────┴──────────────────┘
+- Visible only when the current registry is in `draft` status.
+- Confirmation dialog before discarding (action is destructive and irreversible).
+- Discard performs a **soft delete**: sets `deleted_on = now()` and `deleted_by = currentUserId` on the `skill_registries` row. Items in `skill_registry_items` are kept untouched (orphaned but reachable via the soft-deleted parent), consistent with the project's audit policy.
+- After discard, the user is routed back to `/skill-registry`. The list page already auto-features the latest submitted version when no draft exists, so the previous submission becomes the active one again.
+- A toast confirms the discard.
+- If the draft is the **only** registry the user has (no prior submission), the discard still works — the My Registry page falls through to the existing "Start Your First Registry" empty state.
+
+## Where the action appears
+
+1. **My Registry → Detail (Draft / Self Review)** — `src/pages/SkillRegistryDetailPage.tsx`
+   - In the right-side `Registry Summary` panel, below the existing `Submit Registry` and `Save as Draft` buttons, add a destructive ghost-style button: `Discard Draft`.
+   - Styled with `text-destructive hover:bg-destructive/10` so it reads as the destructive option but doesn't compete visually with Submit.
+
+2. **My Registry list page** — `src/pages/SkillRegistryPage.tsx`
+   - When the featured card is in draft status, add a small `Discard` outline button next to `Continue Editing` in the hero card footer (same destructive styling).
+
+Both entry points open the same confirmation dialog and call the same store action.
+
+## Confirmation dialog
+
+Reuse `AlertDialog` (already in the project). Title: `Discard this draft?`. Body: `Your unsaved changes for v{N} will be permanently removed and cannot be restored. Your last submitted version will remain unchanged.`. Buttons: `Cancel` / `Discard Draft` (destructive variant).
+
+## Store change — `src/stores/skillRegistryStore.ts`
+
+Add a new action:
+
+```ts
+discardDraft: (registryId: string) => Promise<void>;
 ```
 
-## Changes — `src/pages/SkillRegistryDetailPage.tsx` (`SelfReviewForm` only)
+Implementation:
+- Soft-delete the row: `update({ deleted_on: now, deleted_by: userId })` on `skill_registries`.
+- Cancel any pending auto-save before invoking (handled by the page).
+- Remove the discarded registry from local `registries` state and drop its `items` cache entry.
+- No notification is emitted (drafts are private to the employee).
 
-### Page shell
+## Page wiring — `SkillRegistryDetailPage.tsx`
 
-- Replace the single-column accordion layout with a `grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8` wrapper.
-- Keep the existing top header (back link, domain title, draft badge) above the grid; move the small progress + search controls into the right panel and the top of the left column respectively.
+- Add `discardOpen` local state and a `handleDiscard` callback that:
+  1. Clears the auto-save timeout (`saveTimeoutRef`).
+  2. Calls `discardDraft(registry.id)`.
+  3. Shows a success toast (`Draft discarded`).
+  4. Navigates to `/skill-registry`.
+- Pass `onDiscard` into `SelfReviewForm`; render the `Discard Draft` button + `AlertDialog` inside the summary panel.
+- Guard: only render the button when `isDraft` is true (already the case for this view).
 
-### Left column — categories and skill cards
+## Page wiring — `SkillRegistryPage.tsx`
 
-- Render each category as an open section (no accordion / no collapse): a section header showing category name, optional one-line description (skill count), and a thin divider.
-- Below the header, render each skill as an always-expanded **Skill Card** (`rounded-xl border bg-card p-5 space-y-4`). No accordions, no separate "Add comment" collapsible.
-- Skill Card contents (top to bottom):
-  1. Title row: skill name (semibold), optional info tooltip, tags, and a small right-aligned status pill (e.g. "Initial rating" / "Updated") when applicable.
-  2. Short prompt line: keep current copy ("Assess your current proficiency...") in muted text.
-  3. **Proficiency Level** label + segmented 5-button selector. Reuse `RatingSlider` but switch to a taller card-like button: each button shows the level number prominently with the short label below (derived from `getRatingLabels(levels)`). Selected button gets primary border + soft primary background; unselected stays neutral. The selected-state description block stays below.
-  4. Allow unselect as well.
-  5. **Supporting Details** label with `Optional, but recommended` muted hint on the right; always-visible `Textarea` (collapsible).
-- Active card emphasis: the card the user is currently rating gets a `ring-1 ring-primary/40 border-primary/40` treatment (driven by a local `activeSkillId` state set on focus / click).
-
-### Right column — Registry Summary (sticky)
-
-- `sticky top-6 self-start rounded-xl border bg-card p-5 space-y-5` panel.
-- Sections, top to bottom:
-  - Title "Registry Summary" + small caption "Your progress at a glance".
-  - **Current Average** tile: large numeric average on the 5.0 scale (`avgOnFive.toFixed(1)`), `/ 5.0` muted, half-star row underneath (reuse the same star-rendering pattern already used on the Registry list page).
-  - **Completion**: percentage on the right, progress bar, "X of Y skills rated" line.
-  - **Categories** list: one row per category with a check icon (success) when fully rated or empty circle when partial, label, and `rated/total` count on the right. Clicking a row scrolls the matching category section into view (`element.scrollIntoView({ behavior: 'smooth' })`).
-  - Action buttons stacked: primary `Submit Registry` (disabled when not all rated) and a secondary `Save as Draft` outline button that flushes the pending auto-save immediately and shows a toast.
-- Auto-save indicator (Saving… / Saved) moves to a small line above the action buttons.
-
-### Behavior preserved
-
-- Auto-save debounce, `handleRatingChange`, `handleCommentChange`, search (kept as a small input above the first category), submit confirm dialog — all unchanged.
-- `previousRatings` "Last cycle" hint continues to appear inside `RatingSlider` (no behavior change).
-- Submitted (read-only) view is **not** touched.
+- Reuse the same store action and an `AlertDialog`. Render the small `Discard` button only when `featured.status === 'draft'`.
+- After successful discard, no navigation is needed (the list page already re-renders with the latest submitted registry as featured).
 
 ## Technical notes
-
-- All edits in `src/pages/SkillRegistryDetailPage.tsx`. Minor variant tweak inside `src/components/registry/RatingSlider.tsx` to render number-on-top + label-below buttons, gated by an optional `variant?: 'compact' | 'card'` prop so other usages stay unchanged.
-- Use only existing semantic tokens (`bg-card`, `border-border`, `text-primary`, `text-success`, `text-muted-foreground`). No raw colors.
-- No new dependencies, no DB or store changes, no routing changes.
-- Responsive: on `<lg`, the grid collapses to one column and the summary panel renders inline above the categories (non-sticky).
+- Files modified:
+  - `src/stores/skillRegistryStore.ts` — new `discardDraft` action.
+  - `src/pages/SkillRegistryDetailPage.tsx` — Discard button + dialog in the summary panel; cancel pending auto-save before discard.
+  - `src/pages/SkillRegistryPage.tsx` — Discard button + dialog on the hero card when draft is featured.
+- No DB migration required — `deleted_on`/`deleted_by` already exist on `skill_registries` and queries already filter by `.is('deleted_on', null)`.
+- No routing or RLS changes.
+- Memory update: append a one-liner to `mem://logic/skill-registry/independence` (or add a new `mem://features/skill-registry/discard-draft` note) describing the soft-delete semantics so future work doesn't accidentally hard-delete.

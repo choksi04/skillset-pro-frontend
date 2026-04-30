@@ -17,6 +17,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
@@ -24,7 +28,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   CheckCircle, Lock, Send, Search, Info, Tag,
-  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
+  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown, Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -36,7 +40,7 @@ export default function SkillRegistryDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry, createNewVersion } = useSkillRegistryStore();
+  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry, createNewVersion, discardDraft } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
@@ -159,6 +163,8 @@ export default function SkillRegistryDetailPage() {
 
   // Form state
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -233,6 +239,24 @@ export default function SkillRegistryDetailPage() {
     }
   };
 
+  const confirmDiscard = async () => {
+    if (!registry) return;
+    setDiscarding(true);
+    try {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      isDirtyRef.current = false;
+      await discardDraft(registry.id);
+      setDiscardOpen(false);
+      toast.success('Draft discarded');
+      navigate('/skill-registry');
+    } catch (err) {
+      console.error('Failed to discard draft:', err);
+      toast.error('Failed to discard draft. Please try again.');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   if (!registry) {
     return (
       <div className="space-y-6">
@@ -295,6 +319,7 @@ export default function SkillRegistryDetailPage() {
           onCommentChange={handleCommentChange}
           onSubmit={handleSubmit}
           onSaveDraft={handleSaveDraftNow}
+          onDiscard={() => setDiscardOpen(true)}
           skills={skills}
           maxLevel={maxLevel}
         />
@@ -328,6 +353,29 @@ export default function SkillRegistryDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Discard Draft Confirmation */}
+        <AlertDialog open={discardOpen} onOpenChange={(o) => !discarding && setDiscardOpen(o)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your unsaved changes for v{registry.version_number} will be permanently removed and cannot be restored. Your last submitted version will remain unchanged.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={discarding}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); confirmDiscard(); }}
+                disabled={discarding}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {discarding ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Trash2 size={14} className="mr-1.5" />}
+                {discarding ? 'Discarding…' : 'Discard Draft'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -524,7 +572,7 @@ export default function SkillRegistryDetailPage() {
 function SelfReviewForm({
   domainSkills, filteredSkills, groupedSkills, ratings, comments, previousRatings,
   ratedCount, allRated, search, saveStatus,
-  onSearchChange, onRatingChange, onCommentChange, onSubmit, onSaveDraft, skills, maxLevel,
+  onSearchChange, onRatingChange, onCommentChange, onSubmit, onSaveDraft, onDiscard, skills, maxLevel,
 }: {
   domainSkills: Skill[];
   filteredSkills: Skill[];
@@ -541,6 +589,7 @@ function SelfReviewForm({
   onCommentChange: (skillId: string, comment: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
+  onDiscard: () => void;
   skills: Skill[];
   maxLevel: number;
 }) {
@@ -772,6 +821,14 @@ function SelfReviewForm({
               </Button>
               <Button size="sm" variant="outline" onClick={onSaveDraft} className="w-full">
                 Save as Draft
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onDiscard}
+                className="w-full gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 size={14} /> Discard Draft
               </Button>
             </div>
           </div>
