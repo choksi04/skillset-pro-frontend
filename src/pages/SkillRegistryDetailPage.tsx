@@ -353,6 +353,29 @@ export default function SkillRegistryDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Discard Draft Confirmation */}
+        <AlertDialog open={discardOpen} onOpenChange={(o) => !discarding && setDiscardOpen(o)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your unsaved changes for v{registry.version_number} will be permanently removed and cannot be restored. Your last submitted version will remain unchanged.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={discarding}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); confirmDiscard(); }}
+                disabled={discarding}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {discarding ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Trash2 size={14} className="mr-1.5" />}
+                {discarding ? 'Discarding…' : 'Discard Draft'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
