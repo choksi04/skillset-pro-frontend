@@ -396,6 +396,13 @@ export default function SkillRegistryDetailPage() {
   const avgRaw = ratedItems.length > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedItems.length : 0;
   const avgOnFive = maxLevel > 0 ? (avgRaw / maxLevel) * 5 : 0;
 
+  // Top / lowest rated skills (by self_score)
+  const maxScore = ratedItems.length > 0 ? Math.max(...ratedItems.map((i) => i.self_score)) : 0;
+  const minScore = ratedItems.length > 0 ? Math.min(...ratedItems.map((i) => i.self_score)) : 0;
+  const skillNameById = (id: string) => skills.find((s) => s.id === id)?.skill_name ?? 'Unknown';
+  const topRatedNames = ratedItems.filter((i) => i.self_score === maxScore).map((i) => skillNameById(i.skill_id));
+  const lowestRatedNames = ratedItems.filter((i) => i.self_score === minScore).map((i) => skillNameById(i.skill_id));
+
   // Skill rows — flat, sorted by category then skill name; only skills that have a rating in this version
   const skillRows = ratedItems
     .map((item) => {
