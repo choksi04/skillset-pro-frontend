@@ -348,11 +348,12 @@ export default function TeamRegistryPage() {
                         <span className="text-muted-foreground">{r.ratedCount} / {r.totalSkills} Rated</span>
                         <span className="font-semibold text-foreground">{r.completionPct}%</span>
                       </div>
-                      <Progress
-                        value={r.completionPct}
-                        className="h-1.5"
-                        indicatorClassName={r.completionPct >= 100 ? 'bg-success' : 'bg-primary'}
-                      />
+                      <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${r.completionPct >= 100 ? 'bg-success' : 'bg-primary'}`}
+                          style={{ width: `${Math.max(0, Math.min(100, r.completionPct))}%` }}
+                        />
+                      </div>
                     </div>
                   </TableCell>
 
