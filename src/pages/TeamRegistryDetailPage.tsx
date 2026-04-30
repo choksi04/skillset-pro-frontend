@@ -404,7 +404,8 @@ export default function TeamRegistryDetailPage() {
                               <SelectContent>
                                 {scoreOptions.map((l) => (
                                   <SelectItem key={l.id} value={String(l.level)}>
-                                    {((l.name / maxLevel) * 5).toFixed(1)}
+                                    {/* /* {((l.name / maxLevel) * 5).toFixed(1)} */ */}
+                                    {l.label} + {l.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
