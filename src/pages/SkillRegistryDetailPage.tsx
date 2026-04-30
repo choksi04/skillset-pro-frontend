@@ -396,6 +396,13 @@ export default function SkillRegistryDetailPage() {
   const avgRaw = ratedItems.length > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedItems.length : 0;
   const avgOnFive = maxLevel > 0 ? (avgRaw / maxLevel) * 5 : 0;
 
+  // Top / lowest rated skills (by self_score)
+  const maxScore = ratedItems.length > 0 ? Math.max(...ratedItems.map((i) => i.self_score)) : 0;
+  const minScore = ratedItems.length > 0 ? Math.min(...ratedItems.map((i) => i.self_score)) : 0;
+  const skillNameById = (id: string) => skills.find((s) => s.id === id)?.skill_name ?? 'Unknown';
+  const topRatedNames = ratedItems.filter((i) => i.self_score === maxScore).map((i) => skillNameById(i.skill_id));
+  const lowestRatedNames = ratedItems.filter((i) => i.self_score === minScore).map((i) => skillNameById(i.skill_id));
+
   // Skill rows — flat, sorted by category then skill name; only skills that have a rating in this version
   const skillRows = ratedItems
     .map((item) => {
@@ -503,6 +510,58 @@ export default function SkillRegistryDetailPage() {
               <Star size={18} className="fill-amber-400 text-amber-400" />
               {ratedItems.length > 0 ? avgOnFive.toFixed(1) : '—'}
             </p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Top Rated Skill</p>
+            <div className="mt-1 text-sm font-semibold text-success flex items-center gap-1.5 flex-wrap">
+              {ratedItems.length > 0 ? (
+                <>
+                  <span className="truncate">{topRatedNames[0]} (L{maxScore})</span>
+                  {topRatedNames.length > 1 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="text-[10px] cursor-help">+{topRatedNames.length - 1}</Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-0.5">
+                            {topRatedNames.slice(1).map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground font-normal">—</span>
+              )}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Lowest Rated Skill</p>
+            <div className="mt-1 text-sm font-semibold text-warning flex items-center gap-1.5 flex-wrap">
+              {ratedItems.length > 0 ? (
+                <>
+                  <span className="truncate">{lowestRatedNames[0]} (L{minScore})</span>
+                  {lowestRatedNames.length > 1 && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="text-[10px] cursor-help">+{lowestRatedNames.length - 1}</Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-0.5">
+                            {lowestRatedNames.slice(1).map((n, i) => <p key={i} className="text-xs">{n}</p>)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground font-normal">—</span>
+              )}
+            </div>
           </div>
         </div>
       )}
