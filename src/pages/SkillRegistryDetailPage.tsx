@@ -261,17 +261,19 @@ export default function SkillRegistryDetailPage() {
   const allItems = useSkillRegistryStore.getState().items.get(registry.id) ?? [];
 
 
-  // Header used in DRAFT view (kept compact, original style)
+  // Header used in DRAFT view
   const draftHeader = (
     <div className="space-y-1">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground mb-2">
-        <ArrowLeft size={14} /> Back to My Registry
+      <Button variant="ghost" size="sm" onClick={() => navigate('/skill-registry')} className="gap-1.5 -ml-2 text-primary hover:text-primary mb-1">
+        <ArrowLeft size={14} /> Back to Registries
       </Button>
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-        <Badge className="text-xs bg-warning/15 text-warning border-warning/20">Draft</Badge>
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Your Skillset Registry'}</h1>
+        <Badge className="text-xs bg-warning/15 text-warning border-warning/20 hover:bg-warning/15">Draft · v{registry.version_number}</Badge>
       </div>
-      <p className="text-xs text-muted-foreground">v{registry.version_number} · {pageDescription}</p>
+      {assignedDomain?.description && (
+        <p className="text-sm text-muted-foreground">{assignedDomain.description}</p>
+      )}
     </div>
   );
 
@@ -295,7 +297,9 @@ export default function SkillRegistryDetailPage() {
           onRatingChange={handleRatingChange}
           onCommentChange={handleCommentChange}
           onSubmit={handleSubmit}
+          onSaveDraft={handleSaveDraftNow}
           skills={skills}
+          maxLevel={maxLevel}
         />
 
         {/* Confirm Dialog */}
