@@ -27,8 +27,11 @@ import {
 } from '@/components/ui/collapsible';
 import {
   CheckCircle, Lock, Send, Search, Info, FolderOpen, Tag,
-  ArrowLeft, Loader2, MessageSquare,
+  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 export default function SkillRegistryDetailPage() {
