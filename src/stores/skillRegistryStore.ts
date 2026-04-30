@@ -38,6 +38,7 @@ interface SkillRegistryStore {
   fetchItemsForRegistries: (ids: string[]) => Promise<void>;
   saveDraft: (registryId: string, items: Omit<SkillRegistryItem, 'id' | 'registry_id'>[]) => Promise<void>;
   submitRegistry: (registryId: string, employeeName: string, domainLeadId: string | null) => Promise<void>;
+  discardDraft: (registryId: string) => Promise<void>;
 }
 
 export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
