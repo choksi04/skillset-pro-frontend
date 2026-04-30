@@ -15,6 +15,7 @@ export default function TeamRegistryPage() {
   const { registries, fetchRegistries, items, fetchItemsForRegistries, loading, initialized } = useSkillRegistryStore();
   const { domains, fetchDomains } = useDomainStore();
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [namesLoading, setNamesLoading] = useState(true);
 
   useEffect(() => {
     fetchRegistries();
@@ -30,16 +31,22 @@ export default function TeamRegistryPage() {
 
   // Fetch employee names
   useEffect(() => {
+    if (!initialized) return;
     const employeeIds = [...new Set(teamRegistries.map((r) => r.employee_id))];
-    if (employeeIds.length === 0) return;
+    if (employeeIds.length === 0) {
+      setNamesLoading(false);
+      return;
+    }
+    setNamesLoading(true);
     supabase.from('users').select('id, full_name').in('id', employeeIds).then(({ data }) => {
       if (data) {
         const map: Record<string, string> = {};
         data.forEach((u: any) => { map[u.id] = u.full_name; });
         setUserNames(map);
       }
-    });
-  }, [teamRegistries]);
+      setNamesLoading(false);
+    }, () => setNamesLoading(false));
+  }, [teamRegistries, initialized]);
 
   // Group by employee, show latest version per employee
   const groupedByEmployee = useMemo(() => {
@@ -78,7 +85,7 @@ export default function TeamRegistryPage() {
         <p className="text-sm text-muted-foreground mt-1">Monitor your team's skill self-assessments and version history.</p>
       </div>
 
-      {loading && !initialized ? (
+      {(loading && !initialized) || namesLoading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="border-border">
@@ -136,7 +143,7 @@ export default function TeamRegistryPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-card-foreground truncate">
-                          {userNames[empId] || empId}
+                          {userNames[empId] || '—'}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
                           {domain?.name ?? 'Unknown domain'}
