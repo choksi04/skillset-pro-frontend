@@ -138,10 +138,15 @@ export default function SkillRegistryDetailPage() {
     }, 2000);
   }, [isDraft, submissionId, ratings, comments, saveDraft]);
 
-  const handleRatingChange = useCallback((skillId: string, rating: RatingLevel) => {
+  const handleRatingChange = useCallback((skillId: string, rating: RatingLevel | null) => {
     if (!isDraft) return;
     setRatings((prev) => {
-      const next = { ...prev, [skillId]: rating };
+      const next = { ...prev };
+      if (rating == null) {
+        delete next[skillId];
+      } else {
+        next[skillId] = rating;
+      }
       setTimeout(() => triggerAutoSave(), 0);
       return next;
     });
