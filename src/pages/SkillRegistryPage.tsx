@@ -134,6 +134,24 @@ export default function SkillRegistryPage() {
     }
   };
 
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  const handleDiscardDraft = async () => {
+    if (!draft) return;
+    setDiscarding(true);
+    try {
+      await discardDraft(draft.id);
+      setDiscardOpen(false);
+      toast.success('Draft discarded');
+    } catch (err) {
+      console.error('Failed to discard draft:', err);
+      toast.error('Failed to discard draft. Please try again.');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   const isInitialLoading = (loading && !initialized) || !domainsInitialized || !skillsInitialized;
   const maxLevel = levels.length > 0 ? levels.length : 5;
 
