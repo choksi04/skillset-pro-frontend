@@ -1,17 +1,20 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useSkillRegistryStore, SkillRegistry } from '@/stores/skillRegistryStore';
+import { useMemo, useEffect } from 'react';
+import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
+import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   AlertTriangle, FileText, Plus, Edit, Eye, Play,
+  History, Clock, CheckCircle2, BarChart3, Star, StarHalf, ArrowRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,10 +23,51 @@ function formatDateTime(dateStr: string) {
   return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatRelative(dateStr: string): string {
+  const d = new Date(dateStr).getTime();
+  const diff = Date.now() - d;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hr / 24);
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
+  const years = Math.floor(days / 365);
+  return `${years} year${years === 1 ? '' : 's'} ago`;
+}
+
 function computeAvg(items: { self_score: number }[]): number | null {
   if (!items || items.length === 0) return null;
   const sum = items.reduce((acc, i) => acc + i.self_score, 0);
   return Math.round((sum / items.length) * 10) / 10;
+}
+
+function StarRow({ value, max }: { value: number | null; max: number }) {
+  // Map value (in competency-level scale) to a 5-star scale
+  const ratio = value !== null && max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const score5 = ratio * 5;
+  const full = Math.floor(score5);
+  const half = score5 - full >= 0.5;
+  const empty = 5 - full - (half ? 1 : 0);
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: full }).map((_, i) => (
+        <Star key={`f-${i}`} size={18} className="fill-amber-400 text-amber-400" />
+      ))}
+      {half && <StarHalf size={18} className="fill-amber-400 text-amber-400" />}
+      {Array.from({ length: empty }).map((_, i) => (
+        <Star key={`e-${i}`} size={18} className="text-muted-foreground/30" />
+      ))}
+    </div>
+  );
 }
 
 export default function SkillRegistryPage() {
@@ -33,6 +77,7 @@ export default function SkillRegistryPage() {
   const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
   const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
+  const { levels, fetchLevels } = useCompetencyLevelStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
@@ -41,6 +86,7 @@ export default function SkillRegistryPage() {
     fetchRegistries(employeeId);
     fetchDomains();
     fetchSkills();
+    fetchLevels();
   }, []);
 
   const assignedDomain = useMemo(() => {
@@ -59,7 +105,6 @@ export default function SkillRegistryPage() {
     [registries, employeeId]
   );
 
-  // Batch fetch items for all displayed registries
   useEffect(() => {
     if (myRegistries.length > 0) {
       fetchItemsForRegistries(myRegistries.map((r) => r.id));
@@ -68,6 +113,7 @@ export default function SkillRegistryPage() {
 
   const draft = getDraft(employeeId);
   const latest = getLatest(employeeId);
+  const submittedRegistries = myRegistries.filter((r) => r.status === 'submitted');
 
   const handleCreateNewVersion = async () => {
     if (!assignedDomain) return;
@@ -75,55 +121,58 @@ export default function SkillRegistryPage() {
     if (reg) navigate(`/skill-registry/${reg.id}`);
   };
 
-  const isInitialLoading = (loading && !initialized) || !domainsInitialized || !skillsInitialized;
+  const handleEditDetails = () => {
+    if (draft) {
+      navigate(`/skill-registry/${draft.id}`);
+    } else {
+      handleCreateNewVersion();
+    }
+  };
 
-  // Initial loading skeleton
+  const isInitialLoading = (loading && !initialized) || !domainsInitialized || !skillsInitialized;
+  const maxLevel = levels.length > 0 ? levels.length : 5;
+
+  // ── Initial loading skeleton ──
   if (isInitialLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-          <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
-        </div>
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-32" />
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-64" />
-                </div>
-                <Skeleton className="h-8 w-32" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-32" />
-          <div className="rounded-lg border border-border p-3 space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="h-4 w-20 rounded-full" />
-              </div>
-            ))}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-foreground">My Registry</h2>
+            <p className="text-sm text-muted-foreground mt-1">Manage and track your assessed skill sets over time.</p>
           </div>
+          <Skeleton className="h-9 w-32" />
         </div>
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-7 w-56" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-32 w-full rounded-lg" />
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </div>
+            <div className="flex justify-end pt-2 border-t border-border">
+              <Skeleton className="h-9 w-44" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // No domain warning
+  // ── No domain warning ──
   if (!assignedDomain) {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-          <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
+          <h2 className="text-2xl font-semibold text-foreground">My Registry</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage and track your assessed skill sets over time.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16">
           <AlertTriangle size={32} className="text-warning mb-3" />
@@ -136,13 +185,13 @@ export default function SkillRegistryPage() {
     );
   }
 
-  // Domain without skills
+  // ── Domain without skills ──
   if (domainSkills.length === 0) {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-          <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime.</p>
+          <h2 className="text-2xl font-semibold text-foreground">My Registry</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage and track your assessed skill sets over time.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16">
           <AlertTriangle size={32} className="text-warning mb-3" />
@@ -155,89 +204,135 @@ export default function SkillRegistryPage() {
     );
   }
 
-  const submittedRegistries = myRegistries.filter((r) => r.status === 'submitted');
+  // Pick the registry to feature: draft if exists, else latest submitted
+  const featured = draft ?? latest ?? null;
+  const featuredItems = featured ? (items.get(featured.id) ?? []) : [];
+  const ratedCount = featuredItems.length;
+  const totalSkills = domainSkills.length;
+  const avgLevel = computeAvg(featuredItems);
+  const updatedTimes = submittedRegistries.length;
+  const lastEditDate = featured
+    ? (featured.status === 'submitted' && featured.submitted_at ? featured.submitted_at : (featured.modified_at ?? featured.created_at))
+    : null;
 
-  const AvgBadge = ({ registryId }: { registryId: string }) => {
-    const regItems = items.get(registryId);
-    const avg = computeAvg(regItems ?? []);
-    if (avg === null) return null;
-    return (
-      <Badge variant="outline" className="text-xs font-medium">
-        Avg Level: {avg}
-      </Badge>
-    );
-  };
+  // Status pill
+  let statusLabel = 'Not started';
+  let statusClass = 'bg-muted text-muted-foreground border-border';
+  if (featured?.status === 'draft') {
+    statusLabel = 'Draft';
+    statusClass = 'bg-warning/15 text-warning border-warning/20';
+  } else if (featured?.status === 'submitted') {
+    statusLabel = 'Up to date';
+    statusClass = 'bg-success/15 text-success border-success/20';
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-foreground">Your Skillset Registry</h2>
-        <p className="text-sm text-muted-foreground mt-1">Update and submit your self-assessed skill ratings anytime. Each submission creates a new version.</p>
-      </div>
-
-      {/* Section 1: Current / Latest Version */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Current Registry</h3>
-
-        {draft ? (
-          <Card className="border-primary/20 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => navigate(`/skill-registry/${draft.id}`)}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">Your Skillset Registry</p>
-                    <Badge className="text-[10px] bg-warning/15 text-warning border-warning/20">Draft</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    v{draft.version_number} · {assignedDomain.name} · {formatDateTime(draft.created_at)}
-                  </p>
-                </div>
-                <Button variant="default" size="sm" className="gap-1.5">
-                  <Edit size={13} /> Continue Editing
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : latest ? (
-          <Card className="border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">Your Skillset Registry</p>
-                    <Badge className="text-[10px] bg-success/15 text-success border-success/20">Submitted</Badge>
-                    <AvgBadge registryId={latest.id} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    v{latest.version_number} · {assignedDomain.name} · {latest.submitted_at ? formatDateTime(latest.submitted_at) : '—'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${latest.id}`); }}>
-                    <Eye size={13} /> View
-                  </Button>
-                  <Button variant="default" size="sm" className="gap-1.5" onClick={handleCreateNewVersion}>
-                    <Plus size={13} /> Create New Version
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-dashed border-2 border-muted-foreground/20">
-            <CardContent className="p-6 flex flex-col items-center text-center">
-              <FileText size={28} className="text-muted-foreground mb-2" />
-              <h3 className="text-sm font-semibold text-foreground mb-1">Start Your First Registry</h3>
-              <p className="text-xs text-muted-foreground mb-3">Rate your skills to create your first skill registry version.</p>
-              <Button size="sm" className="gap-1.5" onClick={handleCreateNewVersion}>
-                <Play size={13} /> Start Self Review
-              </Button>
-            </CardContent>
-          </Card>
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">My Registry</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage and track your assessed skill sets over time.</p>
+        </div>
+        {featured && (
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={handleEditDetails}>
+            <Edit size={13} /> Edit Details
+          </Button>
         )}
       </div>
 
-      {/* Section 2: Version History */}
+      {/* Hero card */}
+      {featured ? (
+        <Card className="border-border">
+          <CardContent className="p-6 space-y-5">
+            {/* Title row */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-2xl font-bold text-foreground">{assignedDomain.name}</h3>
+              <Badge variant="outline" className={`text-xs font-medium ${statusClass}`}>
+                {statusLabel}
+              </Badge>
+            </div>
+
+            {/* Meta row */}
+            <div className="flex items-center gap-5 flex-wrap text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <History size={13} />
+                <span>Updated <span className="font-medium text-foreground">{updatedTimes}</span> {updatedTimes === 1 ? 'time' : 'times'}</span>
+              </div>
+              {lastEditDate && (
+                <div className="flex items-center gap-1.5">
+                  <Clock size={13} />
+                  <span>Last edit: <span className="font-medium text-foreground">{formatRelative(lastEditDate)}</span></span>
+                </div>
+              )}
+            </div>
+
+            {/* Summary tiles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Completion Status */}
+              <div className="rounded-lg border border-border p-5">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                  <CheckCircle2 size={15} />
+                  <span>Completion Status</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className="text-4xl font-bold text-foreground leading-none">{ratedCount}</span>
+                  <span className="text-base text-muted-foreground">/ {totalSkills}</span>
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground ml-1">Skills Rated</span>
+                </div>
+                <Progress value={totalSkills > 0 ? (ratedCount / totalSkills) * 100 : 0} className="h-2" />
+              </div>
+
+              {/* Overall Average Rating */}
+              <div className="rounded-lg border border-border p-5">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                  <BarChart3 size={15} />
+                  <span>Overall Average Rating</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl font-bold text-foreground leading-none">
+                    {avgLevel !== null ? avgLevel.toFixed(1) : '—'}
+                  </span>
+                  <div className="flex flex-col gap-1">
+                    <StarRow value={avgLevel} max={maxLevel} />
+                    <span className="text-[11px] text-muted-foreground">
+                      Out of {maxLevel.toFixed(1)} possible
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer action */}
+            <div className="flex justify-end pt-4 border-t border-border">
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate(`/skill-registry/${featured.id}`)}
+              >
+                {featured.status === 'draft' ? 'Continue Editing' : 'View Detailed Breakdown'}
+                <ArrowRight size={14} />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        // No registry yet → empty state inside hero shell
+        <Card className="border-dashed border-2 border-muted-foreground/20">
+          <CardContent className="p-8 flex flex-col items-center text-center">
+            <FileText size={32} className="text-muted-foreground mb-3" />
+            <h3 className="text-base font-semibold text-foreground mb-1">Start Your First Registry</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+              Rate your skills in <span className="font-medium text-foreground">{assignedDomain.name}</span> to create your first skill registry version.
+            </p>
+            <Button size="sm" className="gap-1.5" onClick={handleCreateNewVersion}>
+              <Play size={13} /> Start Self Review
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Version History */}
       {submittedRegistries.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -281,13 +376,6 @@ export default function SkillRegistryPage() {
               </TableBody>
             </Table>
           </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {myRegistries.length === 0 && !loading && (
-        <div className="flex flex-col items-center justify-center py-8">
-          <p className="text-sm text-muted-foreground">No registry versions yet.</p>
         </div>
       )}
     </div>
