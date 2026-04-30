@@ -1,65 +1,60 @@
-# Discard Draft Registry
+# Redesign Team Registry listing page
 
-Add the ability to discard a draft skill registry — soft-deleting it and returning the user to their last submitted version (or the empty state if none exists).
+Convert `src/pages/TeamRegistryPage.tsx` from the current card-list layout into a structured table that matches the attached mockup, while keeping all existing data sources, role-based scoping, and navigation behaviour intact.
 
-## Behaviour
+## Layout
 
-- Visible only when the current registry is in `draft` status.
-- Confirmation dialog before discarding (action is destructive and irreversible).
-- Discard performs a **soft delete**: sets `deleted_on = now()` and `deleted_by = currentUserId` on the `skill_registries` row. Items in `skill_registry_items` are kept untouched (orphaned but reachable via the soft-deleted parent), consistent with the project's audit policy.
-- After discard, the user is routed back to `/skill-registry`. The list page already auto-features the latest submitted version when no draft exists, so the previous submission becomes the active one again.
-- A toast confirms the discard.
-- If the draft is the **only** registry the user has (no prior submission), the discard still works — the My Registry page falls through to the existing "Start Your First Registry" empty state.
-
-## Where the action appears
-
-1. **My Registry → Detail (Draft / Self Review)** — `src/pages/SkillRegistryDetailPage.tsx`
-   - In the right-side `Registry Summary` panel, below the existing `Submit Registry` and `Save as Draft` buttons, add a destructive ghost-style button: `Discard Draft`.
-   - Styled with `text-destructive hover:bg-destructive/10` so it reads as the destructive option but doesn't compete visually with Submit.
-
-2. **My Registry list page** — `src/pages/SkillRegistryPage.tsx`
-   - When the featured card is in draft status, add a small `Discard` outline button next to `Continue Editing` in the hero card footer (same destructive styling).
-
-Both entry points open the same confirmation dialog and call the same store action.
-
-## Confirmation dialog
-
-Reuse `AlertDialog` (already in the project). Title: `Discard this draft?`. Body: `Your unsaved changes for v{N} will be permanently removed and cannot be restored. Your last submitted version will remain unchanged.`. Buttons: `Cancel` / `Discard Draft` (destructive variant).
-
-## Store change — `src/stores/skillRegistryStore.ts`
-
-Add a new action:
-
-```ts
-discardDraft: (registryId: string) => Promise<void>;
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Team Registries                                          [ Search… ]   [ Filter ]          │
+│ Review and manage skill assessments submitted by your team.                                │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│ TEAM MEMBER          REGISTRY SUBJECT     STATUS         COMPLETION         AVG    ACTIONS│
+│ ◐ Alice Chen         Frontend Engineering [Up to date]   12/12 Rated 100%   ★ 4.8  Review▸│
+│   Senior Frontend…   Updated 1 day ago                   ▰▰▰▰▰▰▰▰▰▰                       │
+│ ...                                                                                        │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Implementation:
-- Soft-delete the row: `update({ deleted_on: now, deleted_by: userId })` on `skill_registries`.
-- Cancel any pending auto-save before invoking (handled by the page).
-- Remove the discarded registry from local `registries` state and drop its `items` cache entry.
-- No notification is emitted (drafts are private to the employee).
+## Columns
 
-## Page wiring — `SkillRegistryDetailPage.tsx`
+1. **Team Member** — circular avatar (initials chip, `bg-primary/10 text-primary`), full name, designation as muted subtext.
+2. **Registry Subject** — domain name (foreground, semibold), `Updated {relative time}` muted subtext below.
+3. **Status** — pill badge derived from latest registry version:
+   - `submitted` and is the latest version → `Up to date` (success).
+   - `draft` exists for that employee → `In Progress` (info / blue tint).
+   - `submitted` but not latest expected (no current draft, but version count behind cycle) → `Needs Review` (warning).  *MVP rule: treat `submitted` with completion < 100% as `Needs Review`; otherwise `Up to date`.*
+4. **Completion** — `X / Y Rated` + `%` aligned right, `Progress` bar below. Bar turns `bg-success` when 100%, `bg-primary` otherwise. Y is the count of skills mapped to the registry's domain (from `domainStore.mappings`).
+5. **Avg Rating** — star icon + score scaled to **/5** (`avg / maxLevel * 5`, one decimal), consistent with My Registry. Use competency level count from `competencyLevelStore` (already loaded elsewhere; fetch here too).
+6. **Actions** — `Review ›` text-only link button → navigates to `/team-registry/{latestRegistryId}` (existing route).
 
-- Add `discardOpen` local state and a `handleDiscard` callback that:
-  1. Clears the auto-save timeout (`saveTimeoutRef`).
-  2. Calls `discardDraft(registry.id)`.
-  3. Shows a success toast (`Draft discarded`).
-  4. Navigates to `/skill-registry`.
-- Pass `onDiscard` into `SelfReviewForm`; render the `Discard Draft` button + `AlertDialog` inside the summary panel.
-- Guard: only render the button when `isDraft` is true (already the case for this view).
+## Header
 
-## Page wiring — `SkillRegistryPage.tsx`
+- Page title `Team Registries` and the description from the mockup.
+- Right-aligned `Search` input (`Search members or roles…`) — filters by employee name and designation, case-insensitive.
+- `Filter` button opens a `Popover` with two `Select`s: **Status** (All / Up to date / Needs Review / In Progress) and **Domain** (All / each domain visible to the user).
 
-- Reuse the same store action and an `AlertDialog`. Render the small `Discard` button only when `featured.status === 'draft'`.
-- After successful discard, no navigation is needed (the list page already re-renders with the latest submitted registry as featured).
+## Data & logic
 
-## Technical notes
-- Files modified:
-  - `src/stores/skillRegistryStore.ts` — new `discardDraft` action.
-  - `src/pages/SkillRegistryDetailPage.tsx` — Discard button + dialog in the summary panel; cancel pending auto-save before discard.
-  - `src/pages/SkillRegistryPage.tsx` — Discard button + dialog on the hero card when draft is featured.
-- No DB migration required — `deleted_on`/`deleted_by` already exist on `skill_registries` and queries already filter by `.is('deleted_on', null)`.
-- No routing or RLS changes.
-- Memory update: append a one-liner to `mem://logic/skill-registry/independence` (or add a new `mem://features/skill-registry/discard-draft` note) describing the soft-delete semantics so future work doesn't accidentally hard-delete.
+- Reuse `useSkillRegistryStore`, `useDomainStore`, `useCompetencyLevelStore`, `useSkillStore` (skills not strictly needed; domain mappings give the denominator).
+- Group registries by `employee_id`, pick the highest `version_number` per employee (existing logic).
+- Batch-fetch employee `full_name` and `designation` from `users` for ids not already cached.
+- Completion denominator = count of `domain_skill_mappings` for `latest.domain_id`. Numerator = `items.get(latest.id).length`.
+- Avg = mean of `self_score` across the latest registry's items, then scaled to `/5` using `competencyLevels.length` (fallback 5).
+- "Updated" timestamp = `submitted_at ?? modified_at ?? created_at`, rendered with the existing `formatRelative` helper (copy from `SkillRegistryPage.tsx`).
+- Role scoping unchanged: admins see everyone; managers see only their own `domain_id`.
+
+## States
+
+- **Loading**: render 4–5 skeleton rows that mirror the table layout.
+- **Empty (no registries)**: keep current empty-state copy, centered inside the table card.
+- **Empty after filter**: small inline message inside the table body — `No team members match your filters.`
+
+## Technical details
+
+- File touched: `src/pages/TeamRegistryPage.tsx` only (single component rewrite).
+- Components used: existing `Table*`, `Input`, `Button`, `Badge`, `Progress`, `Popover`, `Select`, `Skeleton`, `Card` — all already in the project.
+- Icons: `Search`, `Filter`, `Star`, `ChevronRight`, `Users` from `lucide-react`.
+- Avatar: derive 2-letter initials from `full_name`; render in a `rounded-full` div using semantic tokens (`bg-primary/10 text-primary`) — no hardcoded colours.
+- The whole row stays clickable (navigates to detail), with the explicit `Review` link as the visible affordance.
+- No store, route, or DB changes. No new dependencies.
