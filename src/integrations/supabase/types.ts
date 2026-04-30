@@ -1036,6 +1036,84 @@ export type Database = {
         }
         Relationships: []
       }
+      registry_review_items: {
+        Row: {
+          created_at: string
+          id: string
+          manager_comment: string | null
+          manager_score: number | null
+          modified_at: string | null
+          review_id: string
+          skill_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manager_comment?: string | null
+          manager_score?: number | null
+          modified_at?: string | null
+          review_id: string
+          skill_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manager_comment?: string | null
+          manager_score?: number | null
+          modified_at?: string | null
+          review_id?: string
+          skill_id?: string
+        }
+        Relationships: []
+      }
+      registry_reviews: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deleted_by: string | null
+          deleted_on: string | null
+          id: string
+          modified_at: string | null
+          modified_by: string | null
+          overall_comment: string | null
+          registry_id: string
+          reviewer_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          overall_comment?: string | null
+          registry_id: string
+          reviewer_id: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_by?: string | null
+          deleted_on?: string | null
+          id?: string
+          modified_at?: string | null
+          modified_by?: string | null
+          overall_comment?: string | null
+          registry_id?: string
+          reviewer_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       review_skill_entries: {
         Row: {
           ai_calculated_level: number
