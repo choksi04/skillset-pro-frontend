@@ -79,7 +79,7 @@ export default function SkillRegistryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized } = useSkillRegistryStore();
+  const { registries, items, fetchRegistries, fetchItemsForRegistries, createNewVersion, getDraft, getLatest, loading, initialized, discardDraft } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
   const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
