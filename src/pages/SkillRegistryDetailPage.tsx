@@ -17,6 +17,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
@@ -24,7 +28,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   CheckCircle, Lock, Send, Search, Info, Tag,
-  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown,
+  ArrowLeft, Loader2, MessageSquare, Star, Pencil, ChevronDown, Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
