@@ -36,9 +36,11 @@ export default function SkillRegistryDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry } = useSkillRegistryStore();
+  const { registries, fetchRegistries, fetchItems, saveDraft, submitRegistry, createNewVersion } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
+  const { levels: competencyLevels } = useCompetencyLevelStore();
+  const maxLevel = competencyLevels.length || 5;
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
