@@ -1,45 +1,54 @@
-## Problem
+## Goal
 
-In `src/pages/AssessmentTemplatesPage.tsx`, each template `Card` has an `onClick` handler that navigates to the detail/edit page. The action buttons rendered inside the card (Assign, Assignments count, Activate/Deactivate, Edit, Delete) do not stop event propagation, so clicking any of them bubbles the event up to the card and navigates instead of running the intended action.
+Eliminate the "no data" → "data appears" flash on listing pages by showing skeleton loaders while the initial fetch is in flight. Reuse the pattern already established in `DomainsPage` and `SkillFrameworkPage` (which gate on `loading && !initialized`).
 
-## Fix
+## Pages to update
 
-Stop click propagation on every interactive control inside the card, and prevent the card's navigate-on-click from firing when the user actually clicked an action. Two complementary changes:
+All listing pages that currently render an empty-state or jump straight to data without a skeleton:
 
-1. **Wrap each action button's `onClick`** with `e.stopPropagation()` so the card's handler never sees the event:
-   - Assign button → `setAssignFor(t)`
-   - Assignments count button → `setViewAssignmentsFor(t)`
-   - Activate/Deactivate button → `handleToggleStatus(t)`
-   - Edit button → `navigate(...)` (still navigates, but explicitly)
-   - Delete button → `setConfirmDelete(t)`
+1. `src/pages/AssessmentTemplatesPage.tsx` — currently shows "Loading templates…" text only.
+2. `src/pages/SkillRegistryPage.tsx` — no loading guard; flashes "Start Your First Registry" empty card.
+3. `src/pages/QuestionBankPage.tsx`
+4. `src/pages/AssessmentsPage.tsx`
+5. `src/pages/TeamRegistryPage.tsx`
+6. `src/pages/TeamAssessmentsPage.tsx`
+7. `src/pages/ReviewsPage.tsx`
+8. `src/pages/AllRegistriesPage.tsx`
+9. `src/pages/UsersPage.tsx` — already has a `loading` flag; replace its current placeholder with skeleton rows.
 
-2. **Guard the Card's `onClick`** as a defense-in-depth: only navigate when the click target is not inside an interactive element. Use `(e.target as HTMLElement).closest("button, a, [role=button]")` — if it returns truthy, skip navigation.
+(Already correct: `DomainsPage`, `SkillFrameworkPage`. No changes needed.)
 
-Also ensure the `AlertDialog`, `AssignTemplateDialog`, and `TemplateAssignmentsSheet` triggers behave correctly (they already render outside the card, so no change needed there).
+## Approach
 
-## Technical details
+For each page above:
 
-File: `src/pages/AssessmentTemplatesPage.tsx`
-
-- Card:
-  ```tsx
-  onClick={(e) => {
-    if ((e.target as HTMLElement).closest("button, a, [role=button]")) return;
-    navigate(`/assessment-templates/${t.id}`);
-  }}
+- Read `loading` and `initialized` from the relevant store (all listed stores already expose both flags). For `UsersPage`, use the local `loading` state already present.
+- Wrap the list/table/card grid in:
+  ```text
+  {loading && !initialized
+     ? <SkeletonList />
+     : items.length === 0
+        ? <EmptyState />
+        : <ActualList />}
   ```
-- Each action button gets:
-  ```tsx
-  onClick={(e) => { e.stopPropagation(); <existing handler>; }}
-  ```
+- Skeleton should visually mirror each page's row/card shape (3–5 placeholder rows) using the existing `Skeleton` component from `@/components/ui/skeleton`. Reuse the table-row skeleton pattern from `DomainsPage` for table-style pages, and a card skeleton variant for card-style pages (Assessment Templates, Skill Registry, Assessments, Team Registry, Reviews).
+- Keep page header, search/filter bar, and action buttons rendered above the skeleton so layout doesn't jump.
 
-No other files need to change. No styling, routing, or store changes.
+## Skeleton variants (two reusable shapes)
 
-## Verification
+- **Table rows** (Users, Question Bank, All Registries, Team Registry, Team Assessments, Reviews): rounded card → 4–5 rows of `Skeleton h-5` bars matching column widths.
+- **Stacked cards** (Assessment Templates, Skill Registry, Assessments): 3 placeholder cards each containing a title bar, two text bars, and a row of small action-button bars on the right.
 
-- Clicking the card body (title/description/meta area) → opens detail page.
-- Clicking Assign → opens Assign dialog only.
-- Clicking the assignments count → opens assignments sheet only.
-- Clicking Activate/Deactivate → toggles status, no navigation.
-- Clicking Edit → navigates to edit page (expected).
-- Clicking Delete (trash) → opens confirm dialog only, no navigation.
+These can be defined inline per page (matching existing `DomainsPage` style) — no need for a shared component, keeping the change minimal and localized.
+
+## Edge cases
+
+- Pages that fetch from multiple stores (e.g. `SkillRegistryPage` fetches registries + domains + skills): gate skeleton on the primary store's `initialized` flag (`useSkillRegistryStore`), which is what determines whether the listing has data.
+- Pages where `fetchX` is called unconditionally on mount: the `initialized` flag remains false until the first fetch resolves, so the skeleton will display for any first-paint, including refreshes.
+- Subsequent refetches (e.g. after create/delete) must NOT show the skeleton again — the `&& !initialized` guard ensures this; data stays visible during background refresh.
+
+## Out of scope
+
+- Detail pages (`AssessmentDetailPage`, `SkillRegistryDetailPage`, etc.) — only listing pages are affected by this request.
+- Loader behaviour inside dialogs/sheets.
+- Changing store APIs or fetch logic.
