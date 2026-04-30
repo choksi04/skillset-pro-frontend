@@ -1,44 +1,45 @@
-## Goal
+## Problem
 
-In the **Selected Questions** drawer (and ideally also the inline Selected list in the Assessment Template editor), make each question row clickable to open a detail panel that shows the full question content, options, and correct answer — matching the experience in the Question Bank.
+In `src/pages/AssessmentTemplatesPage.tsx`, each template `Card` has an `onClick` handler that navigates to the detail/edit page. The action buttons rendered inside the card (Assign, Assignments count, Activate/Deactivate, Edit, Delete) do not stop event propagation, so clicking any of them bubbles the event up to the card and navigates instead of running the intended action.
 
-## Approach
+## Fix
 
-Reuse the existing `QuestionDetailSheet` from `src/pages/QuestionBankPage.tsx` rather than rebuilding it. This guarantees identical formatting (uses `FormattedQuestionContent`, badges, level labels, dates).
+Stop click propagation on every interactive control inside the card, and prevent the card's navigate-on-click from firing when the user actually clicked an action. Two complementary changes:
 
-### Steps
+1. **Wrap each action button's `onClick`** with `e.stopPropagation()` so the card's handler never sees the event:
+   - Assign button → `setAssignFor(t)`
+   - Assignments count button → `setViewAssignmentsFor(t)`
+   - Activate/Deactivate button → `handleToggleStatus(t)`
+   - Edit button → `navigate(...)` (still navigates, but explicitly)
+   - Delete button → `setConfirmDelete(t)`
 
-1. **Extract `QuestionDetailSheet` into a shared component**
-   - Move the inline `QuestionDetailSheet` function (lines 1082–1121 of `QuestionBankPage.tsx`) plus its dependencies (`questionTypeLabels`, `statusStyles`, `FormattedQuestionContent` import) into a new file: `src/components/questions/QuestionDetailSheet.tsx`.
-   - Update `QuestionBankPage.tsx` to import from the new location.
+2. **Guard the Card's `onClick`** as a defense-in-depth: only navigate when the click target is not inside an interactive element. Use `(e.target as HTMLElement).closest("button, a, [role=button]")` — if it returns truthy, skip navigation.
 
-2. **Make rows clickable in `SelectedQuestionRow.tsx`**
-   - Add an optional `onClick` prop. Wrap the row content in a `button` (or add `role="button"` + `onClick` + cursor/hover styles).
-   - Ensure the **Remove (X)** button stops propagation so it doesn't trigger the detail view.
+Also ensure the `AlertDialog`, `AssignTemplateDialog`, and `TemplateAssignmentsSheet` triggers behave correctly (they already render outside the card, so no change needed there).
 
-3. **Wire detail sheet inside `SelectedQuestionsSheet.tsx`**
-   - Add local state `detailQuestion: Question | null`.
-   - Pass `onClick={() => setDetailQuestion(q)}` to each `SelectedQuestionRow`.
-   - Render `<QuestionDetailSheet>` when `detailQuestion` is set, resolving `skillName`, `topicName`, and `levelLabels` from the existing stores already loaded in this component (skills, competencyLevels) plus the topic store.
+## Technical details
 
-4. **Apply the same in the inline Selected list** on `AssessmentTemplateEditPage.tsx`
-   - Wherever `SelectedQuestionRow` is rendered inline (outside the sheet), pass the same `onClick` and host the `QuestionDetailSheet` at page level so users can click any selected question to inspect it without going through the secondary drawer.
+File: `src/pages/AssessmentTemplatesPage.tsx`
 
-### Technical notes
+- Card:
+  ```tsx
+  onClick={(e) => {
+    if ((e.target as HTMLElement).closest("button, a, [role=button]")) return;
+    navigate(`/assessment-templates/${t.id}`);
+  }}
+  ```
+- Each action button gets:
+  ```tsx
+  onClick={(e) => { e.stopPropagation(); <existing handler>; }}
+  ```
 
-- `QuestionDetailSheet` already uses the shared `FormattedQuestionContent`, which renders MCQ options with the correct answer highlighted, scenarios, and coding problems consistently with Question Bank.
-- No data fetching changes required — `useQuestionStore` already has full question objects in `SelectedQuestionsSheet`.
-- Topic name in the sheet can be omitted (pass `null`) if the topic store isn't already loaded here, to keep the change minimal; the detail sheet handles `null` topic gracefully.
+No other files need to change. No styling, routing, or store changes.
 
-### Files
+## Verification
 
-- New: `src/components/questions/QuestionDetailSheet.tsx`
-- Edited: `src/pages/QuestionBankPage.tsx` (import from new location, remove inline def)
-- Edited: `src/components/templates/SelectedQuestionRow.tsx` (clickable + stopPropagation on remove)
-- Edited: `src/components/templates/SelectedQuestionsSheet.tsx` (host detail sheet)
-- Edited: `src/pages/AssessmentTemplateEditPage.tsx` (host detail sheet for inline list)
-
-### Out of scope
-
-- No changes to the Add Questions picker (it already supports expanding to view options).
-- No changes to data model or stores.
+- Clicking the card body (title/description/meta area) → opens detail page.
+- Clicking Assign → opens Assign dialog only.
+- Clicking the assignments count → opens assignments sheet only.
+- Clicking Activate/Deactivate → toggles status, no navigation.
+- Clicking Edit → navigates to edit page (expected).
+- Clicking Delete (trash) → opens confirm dialog only, no navigation.

@@ -146,7 +146,10 @@ export default function AssessmentTemplatesPage() {
             <Card
               key={t.id}
               className="hover:border-primary/30 transition-colors cursor-pointer"
-              onClick={() => navigate(`/assessment-templates/${t.id}`)}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("button, a, [role=button]")) return;
+                navigate(`/assessment-templates/${t.id}`);
+              }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
@@ -200,7 +203,10 @@ export default function AssessmentTemplatesPage() {
                         size="sm"
                         variant="ghost"
                         className="h-8 gap-1.5 text-xs text-primary hover:text-primary"
-                        onClick={() => setAssignFor(t)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssignFor(t);
+                        }}
                       >
                         <UserCheck size={13} /> Assign
                       </Button>
@@ -209,7 +215,10 @@ export default function AssessmentTemplatesPage() {
                       size="sm"
                       variant="ghost"
                       className="h-8 gap-1.5 text-xs"
-                      onClick={() => setViewAssignmentsFor(t)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewAssignmentsFor(t);
+                      }}
                     >
                       <Users size={13} /> {getAssignmentsForTemplate(t.id).length}
                     </Button>
@@ -217,7 +226,10 @@ export default function AssessmentTemplatesPage() {
                       size="sm"
                       variant="ghost"
                       className="h-8 gap-1.5 text-xs"
-                      onClick={() => handleToggleStatus(t)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleStatus(t);
+                      }}
                     >
                       {t.status === "active" ? <PowerOff size={13} /> : <Power size={13} />}
                       {t.status === "active" ? "Deactivate" : "Activate"}
@@ -226,7 +238,10 @@ export default function AssessmentTemplatesPage() {
                       size="sm"
                       variant="ghost"
                       className="h-8 gap-1.5 text-xs"
-                      onClick={() => navigate(`/assessment-templates/${t.id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/assessment-templates/${t.id}`);
+                      }}
                     >
                       <Pencil size={13} /> Edit
                     </Button>
@@ -234,7 +249,10 @@ export default function AssessmentTemplatesPage() {
                       size="sm"
                       variant="ghost"
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      onClick={() => setConfirmDelete(t)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(t);
+                      }}
                     >
                       <Trash2 size={13} />
                     </Button>
