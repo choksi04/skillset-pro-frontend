@@ -298,7 +298,7 @@ export default function AllRegistriesPage() {
         )
       )}
 
-      {viewMode === 'employees' && (
+      {!(regsLoading && !regsInit) && viewMode === 'employees' && (
         filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
