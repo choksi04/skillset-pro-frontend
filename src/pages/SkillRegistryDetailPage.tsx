@@ -239,6 +239,24 @@ export default function SkillRegistryDetailPage() {
     }
   };
 
+  const confirmDiscard = async () => {
+    if (!registry) return;
+    setDiscarding(true);
+    try {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      isDirtyRef.current = false;
+      await discardDraft(registry.id);
+      setDiscardOpen(false);
+      toast.success('Draft discarded');
+      navigate('/skill-registry');
+    } catch (err) {
+      console.error('Failed to discard draft:', err);
+      toast.error('Failed to discard draft. Please try again.');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   if (!registry) {
     return (
       <div className="space-y-6">
