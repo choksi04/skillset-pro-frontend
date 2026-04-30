@@ -113,7 +113,7 @@ export default function TeamAssessmentsPage() {
         />
       </div>
 
-      {(loading && !initialized) || namesLoading ? (
+      {!initialized || namesLoading || teamAssessments.some((a) => !(a.employee_id in userNames)) ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-xl border border-border bg-card px-5 py-4">
