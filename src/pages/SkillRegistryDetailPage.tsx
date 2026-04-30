@@ -238,38 +238,7 @@ export default function SkillRegistryDetailPage() {
 
   // Summary stats
   const allItems = useSkillRegistryStore.getState().items.get(registry.id) ?? [];
-  const avgLevel = allItems.length > 0 ? Math.round((allItems.reduce((s, i) => s + i.self_score, 0) / allItems.length) * 10) / 10 : null;
-  const maxScore = allItems.length > 0 ? Math.max(...allItems.map((i) => i.self_score)) : 0;
-  const minScore = allItems.length > 0 ? Math.min(...allItems.map((i) => i.self_score)) : 0;
-  const topRatedItems = allItems.filter((i) => i.self_score === maxScore);
-  const lowestRatedItems = allItems.filter((i) => i.self_score === minScore);
-  const topRatedSkillNames = topRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
-  const lowestRatedSkillNames = lowestRatedItems.map((i) => skills.find((s) => s.id === i.skill_id)?.skill_name ?? i.skill_id);
 
-  const SkillListBadge = ({ names, score }: { names: string[]; score: number }) => {
-    if (names.length === 0) return <span className="text-muted-foreground">—</span>;
-    const first = names[0];
-    const rest = names.slice(1);
-    return (
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-sm font-medium text-foreground">{first} (L{score})</span>
-        {rest.length > 0 && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-[10px] cursor-help">+{rest.length}</Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <div className="space-y-0.5">
-                  {rest.map((n, i) => <p key={i} className="text-xs">{n}</p>)}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-    );
-  };
 
   // Header used in DRAFT view (kept compact, original style)
   const draftHeader = (
