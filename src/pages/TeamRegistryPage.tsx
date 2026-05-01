@@ -2,14 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-// Progress bar rendered inline (custom colour at 100%)
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -21,6 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { deriveRegistryStatus, registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatRelative(dateStr: string | null): string {
   if (!dateStr) return '—';
