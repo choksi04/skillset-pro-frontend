@@ -404,11 +404,10 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
                     <TableCell className="text-center">
-                      {row.reviewStatus === 'approved' ? (
-                        <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending review</Badge>
-                      )}
+                      <RegistryStatusBadge
+                        status={row.reviewStatus === 'approved' ? 'approved' : 'review_pending'}
+                        size="sm"
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -476,11 +475,10 @@ export default function AllRegistriesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        {emp.reviewStatus === 'approved' ? (
-                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending</Badge>
-                        )}
+                        <RegistryStatusBadge
+                          status={emp.reviewStatus === 'approved' ? 'approved' : 'review_pending'}
+                          size="sm"
+                        />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <ChevronRight size={14} />
