@@ -47,6 +47,8 @@ interface EmployeeAgg {
   entryCount: number;
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
+  topSkill: { name: string; level: number } | null;
+  lowSkill: { name: string; level: number } | null;
 }
 
 function avg(values: number[]): number {
@@ -76,7 +78,8 @@ function exportSkillsCSV(rows: SkillAgg[]) {
 }
 
 function exportEmployeesCSV(rows: EmployeeAgg[]) {
-  const header = ["Employee Name", "Domain", "Self Avg", "Skills", "Status"];
+  const header = ["Employee Name", "Domain", "Self Avg", "Skills", "Top Skill", "Low Skill", "Status"];
+  const fmt = (s: { name: string; level: number } | null) => (s ? `${s.name} (L${s.level})` : "—");
   const csv = [
     header,
     ...rows.map((r) => [
@@ -84,10 +87,12 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
       r.domainName,
       String(r.selfAvg),
       String(r.entryCount),
+      fmt(r.topSkill),
+      fmt(r.lowSkill),
       r.reviewStatus === "approved" ? "Approved" : "Pending review",
     ]),
   ]
-    .map((r) => r.join(","))
+    .map((r) => r.map((c) => (c.includes(",") ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
     .join("\n");
   downloadCSV(csv, "registry_by_employees.csv");
 }
@@ -264,6 +269,16 @@ export default function AllRegistriesPage() {
     return filteredLatest
       .map((reg) => {
         const items = allItems[reg.id] || [];
+        const named = items
+          .map((i) => ({ name: skillMap.get(i.skill_id)?.skill_name || i.skill_id, level: i.self_score }))
+          .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
+        const topSkill = named.length ? { name: named[0].name, level: named[0].level } : null;
+        const lowSkill = named.length
+          ? (() => {
+              const sortedAsc = [...named].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+              return { name: sortedAsc[0].name, level: sortedAsc[0].level };
+            })()
+          : null;
         return {
           employee_id: reg.employee_id,
           employeeName: userNames[reg.employee_id] || reg.employee_id.slice(0, 8),
@@ -272,10 +287,12 @@ export default function AllRegistriesPage() {
           entryCount: items.length,
           latestRegistryId: reg.id,
           reviewStatus: getReviewStatus(reg.id),
+          topSkill,
+          lowSkill,
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap, reviewStatuses]);
+  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses]);
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
@@ -448,6 +465,8 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Employee Name</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Avg</TableHead>
                   <TableHead className="text-xs font-medium text-center">Skills</TableHead>
+                  <TableHead className="text-xs font-medium">Top Skill</TableHead>
+                  <TableHead className="text-xs font-medium">Low Skill</TableHead>
                   <TableHead className="text-xs font-medium text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -464,7 +483,6 @@ export default function AllRegistriesPage() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      {/* <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge> */}
                       <Badge
                         variant="secondary"
                         className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.selfAvg)))}`}
@@ -473,6 +491,36 @@ export default function AllRegistriesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell>
+                      {row.topSkill ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate max-w-[180px]">{row.topSkill.name}</span>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.topSkill.level)))}`}
+                          >
+                            L{row.topSkill.level}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.lowSkill ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate max-w-[180px]">{row.lowSkill.name}</span>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.lowSkill.level)))}`}
+                          >
+                            L{row.lowSkill.level}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       <RegistryStatusBadge
                         status={row.reviewStatus === "approved" ? "approved" : "review_pending"}
