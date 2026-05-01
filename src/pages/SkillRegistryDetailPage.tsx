@@ -34,6 +34,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { deriveRegistryStatus, registryStatusConfig } from '@/lib/registryStatus';
 
 export default function SkillRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
