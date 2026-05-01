@@ -307,12 +307,27 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
   },
 
   discardDraft: async (registryId: string) => {
-    const userId = getCurrentUserId();
-    const now = new Date().toISOString();
+    // Safety: only hard-delete drafts
+    const reg = get().registries.find((r) => r.id === registryId);
+    if (!reg || reg.status !== 'draft') {
+      throw new Error('Only draft registries can be discarded');
+    }
 
+    // 1. Delete child items first (no FK cascade defined)
+    const { error: itemsErr } = await supabase
+      .from('skill_registry_items')
+      .delete()
+      .eq('registry_id', registryId);
+
+    if (itemsErr) {
+      console.error('Failed to delete registry items:', itemsErr);
+      throw itemsErr;
+    }
+
+    // 2. Hard-delete the draft registry
     const { error } = await supabase
       .from('skill_registries')
-      .update({ deleted_on: now, deleted_by: userId })
+      .delete()
       .eq('id', registryId)
       .eq('status', 'draft');
 
