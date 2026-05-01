@@ -59,6 +59,11 @@ export default function SkillRegistryDetailPage() {
     fetchSkills();
   }, []);
 
+  // Fetch review status for this registry (cached in shared store)
+  useEffect(() => {
+    if (submissionId) fetchReviewStatusesForRegistries([submissionId]);
+  }, [submissionId]);
+
   const registry = useMemo(
     () => registries.find((r) => r.id === submissionId),
     [registries, submissionId]
