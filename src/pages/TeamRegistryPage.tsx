@@ -197,7 +197,7 @@ export default function TeamRegistryPage() {
         updatedAt,
       };
     });
-  }, [groupedByEmployee, domains, mappings, items, userMeta, maxLevel]);
+  }, [groupedByEmployee, domains, mappings, items, userMeta, maxLevel, reviewStatuses]);
 
   // Filter + search
   const filteredRows = useMemo(() => {
