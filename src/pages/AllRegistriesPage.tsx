@@ -543,8 +543,8 @@ export default function AllRegistriesPage() {
                       }}
                     >
                       <TableCell>
-                        <h5 className="text-sm font-medium"> {row.employeeName} </h5>
-                        <p className="text-xs text-muted-foreground">{row.domainName}</p>
+                        <h5 className="text-sm font-medium"> {emp.name} </h5>
+                        <p className="text-xs text-muted-foreground">{emp.domain}</p>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, emp.level)))}`}>
