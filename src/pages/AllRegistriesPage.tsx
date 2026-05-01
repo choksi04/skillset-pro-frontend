@@ -358,8 +358,8 @@ export default function AllRegistriesPage() {
                         aria-label={`View ${row.totalEmps} employees with skill ${row.skillName}`}
                       >
                         <Badge
-                          variant="secondary"
-                          className="text-[11px] cursor-pointer hover:bg-secondary/80"
+                          variant="default"
+                          className="text-[11px] cursor-pointer"
                         >
                           {row.totalEmps}
                         </Badge>
@@ -367,11 +367,11 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     {[1, 2, 3, 4, 5].map(l => (
                       <TableCell key={l} className="text-center">
-                        <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? getLevelColorClass(l) : 'opacity-40'}`}>{row.levels[l]}</Badge>
+                        <Badge variant="secondary" className={`text-[10px]`}>{row.levels[l]}</Badge>
                       </TableCell>
                     ))}
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] pointer-events-none ${getLevelColorClass(Math.round(row.avgLevel))}`}>{row.avgLevel}</Badge>
+                      <Badge  variant="secondary" className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.avgLevel)))}`}>{row.avgLevel}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -409,7 +409,9 @@ export default function AllRegistriesPage() {
                     <TableCell className="text-sm font-medium">{row.employeeName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{row.domainName}</TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge>
+                      {/* <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge> */}
+                      <Badge  variant="secondary" className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.selfAvg)))}`}>{row.selfAvg}</Badge>
+
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
                     <TableCell className="text-center">
