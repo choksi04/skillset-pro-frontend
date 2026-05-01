@@ -456,13 +456,14 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Employee</TableHead>
                   <TableHead className="text-xs font-medium">Domain</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Level</TableHead>
+                  <TableHead className="text-xs font-medium text-center">Status</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {drawerEmployees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
                       No employees match your search.
                     </TableCell>
                   </TableRow>
@@ -482,6 +483,13 @@ export default function AllRegistriesPage() {
                         <Badge className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, emp.level)))}`}>
                           L{emp.level}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {emp.reviewStatus === 'approved' ? (
+                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <ChevronRight size={14} />
