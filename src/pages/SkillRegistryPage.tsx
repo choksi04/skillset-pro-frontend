@@ -245,16 +245,13 @@ export default function SkillRegistryPage() {
     ? (featured.status === 'submitted' && featured.submitted_at ? featured.submitted_at : (featured.modified_at ?? featured.created_at))
     : null;
 
-  // Status pill
-  let statusLabel = 'Not started';
-  let statusClass = 'bg-muted text-muted-foreground border-border';
-  if (featured?.status === 'draft') {
-    statusLabel = 'Draft';
-    statusClass = 'bg-warning/15 text-warning border-warning/20';
-  } else if (featured?.status === 'submitted') {
-    statusLabel = 'Up to date';
-    statusClass = 'bg-success/15 text-success border-success/20';
-  }
+  // Derive featured status from the unified helper (handles draft / incomplete / review_pending / approved)
+  const featuredStatus = deriveRegistryStatus({
+    registryStatus: (featured?.status as 'draft' | 'submitted' | undefined) ?? null,
+    ratedCount,
+    totalSkills,
+    reviewStatus: featured ? (reviewStatuses[featured.id] ?? null) : null,
+  });
 
   return (
     <div className="space-y-6">
@@ -278,9 +275,7 @@ export default function SkillRegistryPage() {
             {/* Title row */}
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-2xl font-bold text-foreground">{assignedDomain.name}</h3>
-              <Badge variant="outline" className={`text-xs font-medium ${statusClass}`}>
-                {statusLabel}
-              </Badge>
+              <RegistryStatusBadge status={featuredStatus} />
             </div>
 
             {/* Meta row */}
