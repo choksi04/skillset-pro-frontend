@@ -255,7 +255,7 @@ export default function TeamRegistryDetailPage() {
                       : "bg-warning/15 text-warning border-warning/20"
                   }`}
                 >
-                  {isApproved ? "Approved" : "Pending Review"}
+                  {isApproved ? "Approved" : "Review Pending"}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
