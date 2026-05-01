@@ -465,6 +465,8 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Employee Name</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Avg</TableHead>
                   <TableHead className="text-xs font-medium text-center">Skills</TableHead>
+                  <TableHead className="text-xs font-medium">Top Skill</TableHead>
+                  <TableHead className="text-xs font-medium">Low Skill</TableHead>
                   <TableHead className="text-xs font-medium text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -481,7 +483,6 @@ export default function AllRegistriesPage() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      {/* <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge> */}
                       <Badge
                         variant="secondary"
                         className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.selfAvg)))}`}
@@ -490,6 +491,36 @@ export default function AllRegistriesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell>
+                      {row.topSkill ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate max-w-[180px]">{row.topSkill.name}</span>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.topSkill.level)))}`}
+                          >
+                            L{row.topSkill.level}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.lowSkill ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate max-w-[180px]">{row.lowSkill.name}</span>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.lowSkill.level)))}`}
+                          >
+                            L{row.lowSkill.level}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       <RegistryStatusBadge
                         status={row.reviewStatus === "approved" ? "approved" : "review_pending"}
