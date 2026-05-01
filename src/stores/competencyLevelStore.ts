@@ -198,10 +198,10 @@ export function getRatingDescriptions(levels: CompetencyLevel[]): Record<number,
 
 /** Semantic color classes for level badges */
 const LEVEL_COLOR_CLASSES: Record<number, string> = {
-  1: 'bg-muted text-muted-foreground',
-  2: 'bg-info/15 text-info',
-  3: 'bg-accent/15 text-accent',
-  4: 'bg-warning/15 text-warning',
+  1: 'bg-destructive/15 text-destructive',
+  2: 'bg-warning/15 text-warning',
+  3: 'bg-info/15 text-info',
+  4: 'bg-primary/15 text-primary',
   5: 'bg-success/15 text-success',
 };
 
