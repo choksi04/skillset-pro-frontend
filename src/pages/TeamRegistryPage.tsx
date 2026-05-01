@@ -230,9 +230,9 @@ export default function TeamRegistryPage() {
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="up_to_date">Up to date</SelectItem>
-                    <SelectItem value="needs_review">Needs Review</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    {statusFilterOptions.map((s) => (
+                      <SelectItem key={s} value={s}>{registryStatusConfig[s].label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -341,7 +341,7 @@ export default function TeamRegistryPage() {
                   </TableCell>
 
                   {/* Status */}
-                  <TableCell className="py-4 px-5">{statusBadge(r.status)}</TableCell>
+                  <TableCell className="py-4 px-5"><RegistryStatusBadge status={r.status} size="sm" /></TableCell>
 
                   {/* Completion */}
                   <TableCell className="py-4 px-5">
