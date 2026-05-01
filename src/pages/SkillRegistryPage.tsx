@@ -3,9 +3,9 @@ import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
