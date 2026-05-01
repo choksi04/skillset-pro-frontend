@@ -275,15 +275,18 @@ export default function SkillRegistryPage() {
     ? (featured.status === 'submitted' && featured.submitted_at ? featured.submitted_at : (featured.modified_at ?? featured.created_at))
     : null;
 
-  // Status pill
+  // Status pill — derived from registry + manager review state
   let statusLabel = 'Not started';
   let statusClass = 'bg-muted text-muted-foreground border-border';
-  if (featured?.status === 'draft') {
-    statusLabel = 'Draft';
-    statusClass = 'bg-warning/15 text-warning border-warning/20';
-  } else if (featured?.status === 'submitted') {
-    statusLabel = 'Up to date';
-    statusClass = 'bg-success/15 text-success border-success/20';
+  if (featured) {
+    const derived = deriveRegistryStatus({
+      registryStatus: featured.status as 'draft' | 'submitted',
+      ratedCount,
+      totalSkills,
+      reviewStatus: reviewStatuses[featured.id] ?? null,
+    });
+    statusLabel = registryStatusConfig[derived].label;
+    statusClass = registryStatusConfig[derived].badgeClass;
   }
 
   return (
