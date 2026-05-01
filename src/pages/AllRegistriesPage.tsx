@@ -4,6 +4,7 @@ import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,8 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from 'lucide-react';
+import { deriveRegistryStatus, type RegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 type ReviewStatus = 'approved' | 'pending';
 
