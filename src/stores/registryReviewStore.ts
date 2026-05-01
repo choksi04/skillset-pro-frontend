@@ -252,9 +252,14 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
     set((s) => {
       const next = new Map(s.reviews);
       const r = next.get(registryId);
-      if (!r) return { reviews: next };
+      if (!r) {
+        return { reviews: next, reviewStatuses: { ...s.reviewStatuses, [registryId]: 'approved' } };
+      }
       next.set(registryId, { ...r, status: 'approved', completed_at: now });
-      return { reviews: next };
+      return {
+        reviews: next,
+        reviewStatuses: { ...s.reviewStatuses, [registryId]: 'approved' },
+      };
     });
   },
 }));
