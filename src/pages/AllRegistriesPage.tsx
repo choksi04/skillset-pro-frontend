@@ -71,7 +71,7 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
   const header = ['Employee Name', 'Domain', 'Self Avg', 'Skills', 'Status'];
   const csv = [header, ...rows.map(r => [
     r.employeeName, r.domainName, String(r.selfAvg), String(r.entryCount),
-    r.reviewStatus === 'approved' ? 'Approved' : 'Pending review',
+    r.reviewStatus === 'approved' ? 'Approved' : 'Review Pending',
   ])].map(r => r.join(',')).join('\n');
   downloadCSV(csv, 'registry_by_employees.csv');
 }
