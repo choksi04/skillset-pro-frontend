@@ -1,70 +1,76 @@
-## Goal
+## Bug
 
-Replace the current role-based `DashboardPage` with a simple, polished **"Dashboard — Coming Soon"** screen. This is a temporary placeholder until a properly designed dashboard is built. It should reassure users the platform is functional and guide them to the parts of the product that *are* live.
+Manager `test_manager@1rivet.com` (domain lead of "Dynamic 365" / `dom-1776245490169`) cannot see Nikunj Patel's submitted assessment on **Team Assessments**, even though Nikunj belongs to the same domain.
 
-## Scope
+## Root cause
 
-- File touched: `src/pages/DashboardPage.tsx` (full rewrite, kept small)
-- No routing changes, no new components, no store changes, no DB changes
-- Existing data fetching (`fetchSkills`, `fetchAssessments`, etc.) on the dashboard will be **removed** — this fixes a meaningful chunk of the "too many API calls" concern raised earlier, since the landing route currently fires 7 store fetches on mount that the placeholder doesn't need.
+Verified with live data:
 
-## UX Design
+- `users.test_manager@1rivet.com.domain_id` = `dom-1776245490169` ✅
+- `users.nikunjkumar.s.patel@1rivet.com.domain_id` = `dom-1776245490169` ✅
+- `assessments` row for Nikunj has **`domain_id = "fixed"`** ❌ (a placeholder string, not a real domain id)
 
-Single centered, minimal layout. Subtle, neutral, with a small indigo/blue accent — consistent with project visual identity. Works in light + dark mode.
+Two issues combine to cause the bug:
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  Welcome back, {first name}                                  │
-│  Your skill intelligence workspace                           │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  [icon]  Dashboard — Coming Soon                       │  │
-│  │                                                        │  │
-│  │  We're crafting a focused dashboard with the           │  │
-│  │  insights that matter most. In the meantime, the       │  │
-│  │  platform is fully usable — jump into the modules     │  │
-│  │  below to get started.                                 │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                              │
-│  Explore what's available today                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│  │ Skill        │  │ Assessments  │  │ Team         │        │
-│  │ Registry     │  │              │  │ Registry *   │        │
-│  │ Self-rate…   │  │ Take/review… │  │ Review team… │        │
-│  │ Open →       │  │ Open →       │  │ Open →       │        │
-│  └──────────────┘  └──────────────┘  └──────────────┘        │
-│  (cards shown depend on role)                                │
-│                                                              │
-│  Need a tour? → Open the User Guide                          │
-└──────────────────────────────────────────────────────────────┘
+1. **Bad data being written** — `src/stores/assignmentStore.ts` (lines 135 and 170) inserts assessments using:
+   ```ts
+   domain_id: template.domain_id ?? 'fixed'
+   ```
+   When a template is not bound to a specific domain, the assessment gets the literal string `'fixed'` instead of the employee's actual domain. The same fallback is also written into the in-memory store at line 170.
+
+2. **Wrong filter on Team Assessments** — `src/pages/TeamAssessmentsPage.tsx` filters team assessments by `a.domain_id === user.domain_id`. The intent is "assessments of employees in my domain", but it's filtering on the assessment's stamped `domain_id`, which can drift from the employee's actual domain (and in this case is `'fixed'`).
+
+## Fix
+
+### 1. `src/pages/TeamAssessmentsPage.tsx` — filter by the employee's domain, not the assessment's domain
+For managers, resolve each assessment's owner domain via `useUserStore` (or the same `users` lookup the page already does via `supabase`), and include the assessment when the employee's `domain_id` matches the manager's `domain_id`. This is consistent with the "managers see data of employees in their domain" rule (memory: `data-visibility`).
+
+Implementation outline:
+- Reuse the existing `users` fetch already running on the page; extend the projection to include `domain_id`.
+- Build a `Map<employeeId, domainId>` and use it in the `teamAssessments` memo:
+  ```ts
+  if (currentRole === 'manager') {
+    const myDomain = user?.domain_id;
+    if (!myDomain) return [];
+    return assessments.filter((a) => employeeDomainMap.get(a.employee_id) === myDomain);
+  }
+  ```
+- Admin branch unchanged (sees all).
+
+### 2. `src/stores/assignmentStore.ts` — stop stamping the literal `'fixed'`
+Replace both occurrences of `template.domain_id ?? 'fixed'` (lines 135 and 170) so the assessment row carries the **employee's** domain when the template is not bound to one:
+
+```ts
+const employeeDomain =
+  template.domain_id ?? (await getEmployeeDomain(employeeId)) ?? null;
+// ...
+domain_id: employeeDomain,
 ```
 
-### Card visibility by role
+Where `getEmployeeDomain` is a small inline lookup against `users.domain_id` (we can fetch it once per call). The DB column is `text NOT NULL` per schema, so if both template and employee have no domain, fall back to an empty string `''` rather than `'fixed'` (or, cleaner, alter to nullable in a follow-up — out of scope here). Choosing empty-string keeps the schema intact and avoids the placeholder showing up in any UI filter.
 
-- **Employee**: Skill Registry, My Assessments, User Guide
-- **Manager**: Skill Registry, My Assessments, Team Registry, Team Assessments, Manager Reviews, User Guide
-- **Admin**: Skill Library, Domains, Question Bank, Assessment Templates, All Registries, User Guide
+### 3. Backfill the existing broken row
+One-shot migration to repair existing data:
 
-Each card: small lucide icon in a soft `bg-primary/10` square, short title, one-line description, subtle `Open →` affordance. Entire card is clickable (uses `useNavigate`).
+```sql
+UPDATE assessments a
+SET domain_id = u.domain_id
+FROM users u
+WHERE a.employee_id = u.id
+  AND a.domain_id = 'fixed'
+  AND u.domain_id IS NOT NULL;
+```
 
-### Visual details
+This makes Nikunj's existing assessment immediately visible to the manager and fixes any other historical rows created with the placeholder.
 
-- Outer container: `space-y-8`, max width `max-w-5xl`
-- Hero card: single `Card` with muted border, soft gradient or plain `bg-card`, small `Sparkles` / `Construction` icon in a rounded square, "Coming Soon" pill badge using existing `Badge` variant
-- Module grid: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`
-- Hover: `hover:border-primary/40 hover:shadow-sm transition` — subtle, no heavy effects
-- Footer line: muted text linking to `/help`
+## Files to change
 
-## Technical Notes
+- `src/pages/TeamAssessmentsPage.tsx` — manager filter uses employee→domain map.
+- `src/stores/assignmentStore.ts` — remove `'fixed'` placeholder; resolve employee domain.
+- New migration — backfill `assessments.domain_id` where it equals `'fixed'`.
 
-- Keep `useAuth()` for greeting + role-based card list
-- Remove all store imports and the big `useEffect` that fetches 7 stores
-- Preserve the `data-tour="dashboard"` attribute on the root so the existing guided tour selectors don't break
-- Drop unused imports (`Progress`, `useSkillStore`, etc.)
-- No new files; no changes to `QuickStartChecklist` (it stays available elsewhere if referenced — verify no other page imports break; it's only used inside DashboardPage today, but the component file remains untouched so nothing else regresses)
+## Verification
 
-## Out of Scope
-
-- No changes to the sidebar, routes, or other pages
-- No new "real" dashboard widgets — that's the next iteration
-- No analytics/telemetry hooks
+1. Sign in as `test_manager@1rivet.com` → **Team Assessments** lists Nikunj's assessment.
+2. Open the assessment, take a manager action, return to the list — assessment still visible.
+3. Assigning a template (with no domain bound) to an employee creates an assessment whose `domain_id` matches the employee's domain, not `'fixed'`.

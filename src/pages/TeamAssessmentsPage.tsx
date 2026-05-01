@@ -32,6 +32,7 @@ export default function TeamAssessmentsPage() {
   const navigate = useNavigate();
 
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userDomains, setUserDomains] = useState<Record<string, string | null>>({});
   const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
