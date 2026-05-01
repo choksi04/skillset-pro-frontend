@@ -1,68 +1,79 @@
-# Redesign: My Assessments Page
+# Redesign: Team Assessments Page
 
-Rebuild `src/pages/AssessmentsPage.tsx` to match the attached mockup — a structured table replacing the current card list, with a filter control and pagination. Keep all underlying data/logic (status derivation, attempts, assignments, templates) untouched.
+Rebuild `src/pages/TeamAssessmentsPage.tsx` as a structured table matching the mockup, mirroring the new My Assessments visual language. Keep all existing data, manager-domain filtering, and "Assign from Template" behaviour intact.
 
 ## Layout
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ My Assessments                              [🔍 Search...]   [▽ Filter]     │
-│ View and take your assigned skill assessments.                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ ASSESSMENT DETAILS │ FORMAT       │ ASSIGNED BY    │ STATUS & DATE │ ACTION │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ <name>             │ ❓ N (Type)   │ 👤 Name        │ [Status]      │ [Btn]  │
-│ 🏷 <domain chip>   │ ⏱ X mins     │   sub-label    │ Due/Done date │        │
-└─────────────────────────────────────────────────────────────────────────────┘
-              Showing 1 to N of M assessments                [« 1 2 3 »]
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│ Team Assessments                            [🔍 Search...] [▽ Filter] [+ Assign]     │
+│ Track and review your team's ongoing and completed skill assessments.                │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ EMPLOYEE        │ ASSESSMENT INFO  │ FORMAT DETAILS │ SKILL LEVEL │ STATUS │ ACTION  │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ 👤 Name         │ <Template>       │ ❓ N Qs (Type) │ Advanced    │ [badge]│ [Btn]   │
+│   designation   │ 🏷 <Domain>      │ ⏱ X mins      │ ✓ Verified  │        │         │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+              Showing 1 to N of M assessments                       [« 1 2 3 »]
 ```
 
 ## Columns
 
-| Column | Source | Notes |
-|---|---|---|
-| **Assessment Details** | template name (or "Assessment") + domain name chip | Domain resolved from `domains` store via `assessment.domain_id`. Chip uses `Layers` icon + muted bg. |
-| **Format** | `assessment_questions.length` + `is_adaptive ? 'Adaptive' : 'Fixed'` and `duration_minutes` | Two stacked rows with `HelpCircle` and `Clock` icons. Show "Pending" if no questions yet. |
-| **Assigned By** | resolved via existing `assignerNames` lookup; fallback "System Auto-Assign / Automated" when no `assigned_by` | Avatar (initials) + full name + small muted sub-label (role/team if available, else "Automated"). |
-| **Status & Date** | `getEffectiveStatus(...)` with existing badge config | Below the badge: `Due: <created date + duration window>` for active, `Completed: <updated_at>` for approved/evaluated, `Submitted: <date>` for submitted. |
-| **Action** | Status-driven button | `Not Started/In Progress` → **Start →** (primary). `Submitted/Evaluated/Under Review/Approved` → **View Results** (outline). Click navigates to `/assessments/:id`. |
 
-## Filter control
+| Column              | Source                                                                                                                                                                                                                                                | Notes                                                                                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Employee**        | `users.full_name` + `users.designation`                                                                                                                                                                                                               | Avatar with initials. Sub-line muted, falls back to "—" if no designation.                                                                         |
+| **Assessment Info** | template name + domain chip                                                                                                                                                                                                                           | Same `Layers` chip style as My Assessments.                                                                                                        |
+| **Format Details**  | `assessment_questions.length` "Qs" + `(Adaptive|Fixed)` and `duration_minutes`                                                                                                                                                                        | Two-line stacked with `HelpCircle` and `Clock`.                                                                                                    |
+| **Skill Level**     | derived from latest attempt's `total_ai_score` mapped through `competency_levels.score_range_*` to a level label. Below: ✓ "Verified" if a `manager_reviews` row for this assessment is `completed`, else ⚠ "Unverified". `N/A` when no attempt yet.  | Use `scoreToLevel` helper from `competencyLevelStore`. Verified pill = success tone, Unverified = muted.                                           |
+| **Status**          | `getEffectiveStatus(...)` with shared `assessmentStatusConfig` badge.                                                                                                                                                                                 | Same canonical status lifecycle.                                                                                                                   |
+| **Action**          | Status-driven primary button: • `Not Started` → **Send Reminder** (outline + Bell icon) • `In Progress` / `Submitted` → **View Progress** (outline) • `Evaluated` / `Under Review` → **Review →** (primary) • `Approved` → **View Results** (outline) | Click navigates to `/team-assessments/:id`. Reminder button uses `e.stopPropagation` and inserts a notification (see below) instead of navigating. |
 
-Add a `Popover` next to search with a `Filter` icon button. Inside:
-- **Status** multi-select checkboxes (Not Started, In Progress, Submitted, Evaluated, Under Review, Approved).
-- **Format** radio: All / Adaptive / Fixed.
-- "Clear" + "Apply" footer.
 
-State held locally; combined with search to drive `filteredMy`.
+## Send Reminder
+
+When the action is `Send Reminder`:
+
+- Insert a `notifications` row: `target_role: 'employee'`, `target_user_id: a.employee_id`, `type: 'assessment_reminder'`, `reference_id: a.id`, `action_link: '/assessments/${a.id}'`, message `Reminder: please complete your assessment "<name>"`.
+- Toast `"Reminder sent to <employee name>"`.
+- Disable the button briefly to prevent double-fires.
+- Fully self-contained — no new store needed; uses `supabase.from('notifications').insert(...)` (matches pattern in `assignmentStore.createAssignments`).
+
+## Filter popover
+
+Same pattern as My Assessments. Sections:
+
+- **Status** (multi-select): Not Started, In Progress, Submitted, Evaluated, Under Review, Approved.
+- **Format** (radio): All / Adaptive / Fixed.
+- **Verification** (radio): All / Verified / Unverified.
+- "Clear" footer button.
 
 ## Pagination
 
-- Local `page` state, `PAGE_SIZE = 10`.
-- Footer row: left `Showing X to Y of Z assessments`, right shadcn `Pagination` component with prev/next + numeric pages.
-- Reset to page 1 when search/filters change.
+`PAGE_SIZE = 10`, shadcn `Pagination`, `Showing X to Y of Z assessments` summary, resets on filter/search change. Same component used in My Assessments.
 
 ## Visual / styling
 
-- Use shadcn `Table`, `TableHeader`, `TableRow`, `TableHead`, `TableCell`.
-- Header row: uppercase tracking-wide muted text (matches mockup).
-- Rows: subtle hover (`hover:bg-muted/30`), full row clickable (action button uses `e.stopPropagation`).
-- Domain chip: small rounded pill, `bg-muted text-muted-foreground`, `Layers` icon size 11.
-- Avatar: shadcn `Avatar` with initials fallback (no real images — keep neutral).
-- Loading: 5 skeleton rows mirroring the table structure.
-- Empty state: same icon + copy as today, rendered as a single full-width row inside the table.
+- Wrap table in a `rounded-xl border bg-card` card; header row uses `bg-muted/40` with uppercase tracking-wider muted labels.
+- Cells `align-top`; rows clickable with `hover:bg-muted/30`.
+- Avatar: shadcn `Avatar` + `AvatarFallback` initials.
+- Verified pill: green check + "Verified"; Unverified: amber alert + "Unverified".
+- Loading: 5 skeleton rows.
+- Empty state inside table colspan when no rows match.
 
-## Data wiring (unchanged stores)
+## Data wiring (existing stores)
 
-Keep all current `useEffect` fetches: `fetchAssessments`, `fetchQuestions`, `fetchSkills`, `fetchDomains`, `fetchAttempts`, `fetchReviews`, `fetchTemplates`, `fetchAssignments`. Continue resolving assigner full names via the existing `users` lookup. Add a `domains` map lookup for the chip.
+- Continue fetching the same set of stores in one `useEffect`.
+- Extend the existing `users` lookup to include `designation` along with `full_name, domain_id`.
+- Add `competency_levels` via `useCompetencyLevelStore` (already used elsewhere) to translate scores → level label.
+- Manager visibility logic (filter by employee's `domain_id`) stays unchanged.
 
 ## Files
 
-- **Edit only**: `src/pages/AssessmentsPage.tsx` (full rewrite of the render layer; preserve hooks/data flow at the top).
-- No store, schema, or route changes.
-- No User Guide change required (purely visual restyle of an existing page).
+- **Edit**: `src/pages/TeamAssessmentsPage.tsx` (full render rewrite; preserve fetch hooks and manager-scope filter at top).
+- No store/schema/route changes.
 
 ## Out of scope
 
-- Team Assessments page (manager view) stays as-is.
-- No new status semantics, no new DB fields, no backend changes.
+- No changes to detail page (`/team-assessments/:id`), AssignTemplateDialog, or any review logic.
+- No new database migrations; reminder reuses existing `notifications` table & pre-declared `assessment_reminder` type.
