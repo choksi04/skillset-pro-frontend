@@ -418,7 +418,7 @@ export default function AllRegistriesPage() {
                       {row.reviewStatus === 'approved' ? (
                         <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending review</Badge>
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Review Pending</Badge>
                       )}
                     </TableCell>
                   </TableRow>
