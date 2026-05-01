@@ -95,12 +95,13 @@ export default function AllRegistriesPage() {
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
 
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
+
   const [viewMode, setViewMode] = useState<'skills' | 'employees'>('skills');
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState('all');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
-  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ReviewStatus>>({});
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
 
@@ -116,25 +117,10 @@ export default function AllRegistriesPage() {
     [registries]
   );
 
-  // Fetch review status (display-only, does NOT filter rows)
+  // Batched review status fetch (cached in the shared store, so other registry pages reuse it)
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
-    if (ids.length === 0) {
-      setReviewStatuses({});
-      return;
-    }
-    supabase
-      .from('registry_reviews')
-      .select('registry_id, status, deleted_on')
-      .in('registry_id', ids)
-      .is('deleted_on', null)
-      .then(({ data }) => {
-        const map: Record<string, ReviewStatus> = {};
-        (data ?? []).forEach((r: any) => {
-          map[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
-        });
-        setReviewStatuses(map);
-      });
+    if (ids.length > 0) fetchReviewStatusesForRegistries(ids);
   }, [submittedRegistries]);
 
   const getReviewStatus = (regId: string): ReviewStatus =>
