@@ -51,7 +51,8 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-type DerivedStatus = 'up_to_date' | 'needs_review' | 'in_progress';
+// Status filter accepts any RegistryStatus or 'all'
+type StatusFilter = 'all' | RegistryStatus;
 
 export default function TeamRegistryPage() {
   const { user, currentRole } = useAuth();
@@ -59,11 +60,12 @@ export default function TeamRegistryPage() {
   const { registries, fetchRegistries, items, fetchItemsForRegistries, initialized } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const [userMeta, setUserMeta] = useState<Record<string, { full_name: string; designation: string }>>({});
   const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | DerivedStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
 
   const maxLevel = levels.length > 0 ? levels.length : 5;
@@ -117,10 +119,13 @@ export default function TeamRegistryPage() {
     }, () => setNamesLoading(false));
   }, [groupedByEmployee, initialized]);
 
-  // Items for latest registries
+  // Items + review statuses for latest registries (one batched fetch each)
   useEffect(() => {
     const ids = Array.from(groupedByEmployee.values()).map((regs) => regs[0].id);
-    if (ids.length > 0) fetchItemsForRegistries(ids);
+    if (ids.length > 0) {
+      fetchItemsForRegistries(ids);
+      fetchReviewStatusesForRegistries(ids);
+    }
   }, [groupedByEmployee]);
 
   // Build display rows
@@ -135,10 +140,12 @@ export default function TeamRegistryPage() {
       const avgRaw = ratedCount > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedCount : 0;
       const avgOnFive = maxLevel > 0 ? Math.round((avgRaw / maxLevel) * 5 * 10) / 10 : 0;
 
-      let status: DerivedStatus;
-      if (latest.status === 'draft') status = 'in_progress';
-      else if (totalSkills > 0 && ratedCount < totalSkills) status = 'needs_review';
-      else status = 'up_to_date';
+      const status: RegistryStatus = deriveRegistryStatus({
+        registryStatus: latest.status as 'draft' | 'submitted',
+        ratedCount,
+        totalSkills,
+        reviewStatus: reviewStatuses[latest.id] ?? null,
+      });
 
       const updatedAt = latest.status === 'submitted'
         ? (latest.submitted_at ?? latest.modified_at ?? latest.created_at)
@@ -161,7 +168,7 @@ export default function TeamRegistryPage() {
         updatedAt,
       };
     });
-  }, [groupedByEmployee, domains, mappings, items, userMeta, maxLevel]);
+  }, [groupedByEmployee, domains, mappings, items, userMeta, maxLevel, reviewStatuses]);
 
   // Filter + search
   const filteredRows = useMemo(() => {
@@ -186,15 +193,9 @@ export default function TeamRegistryPage() {
     return domains.filter((d) => visible.has(d.id));
   }, [domains, rows]);
 
-  const statusBadge = (s: DerivedStatus) => {
-    if (s === 'up_to_date') {
-      return <Badge className="text-[11px] bg-success/15 text-success border-success/20 hover:bg-success/15 rounded-full px-2.5 py-0.5">Up to date</Badge>;
-    }
-    if (s === 'needs_review') {
-      return <Badge className="text-[11px] bg-warning/15 text-warning border-warning/20 hover:bg-warning/15 rounded-full px-2.5 py-0.5">Needs Review</Badge>;
-    }
-    return <Badge className="text-[11px] bg-primary/10 text-primary border-primary/20 hover:bg-primary/10 rounded-full px-2.5 py-0.5">In Progress</Badge>;
-  };
+  // Status filter dropdown only needs to show statuses that actually appear in the data,
+  // plus the canonical order.
+  const statusFilterOptions: RegistryStatus[] = ['draft', 'incomplete', 'review_pending', 'approved'];
 
   return (
     <div className="space-y-6">
