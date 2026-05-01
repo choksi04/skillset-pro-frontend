@@ -22,6 +22,12 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  RegistryStatus,
+  deriveRegistryStatus,
+  registryStatusConfig,
+} from '@/lib/registryStatus';
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -119,6 +125,37 @@ export default function SkillRegistryPage() {
   const draft = getDraft(employeeId);
   const latest = getLatest(employeeId);
   const submittedRegistries = myRegistries.filter((r) => r.status === 'submitted');
+
+  // Fetch latest review status per submitted registry (one query)
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, 'pending' | 'approved'>>({});
+  useEffect(() => {
+    const ids = submittedRegistries.map((r) => r.id);
+    if (ids.length === 0) {
+      setReviewStatuses({});
+      return;
+    }
+    supabase
+      .from('registry_reviews')
+      .select('registry_id, status, completed_at, created_at')
+      .in('registry_id', ids)
+      .is('deleted_on', null)
+      .then(({ data }) => {
+        if (!data) return;
+        const latest = new Map<string, any>();
+        data.forEach((r: any) => {
+          const cur = latest.get(r.registry_id);
+          const ts = r.completed_at ?? r.created_at;
+          if (!cur || new Date(ts).getTime() > new Date(cur.completed_at ?? cur.created_at).getTime()) {
+            latest.set(r.registry_id, r);
+          }
+        });
+        const map: Record<string, 'pending' | 'approved'> = {};
+        latest.forEach((r, regId) => {
+          map[regId] = r.status === 'approved' || r.status === 'completed' ? 'approved' : 'pending';
+        });
+        setReviewStatuses(map);
+      });
+  }, [submittedRegistries.length, submittedRegistries.map((r) => r.id).join(',')]);
 
   const handleCreateNewVersion = async () => {
     if (!assignedDomain) return;
