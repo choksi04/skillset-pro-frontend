@@ -21,6 +21,11 @@ import {
 } from '@/components/ui/select';
 import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  RegistryStatus,
+  deriveRegistryStatus,
+  registryStatusConfig,
+} from '@/lib/registryStatus';
 
 function formatRelative(dateStr: string | null): string {
   if (!dateStr) return '—';
@@ -50,8 +55,6 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-type DerivedStatus = 'up_to_date' | 'needs_review' | 'in_progress';
-
 export default function TeamRegistryPage() {
   const { user, currentRole } = useAuth();
   const navigate = useNavigate();
@@ -61,8 +64,9 @@ export default function TeamRegistryPage() {
 
   const [userMeta, setUserMeta] = useState<Record<string, { full_name: string; designation: string }>>({});
   const [namesLoading, setNamesLoading] = useState(false);
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, 'pending' | 'approved'>>({});
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | DerivedStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | RegistryStatus>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
 
   const maxLevel = levels.length > 0 ? levels.length : 5;
