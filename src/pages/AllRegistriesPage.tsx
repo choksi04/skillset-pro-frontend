@@ -385,7 +385,7 @@ export default function AllRegistriesPage() {
         filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
-            <p className="text-sm">No approved employee registry data found.</p>
+            <p className="text-sm">No submitted employee registry data found.</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
@@ -396,6 +396,7 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Domain</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Avg</TableHead>
                   <TableHead className="text-xs font-medium text-center">Skills</TableHead>
+                  <TableHead className="text-xs font-medium text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -411,6 +412,13 @@ export default function AllRegistriesPage() {
                       <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell className="text-center">
+                      {row.reviewStatus === 'approved' ? (
+                        <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending review</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
