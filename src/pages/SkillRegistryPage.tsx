@@ -427,6 +427,14 @@ export default function SkillRegistryPage() {
                 {submittedRegistries.map((reg) => {
                   const regItems = items.get(reg.id);
                   const avg = computeAvg(regItems ?? []);
+                  const regRated = regItems?.length ?? 0;
+                  const regDerived = deriveRegistryStatus({
+                    registryStatus: 'submitted',
+                    ratedCount: regRated,
+                    totalSkills: domainSkills.length,
+                    reviewStatus: reviewStatuses[reg.id] ?? null,
+                  });
+                  const regCfg = registryStatusConfig[regDerived];
                   return (
                     <TableRow key={reg.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/skill-registry/${reg.id}`)}>
                       <TableCell className="text-sm font-medium">v{reg.version_number}</TableCell>
@@ -436,7 +444,7 @@ export default function SkillRegistryPage() {
                       <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
                       <TableCell className="text-sm font-medium">{avg !== null ? avg : '—'}</TableCell>
                       <TableCell>
-                        <Badge className="text-[10px] bg-success/15 text-success border-success/20">Submitted</Badge>
+                        <Badge className={`text-[10px] ${regCfg.badgeClass}`}>{regCfg.label}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${reg.id}`); }}>
