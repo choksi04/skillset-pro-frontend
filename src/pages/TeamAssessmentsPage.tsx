@@ -81,10 +81,12 @@ export default function TeamAssessmentsPage() {
     if (currentRole === 'manager') {
       const domainId = user?.domain_id;
       if (!domainId) return [];
-      return assessments.filter((a) => a.domain_id === domainId);
+      // Filter by the EMPLOYEE's current domain, not the assessment's stamped domain_id.
+      // Assessments created from un-bound templates may carry placeholder domain values.
+      return assessments.filter((a) => userDomains[a.employee_id] === domainId);
     }
     return [];
-  }, [assessments, currentRole, user]);
+  }, [assessments, currentRole, user, userDomains]);
 
   const filteredTeam = useMemo(() => {
     if (!search.trim()) return teamAssessments;
