@@ -231,7 +231,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap, userNames, domainMap]);
+  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
