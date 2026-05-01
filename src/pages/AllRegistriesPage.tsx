@@ -15,8 +15,19 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Search, Database, Users, BarChart3 } from 'lucide-react';
+import { Download, Search, Database, Users, BarChart3, ChevronRight } from 'lucide-react';
+
+interface SkillEmployee {
+  employee_id: string;
+  name: string;
+  domain: string;
+  level: number;
+  registryId: string;
+}
 
 interface SkillAgg {
   skill_id: string;
@@ -25,6 +36,7 @@ interface SkillAgg {
   totalEmps: number;
   levels: Record<number, number>;
   avgLevel: number;
+  employees: SkillEmployee[];
 }
 
 interface EmployeeAgg {
@@ -80,6 +92,9 @@ export default function AllRegistriesPage() {
   const [domainFilter, setDomainFilter] = useState('all');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
+  const [drawerSearch, setDrawerSearch] = useState('');
 
   useEffect(() => {
     fetchRegistries();
@@ -93,9 +108,33 @@ export default function AllRegistriesPage() {
     [registries]
   );
 
-  // Fetch items for all submitted registries
+  // Fetch which submitted registries have an approved manager review
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
+    if (ids.length === 0) {
+      setApprovedIds(new Set());
+      return;
+    }
+    supabase
+      .from('registry_reviews')
+      .select('registry_id, status, deleted_on')
+      .in('registry_id', ids)
+      .eq('status', 'approved')
+      .is('deleted_on', null)
+      .then(({ data }) => {
+        setApprovedIds(new Set((data ?? []).map((r: any) => r.registry_id)));
+      });
+  }, [submittedRegistries]);
+
+  // Only approved registries flow into the rest of the pipeline
+  const approvedRegistries = useMemo(
+    () => submittedRegistries.filter((r) => approvedIds.has(r.id)),
+    [submittedRegistries, approvedIds],
+  );
+
+  // Fetch items for all approved registries
+  useEffect(() => {
+    const ids = approvedRegistries.map((r) => r.id);
     if (ids.length === 0) return;
     supabase.from('skill_registry_items').select('registry_id, skill_id, self_score').in('registry_id', ids).then(({ data }) => {
       if (!data) return;
@@ -106,11 +145,11 @@ export default function AllRegistriesPage() {
       });
       setAllItems(map);
     });
-  }, [submittedRegistries]);
+  }, [approvedRegistries]);
 
   // Fetch user names
   useEffect(() => {
-    const empIds = [...new Set(submittedRegistries.map(r => r.employee_id))];
+    const empIds = [...new Set(approvedRegistries.map(r => r.employee_id))];
     if (empIds.length === 0) return;
     supabase.from('users').select('id, full_name').in('id', empIds).then(({ data }) => {
       if (data) {
@@ -119,22 +158,22 @@ export default function AllRegistriesPage() {
         setUserNames(map);
       }
     });
-  }, [submittedRegistries]);
+  }, [approvedRegistries]);
 
   const skillMap = useMemo(() => new Map(skills.map(s => [s.id, { skill_name: s.skill_name, skill_category: s.skill_category || 'Uncategorized' }])), [skills]);
   const domainMap = useMemo(() => new Map(domains.map(d => [d.id, d.name])), [domains]);
 
-  // Get latest submitted version per employee
+  // Get latest approved version per employee
   const latestPerEmployee = useMemo(() => {
-    const map = new Map<string, typeof submittedRegistries[0]>();
-    submittedRegistries.forEach((r) => {
+    const map = new Map<string, typeof approvedRegistries[0]>();
+    approvedRegistries.forEach((r) => {
       const existing = map.get(r.employee_id);
       if (!existing || r.version_number > existing.version_number) {
         map.set(r.employee_id, r);
       }
     });
     return map;
-  }, [submittedRegistries]);
+  }, [approvedRegistries]);
 
   // Domain filtering
   const filteredLatest = useMemo(() => {
@@ -143,37 +182,50 @@ export default function AllRegistriesPage() {
     return entries.filter(r => r.domain_id === domainFilter);
   }, [latestPerEmployee, domainFilter]);
 
-  // Skills aggregation from latest submitted registries
+  // Skills aggregation from latest approved registries (also collects employee drill-down list)
   const skillAggs = useMemo<SkillAgg[]>(() => {
-    const map = new Map<string, Map<string, number>>();
+    // skill_id -> employee_id -> { level, registryId }
+    const map = new Map<string, Map<string, { level: number; registryId: string }>>();
     filteredLatest.forEach(reg => {
       const items = allItems[reg.id] || [];
       items.forEach(item => {
         if (!map.has(item.skill_id)) map.set(item.skill_id, new Map());
-        map.get(item.skill_id)!.set(reg.employee_id, item.self_score);
+        map.get(item.skill_id)!.set(reg.employee_id, { level: item.self_score, registryId: reg.id });
       });
     });
     const result: SkillAgg[] = [];
-    map.forEach((empLevels, skillId) => {
+    map.forEach((empMap, skillId) => {
       const info = skillMap.get(skillId);
       const levels: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
       let sum = 0;
-      empLevels.forEach(level => {
+      const employees: SkillEmployee[] = [];
+      empMap.forEach(({ level, registryId }, employee_id) => {
         const clamped = Math.max(1, Math.min(5, level));
         levels[clamped] = (levels[clamped] || 0) + 1;
         sum += level;
+        // Look up employee's domain from their registry
+        const reg = filteredLatest.find(r => r.id === registryId);
+        employees.push({
+          employee_id,
+          name: userNames[employee_id] || employee_id.slice(0, 8),
+          domain: reg ? (domainMap.get(reg.domain_id) || 'Unknown') : 'Unknown',
+          level,
+          registryId,
+        });
       });
+      employees.sort((a, b) => a.name.localeCompare(b.name));
       result.push({
         skill_id: skillId,
         skillName: info?.skill_name || skillId,
         category: info?.skill_category || 'Uncategorized',
-        totalEmps: empLevels.size,
+        totalEmps: empMap.size,
         levels,
-        avgLevel: Math.round((sum / empLevels.size) * 10) / 10,
+        avgLevel: Math.round((sum / empMap.size) * 10) / 10,
+        employees,
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap]);
+  }, [filteredLatest, allItems, skillMap, userNames, domainMap]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -207,12 +259,22 @@ export default function AllRegistriesPage() {
     else exportEmployeesCSV(filteredEmployees);
   };
 
+  // Drawer: filter employees by search
+  const drawerEmployees = useMemo(() => {
+    if (!selectedSkill) return [];
+    if (!drawerSearch.trim()) return selectedSkill.employees;
+    const q = drawerSearch.toLowerCase();
+    return selectedSkill.employees.filter(e =>
+      e.name.toLowerCase().includes(q) || e.domain.toLowerCase().includes(q)
+    );
+  }, [selectedSkill, drawerSearch]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">All Registries</h2>
-          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest submitted versions.</p>
+          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest approved versions.</p>
         </div>
         <div className="flex items-center gap-3">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'skills' | 'employees')}>
@@ -262,7 +324,7 @@ export default function AllRegistriesPage() {
         filteredSkills.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
-            <p className="text-sm">No skill registry data found.</p>
+            <p className="text-sm">No approved registry data found.</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
@@ -278,10 +340,24 @@ export default function AllRegistriesPage() {
               </TableHeader>
               <TableBody>
                 {filteredSkills.map(row => (
-                  <TableRow key={row.skill_id} className="hover:bg-muted/30 transition-colors">
+                  <TableRow key={row.skill_id}>
                     <TableCell className="text-sm font-medium">{row.skillName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{row.category}</TableCell>
-                    <TableCell className="text-center"><Badge variant="secondary" className="text-[11px]">{row.totalEmps}</Badge></TableCell>
+                    <TableCell className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => { setDrawerSearch(''); setSelectedSkill(row); }}
+                        className="inline-flex items-center justify-center rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        aria-label={`View ${row.totalEmps} employees with skill ${row.skillName}`}
+                      >
+                        <Badge
+                          variant="secondary"
+                          className="text-[11px] cursor-pointer hover:bg-secondary/80"
+                        >
+                          {row.totalEmps}
+                        </Badge>
+                      </button>
+                    </TableCell>
                     {[1, 2, 3, 4, 5].map(l => (
                       <TableCell key={l} className="text-center">
                         <Badge variant="outline" className={`text-[10px] ${row.levels[l] > 0 ? getLevelColorClass(l) : 'opacity-40'}`}>{row.levels[l]}</Badge>
@@ -302,7 +378,7 @@ export default function AllRegistriesPage() {
         filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
-            <p className="text-sm">No employee registry data found.</p>
+            <p className="text-sm">No approved employee registry data found.</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
@@ -319,7 +395,7 @@ export default function AllRegistriesPage() {
                 {filteredEmployees.map(row => (
                   <TableRow
                     key={row.employee_id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => row.latestRegistryId && navigate(`/team-registry/${row.latestRegistryId}`)}
                   >
                     <TableCell className="text-sm font-medium">{row.employeeName}</TableCell>
@@ -335,6 +411,74 @@ export default function AllRegistriesPage() {
           </div>
         )
       )}
+
+      {/* Skill drill-down drawer */}
+      <Sheet open={!!selectedSkill} onOpenChange={(open) => { if (!open) setSelectedSkill(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-lg">{selectedSkill?.skillName}</SheetTitle>
+            <SheetDescription className="flex items-center gap-2 text-xs">
+              <span>{selectedSkill?.category}</span>
+              <span>·</span>
+              <span>{selectedSkill?.totalEmps} {selectedSkill?.totalEmps === 1 ? 'employee' : 'employees'}</span>
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by employee or domain…"
+              value={drawerSearch}
+              onChange={(e) => setDrawerSearch(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
+
+          <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs font-medium">Employee</TableHead>
+                  <TableHead className="text-xs font-medium">Domain</TableHead>
+                  <TableHead className="text-xs font-medium text-center">Self Level</TableHead>
+                  <TableHead className="w-8" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drawerEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                      No employees match your search.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  drawerEmployees.map((emp) => (
+                    <TableRow
+                      key={emp.employee_id}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        navigate(`/team-registry/${emp.registryId}`);
+                        setSelectedSkill(null);
+                      }}
+                    >
+                      <TableCell className="text-sm font-medium">{emp.name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{emp.domain}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, emp.level)))}`}>
+                          L{emp.level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <ChevronRight size={14} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
