@@ -97,7 +97,7 @@ export default function AllRegistriesPage() {
   const [domainFilter, setDomainFilter] = useState('all');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
-  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ReviewStatus>>({});
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
 
@@ -113,33 +113,33 @@ export default function AllRegistriesPage() {
     [registries]
   );
 
-  // Fetch which submitted registries have an approved manager review
+  // Fetch review status (display-only, does NOT filter rows)
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
     if (ids.length === 0) {
-      setApprovedIds(new Set());
+      setReviewStatuses({});
       return;
     }
     supabase
       .from('registry_reviews')
       .select('registry_id, status, deleted_on')
       .in('registry_id', ids)
-      .eq('status', 'approved')
       .is('deleted_on', null)
       .then(({ data }) => {
-        setApprovedIds(new Set((data ?? []).map((r: any) => r.registry_id)));
+        const map: Record<string, ReviewStatus> = {};
+        (data ?? []).forEach((r: any) => {
+          map[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
+        });
+        setReviewStatuses(map);
       });
   }, [submittedRegistries]);
 
-  // Only approved registries flow into the rest of the pipeline
-  const approvedRegistries = useMemo(
-    () => submittedRegistries.filter((r) => approvedIds.has(r.id)),
-    [submittedRegistries, approvedIds],
-  );
+  const getReviewStatus = (regId: string): ReviewStatus =>
+    reviewStatuses[regId] ?? 'pending';
 
-  // Fetch items for all approved registries
+  // Fetch items for all submitted registries
   useEffect(() => {
-    const ids = approvedRegistries.map((r) => r.id);
+    const ids = submittedRegistries.map((r) => r.id);
     if (ids.length === 0) return;
     supabase.from('skill_registry_items').select('registry_id, skill_id, self_score').in('registry_id', ids).then(({ data }) => {
       if (!data) return;
@@ -150,11 +150,11 @@ export default function AllRegistriesPage() {
       });
       setAllItems(map);
     });
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   // Fetch user names
   useEffect(() => {
-    const empIds = [...new Set(approvedRegistries.map(r => r.employee_id))];
+    const empIds = [...new Set(submittedRegistries.map(r => r.employee_id))];
     if (empIds.length === 0) return;
     supabase.from('users').select('id, full_name').in('id', empIds).then(({ data }) => {
       if (data) {
@@ -163,22 +163,22 @@ export default function AllRegistriesPage() {
         setUserNames(map);
       }
     });
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   const skillMap = useMemo(() => new Map(skills.map(s => [s.id, { skill_name: s.skill_name, skill_category: s.skill_category || 'Uncategorized' }])), [skills]);
   const domainMap = useMemo(() => new Map(domains.map(d => [d.id, d.name])), [domains]);
 
-  // Get latest approved version per employee
+  // Get latest version per employee
   const latestPerEmployee = useMemo(() => {
-    const map = new Map<string, typeof approvedRegistries[0]>();
-    approvedRegistries.forEach((r) => {
+    const map = new Map<string, typeof submittedRegistries[0]>();
+    submittedRegistries.forEach((r) => {
       const existing = map.get(r.employee_id);
       if (!existing || r.version_number > existing.version_number) {
         map.set(r.employee_id, r);
       }
     });
     return map;
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   // Domain filtering
   const filteredLatest = useMemo(() => {
