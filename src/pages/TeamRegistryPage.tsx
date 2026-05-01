@@ -169,10 +169,12 @@ export default function TeamRegistryPage() {
       const avgRaw = ratedCount > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedCount : 0;
       const avgOnFive = maxLevel > 0 ? Math.round((avgRaw / maxLevel) * 5 * 10) / 10 : 0;
 
-      let status: DerivedStatus;
-      if (latest.status === 'draft') status = 'in_progress';
-      else if (totalSkills > 0 && ratedCount < totalSkills) status = 'needs_review';
-      else status = 'up_to_date';
+      const status: RegistryStatus = deriveRegistryStatus({
+        registryStatus: latest.status as 'draft' | 'submitted',
+        ratedCount,
+        totalSkills,
+        reviewStatus: reviewStatuses[latest.id] ?? null,
+      });
 
       const updatedAt = latest.status === 'submitted'
         ? (latest.submitted_at ?? latest.modified_at ?? latest.created_at)
