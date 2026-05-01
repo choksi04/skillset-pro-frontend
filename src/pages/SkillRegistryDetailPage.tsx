@@ -4,10 +4,13 @@ import { useSkillRegistryStore, SkillRegistryItem } from '@/stores/skillRegistry
 import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore, Skill } from '@/stores/skillStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
+import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,6 +47,7 @@ export default function SkillRegistryDetailPage() {
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
   const maxLevel = competencyLevels.length || 5;
 
   const employeeId = user?.id ?? '';
