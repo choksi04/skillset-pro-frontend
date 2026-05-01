@@ -4,10 +4,13 @@ import { useSkillRegistryStore, SkillRegistryItem } from '@/stores/skillRegistry
 import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore, Skill } from '@/stores/skillStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
+import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,8 +37,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { deriveRegistryStatus, registryStatusConfig } from '@/lib/registryStatus';
 
 export default function SkillRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
@@ -46,6 +47,7 @@ export default function SkillRegistryDetailPage() {
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
   const maxLevel = competencyLevels.length || 5;
 
   const employeeId = user?.id ?? '';
@@ -56,6 +58,11 @@ export default function SkillRegistryDetailPage() {
     fetchDomains();
     fetchSkills();
   }, []);
+
+  // Fetch review status for this registry (cached in shared store)
+  useEffect(() => {
+    if (submissionId) fetchReviewStatusesForRegistries([submissionId]);
+  }, [submissionId]);
 
   const registry = useMemo(
     () => registries.find((r) => r.id === submissionId),
@@ -391,30 +398,6 @@ export default function SkillRegistryDetailPage() {
   const latestVersion = submittedVersions[0];
   const isLatest = latestVersion ? latestVersion.id === registry.id : true;
 
-  // Latest manager review status for THIS registry (used for the header badge when on latest version)
-  const [reviewStatus, setReviewStatus] = useState<'pending' | 'approved' | null>(null);
-  useEffect(() => {
-    if (!registry?.id || registry.status !== 'submitted') {
-      setReviewStatus(null);
-      return;
-    }
-    supabase
-      .from('registry_reviews')
-      .select('status, completed_at, created_at')
-      .eq('registry_id', registry.id)
-      .is('deleted_on', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) {
-          setReviewStatus(null);
-          return;
-        }
-        setReviewStatus(data.status === 'approved' || data.status === 'completed' ? 'approved' : 'pending');
-      });
-  }, [registry?.id, registry?.status]);
-
   // Stats
   const totalSkills = domainSkills.length;
   const ratedItems = allItems;
@@ -474,27 +457,19 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <Badge
-              className={`text-xs ${
-                isLatest
-                  ? registryStatusConfig[deriveRegistryStatus({
-                      registryStatus: 'submitted',
-                      ratedCount: ratedItems.length,
-                      totalSkills,
-                      reviewStatus,
-                    })].badgeClass
-                  : 'bg-muted text-muted-foreground border-border'
-              }`}
-            >
-              {isLatest
-                ? registryStatusConfig[deriveRegistryStatus({
-                    registryStatus: 'submitted',
-                    ratedCount: ratedItems.length,
-                    totalSkills,
-                    reviewStatus,
-                  })].label
-                : `Version ${registry.version_number}`}
-            </Badge>
+            <RegistryStatusBadge
+              status={deriveRegistryStatus({
+                registryStatus: registry.status as 'draft' | 'submitted',
+                ratedCount: ratedItems.length,
+                totalSkills,
+                reviewStatus: reviewStatuses[registry.id] ?? null,
+              })}
+            />
+            {!isLatest && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Version {registry.version_number}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {assignedDomain?.description || 'Submitted self-assessment for this domain.'}

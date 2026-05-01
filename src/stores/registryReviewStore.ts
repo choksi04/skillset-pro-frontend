@@ -19,11 +19,21 @@ export interface RegistryReview {
   items: RegistryReviewItem[];
 }
 
+/** Lightweight status cache for list/grid views — avoids fetching full review payloads. */
+export type ReviewStatusValue = 'pending' | 'approved';
+
 interface RegistryReviewStore {
   reviews: Map<string, RegistryReview>; // keyed by registry_id
+  /** registry_id -> latest review status (pending/approved). Absent ⇒ no review row. */
+  reviewStatuses: Record<string, ReviewStatusValue>;
   loading: boolean;
 
   fetchReviewForRegistry: (registryId: string) => Promise<RegistryReview | null>;
+  /**
+   * Batch-fetch the review status for many registries in a single query.
+   * Skips IDs already cached in `reviewStatuses`. Safe to call repeatedly.
+   */
+  fetchReviewStatusesForRegistries: (registryIds: string[]) => Promise<void>;
   ensureReview: (
     registryId: string,
     reviewerId: string,
@@ -40,7 +50,30 @@ interface RegistryReviewStore {
 
 export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => ({
   reviews: new Map(),
+  reviewStatuses: {},
   loading: false,
+
+  fetchReviewStatusesForRegistries: async (registryIds) => {
+    const cache = get().reviewStatuses;
+    const missing = Array.from(new Set(registryIds.filter((id) => !(id in cache))));
+    if (missing.length === 0) return;
+    const { data, error } = await supabase
+      .from('registry_reviews')
+      .select('registry_id, status')
+      .in('registry_id', missing)
+      .is('deleted_on', null);
+    if (error) {
+      console.error('fetchReviewStatusesForRegistries', error);
+      return;
+    }
+    set((s) => {
+      const next = { ...s.reviewStatuses };
+      (data ?? []).forEach((r: any) => {
+        next[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
+      });
+      return { reviewStatuses: next };
+    });
+  },
 
   fetchReviewForRegistry: async (registryId) => {
     const { data: review, error } = await supabase
@@ -115,7 +148,10 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
     set((s) => {
       const next = new Map(s.reviews);
       next.set(registryId, r);
-      return { reviews: next };
+      return {
+        reviews: next,
+        reviewStatuses: { ...s.reviewStatuses, [registryId]: 'pending' },
+      };
     });
     return r;
   },
@@ -216,9 +252,14 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
     set((s) => {
       const next = new Map(s.reviews);
       const r = next.get(registryId);
-      if (!r) return { reviews: next };
+      if (!r) {
+        return { reviews: next, reviewStatuses: { ...s.reviewStatuses, [registryId]: 'approved' } };
+      }
       next.set(registryId, { ...r, status: 'approved', completed_at: now });
-      return { reviews: next };
+      return {
+        reviews: next,
+        reviewStatuses: { ...s.reviewStatuses, [registryId]: 'approved' },
+      };
     });
   },
 }));

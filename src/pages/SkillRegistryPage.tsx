@@ -3,9 +3,9 @@ import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -22,12 +22,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import {
-  RegistryStatus,
-  deriveRegistryStatus,
-  registryStatusConfig,
-} from '@/lib/registryStatus';
+import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -89,6 +85,7 @@ export default function SkillRegistryPage() {
   const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
   const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
@@ -118,44 +115,17 @@ export default function SkillRegistryPage() {
 
   useEffect(() => {
     if (myRegistries.length > 0) {
-      fetchItemsForRegistries(myRegistries.map((r) => r.id));
+      const ids = myRegistries.map((r) => r.id);
+      fetchItemsForRegistries(ids);
+      // Batch-fetch review statuses for the hero card + version history rows
+      const submittedIds = myRegistries.filter((r) => r.status === 'submitted').map((r) => r.id);
+      if (submittedIds.length > 0) fetchReviewStatusesForRegistries(submittedIds);
     }
   }, [myRegistries]);
 
   const draft = getDraft(employeeId);
   const latest = getLatest(employeeId);
   const submittedRegistries = myRegistries.filter((r) => r.status === 'submitted');
-
-  // Fetch latest review status per submitted registry (one query)
-  const [reviewStatuses, setReviewStatuses] = useState<Record<string, 'pending' | 'approved'>>({});
-  useEffect(() => {
-    const ids = submittedRegistries.map((r) => r.id);
-    if (ids.length === 0) {
-      setReviewStatuses({});
-      return;
-    }
-    supabase
-      .from('registry_reviews')
-      .select('registry_id, status, completed_at, created_at')
-      .in('registry_id', ids)
-      .is('deleted_on', null)
-      .then(({ data }) => {
-        if (!data) return;
-        const latest = new Map<string, any>();
-        data.forEach((r: any) => {
-          const cur = latest.get(r.registry_id);
-          const ts = r.completed_at ?? r.created_at;
-          if (!cur || new Date(ts).getTime() > new Date(cur.completed_at ?? cur.created_at).getTime()) {
-            latest.set(r.registry_id, r);
-          }
-        });
-        const map: Record<string, 'pending' | 'approved'> = {};
-        latest.forEach((r, regId) => {
-          map[regId] = r.status === 'approved' || r.status === 'completed' ? 'approved' : 'pending';
-        });
-        setReviewStatuses(map);
-      });
-  }, [submittedRegistries.length, submittedRegistries.map((r) => r.id).join(',')]);
 
   const handleCreateNewVersion = async () => {
     if (!assignedDomain) return;
@@ -275,19 +245,13 @@ export default function SkillRegistryPage() {
     ? (featured.status === 'submitted' && featured.submitted_at ? featured.submitted_at : (featured.modified_at ?? featured.created_at))
     : null;
 
-  // Status pill — derived from registry + manager review state
-  let statusLabel = 'Not started';
-  let statusClass = 'bg-muted text-muted-foreground border-border';
-  if (featured) {
-    const derived = deriveRegistryStatus({
-      registryStatus: featured.status as 'draft' | 'submitted',
-      ratedCount,
-      totalSkills,
-      reviewStatus: reviewStatuses[featured.id] ?? null,
-    });
-    statusLabel = registryStatusConfig[derived].label;
-    statusClass = registryStatusConfig[derived].badgeClass;
-  }
+  // Derive featured status from the unified helper (handles draft / incomplete / review_pending / approved)
+  const featuredStatus = deriveRegistryStatus({
+    registryStatus: (featured?.status as 'draft' | 'submitted' | undefined) ?? null,
+    ratedCount,
+    totalSkills,
+    reviewStatus: featured ? (reviewStatuses[featured.id] ?? null) : null,
+  });
 
   return (
     <div className="space-y-6">
@@ -311,9 +275,7 @@ export default function SkillRegistryPage() {
             {/* Title row */}
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-2xl font-bold text-foreground">{assignedDomain.name}</h3>
-              <Badge variant="outline" className={`text-xs font-medium ${statusClass}`}>
-                {statusLabel}
-              </Badge>
+              <RegistryStatusBadge status={featuredStatus} />
             </div>
 
             {/* Meta row */}
@@ -425,16 +387,14 @@ export default function SkillRegistryPage() {
               </TableHeader>
               <TableBody>
                 {submittedRegistries.map((reg) => {
-                  const regItems = items.get(reg.id);
-                  const avg = computeAvg(regItems ?? []);
-                  const regRated = regItems?.length ?? 0;
-                  const regDerived = deriveRegistryStatus({
+                  const regItems = items.get(reg.id) ?? [];
+                  const avg = computeAvg(regItems);
+                  const rowStatus = deriveRegistryStatus({
                     registryStatus: 'submitted',
-                    ratedCount: regRated,
-                    totalSkills: domainSkills.length,
+                    ratedCount: regItems.length,
+                    totalSkills,
                     reviewStatus: reviewStatuses[reg.id] ?? null,
                   });
-                  const regCfg = registryStatusConfig[regDerived];
                   return (
                     <TableRow key={reg.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/skill-registry/${reg.id}`)}>
                       <TableCell className="text-sm font-medium">v{reg.version_number}</TableCell>
@@ -444,7 +404,7 @@ export default function SkillRegistryPage() {
                       <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
                       <TableCell className="text-sm font-medium">{avg !== null ? avg : '—'}</TableCell>
                       <TableCell>
-                        <Badge className={`text-[10px] ${regCfg.badgeClass}`}>{regCfg.label}</Badge>
+                        <RegistryStatusBadge status={rowStatus} size="sm" />
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${reg.id}`); }}>

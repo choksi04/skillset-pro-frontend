@@ -2,14 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-// Progress bar rendered inline (custom colour at 100%)
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -21,11 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import {
-  RegistryStatus,
-  deriveRegistryStatus,
-  registryStatusConfig,
-} from '@/lib/registryStatus';
+import { deriveRegistryStatus, registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatRelative(dateStr: string | null): string {
   if (!dateStr) return '—';
@@ -55,18 +51,21 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// Status filter accepts any RegistryStatus or 'all'
+type StatusFilter = 'all' | RegistryStatus;
+
 export default function TeamRegistryPage() {
   const { user, currentRole } = useAuth();
   const navigate = useNavigate();
   const { registries, fetchRegistries, items, fetchItemsForRegistries, initialized } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const [userMeta, setUserMeta] = useState<Record<string, { full_name: string; designation: string }>>({});
   const [namesLoading, setNamesLoading] = useState(false);
-  const [reviewStatuses, setReviewStatuses] = useState<Record<string, 'pending' | 'approved'>>({});
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | RegistryStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
 
   const maxLevel = levels.length > 0 ? levels.length : 5;
@@ -120,41 +119,13 @@ export default function TeamRegistryPage() {
     }, () => setNamesLoading(false));
   }, [groupedByEmployee, initialized]);
 
-  // Items for latest registries
+  // Items + review statuses for latest registries (one batched fetch each)
   useEffect(() => {
     const ids = Array.from(groupedByEmployee.values()).map((regs) => regs[0].id);
-    if (ids.length > 0) fetchItemsForRegistries(ids);
-  }, [groupedByEmployee]);
-
-  // Fetch latest manager review per registry (for status derivation)
-  useEffect(() => {
-    const ids = Array.from(groupedByEmployee.values()).map((regs) => regs[0].id);
-    if (ids.length === 0) {
-      setReviewStatuses({});
-      return;
+    if (ids.length > 0) {
+      fetchItemsForRegistries(ids);
+      fetchReviewStatusesForRegistries(ids);
     }
-    supabase
-      .from('registry_reviews')
-      .select('registry_id, status, completed_at, created_at')
-      .in('registry_id', ids)
-      .is('deleted_on', null)
-      .then(({ data }) => {
-        if (!data) return;
-        const map: Record<string, 'pending' | 'approved'> = {};
-        // Keep latest review per registry
-        const latest = new Map<string, any>();
-        data.forEach((r: any) => {
-          const cur = latest.get(r.registry_id);
-          const ts = r.completed_at ?? r.created_at;
-          if (!cur || new Date(ts).getTime() > new Date(cur.completed_at ?? cur.created_at).getTime()) {
-            latest.set(r.registry_id, r);
-          }
-        });
-        latest.forEach((r, regId) => {
-          map[regId] = r.status === 'approved' || r.status === 'completed' ? 'approved' : 'pending';
-        });
-        setReviewStatuses(map);
-      });
   }, [groupedByEmployee]);
 
   // Build display rows
@@ -222,14 +193,9 @@ export default function TeamRegistryPage() {
     return domains.filter((d) => visible.has(d.id));
   }, [domains, rows]);
 
-  const statusBadge = (s: RegistryStatus) => {
-    const cfg = registryStatusConfig[s];
-    return (
-      <Badge className={`text-[11px] rounded-full px-2.5 py-0.5 ${cfg.badgeClass}`}>
-        {cfg.label}
-      </Badge>
-    );
-  };
+  // Status filter dropdown only needs to show statuses that actually appear in the data,
+  // plus the canonical order.
+  const statusFilterOptions: RegistryStatus[] = ['draft', 'incomplete', 'review_pending', 'approved'];
 
   return (
     <div className="space-y-6">
@@ -264,10 +230,9 @@ export default function TeamRegistryPage() {
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="incomplete">Incomplete Submission</SelectItem>
-                    <SelectItem value="review_pending">Review Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
+                    {statusFilterOptions.map((s) => (
+                      <SelectItem key={s} value={s}>{registryStatusConfig[s].label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -376,7 +341,7 @@ export default function TeamRegistryPage() {
                   </TableCell>
 
                   {/* Status */}
-                  <TableCell className="py-4 px-5">{statusBadge(r.status)}</TableCell>
+                  <TableCell className="py-4 px-5"><RegistryStatusBadge status={r.status} size="sm" /></TableCell>
 
                   {/* Completion */}
                   <TableCell className="py-4 px-5">

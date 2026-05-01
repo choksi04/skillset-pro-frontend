@@ -4,6 +4,7 @@ import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
+import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,8 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from 'lucide-react';
+import { deriveRegistryStatus, type RegistryStatus } from '@/lib/registryStatus';
+import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 type ReviewStatus = 'approved' | 'pending';
 
@@ -71,7 +74,7 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
   const header = ['Employee Name', 'Domain', 'Self Avg', 'Skills', 'Status'];
   const csv = [header, ...rows.map(r => [
     r.employeeName, r.domainName, String(r.selfAvg), String(r.entryCount),
-    r.reviewStatus === 'approved' ? 'Approved' : 'Review Pending',
+    r.reviewStatus === 'approved' ? 'Approved' : 'Pending review',
   ])].map(r => r.join(',')).join('\n');
   downloadCSV(csv, 'registry_by_employees.csv');
 }
@@ -92,12 +95,13 @@ export default function AllRegistriesPage() {
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
 
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
+
   const [viewMode, setViewMode] = useState<'skills' | 'employees'>('skills');
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState('all');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
-  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ReviewStatus>>({});
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
 
@@ -113,25 +117,10 @@ export default function AllRegistriesPage() {
     [registries]
   );
 
-  // Fetch review status (display-only, does NOT filter rows)
+  // Batched review status fetch (cached in the shared store, so other registry pages reuse it)
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
-    if (ids.length === 0) {
-      setReviewStatuses({});
-      return;
-    }
-    supabase
-      .from('registry_reviews')
-      .select('registry_id, status, deleted_on')
-      .in('registry_id', ids)
-      .is('deleted_on', null)
-      .then(({ data }) => {
-        const map: Record<string, ReviewStatus> = {};
-        (data ?? []).forEach((r: any) => {
-          map[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
-        });
-        setReviewStatuses(map);
-      });
+    if (ids.length > 0) fetchReviewStatusesForRegistries(ids);
   }, [submittedRegistries]);
 
   const getReviewStatus = (regId: string): ReviewStatus =>
@@ -415,11 +404,10 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
                     <TableCell className="text-center">
-                      {row.reviewStatus === 'approved' ? (
-                        <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Review Pending</Badge>
-                      )}
+                      <RegistryStatusBadge
+                        status={row.reviewStatus === 'approved' ? 'approved' : 'review_pending'}
+                        size="sm"
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -487,11 +475,10 @@ export default function AllRegistriesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        {emp.reviewStatus === 'approved' ? (
-                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending</Badge>
-                        )}
+                        <RegistryStatusBadge
+                          status={emp.reviewStatus === 'approved' ? 'approved' : 'review_pending'}
+                          size="sm"
+                        />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <ChevronRight size={14} />
