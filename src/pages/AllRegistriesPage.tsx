@@ -494,13 +494,13 @@ export default function AllRegistriesPage() {
                     <TableCell>
                       {row.topSkill ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm truncate max-w-[180px]">{row.topSkill.name}</span>
                           <Badge
                             variant="secondary"
                             className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.topSkill.level)))}`}
                           >
                             L{row.topSkill.level}
                           </Badge>
+                          <span className="text-sm truncate max-w-[180px]">{row.topSkill.name}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
@@ -509,13 +509,13 @@ export default function AllRegistriesPage() {
                     <TableCell>
                       {row.lowSkill ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm truncate max-w-[180px]">{row.lowSkill.name}</span>
                           <Badge
                             variant="secondary"
                             className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.lowSkill.level)))}`}
                           >
                             L{row.lowSkill.level}
                           </Badge>
+                          <span className="text-sm truncate max-w-[180px]">{row.lowSkill.name}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
