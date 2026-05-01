@@ -1,76 +1,68 @@
-## Bug
+# Redesign: My Assessments Page
 
-Manager `test_manager@1rivet.com` (domain lead of "Dynamic 365" / `dom-1776245490169`) cannot see Nikunj Patel's submitted assessment on **Team Assessments**, even though Nikunj belongs to the same domain.
+Rebuild `src/pages/AssessmentsPage.tsx` to match the attached mockup — a structured table replacing the current card list, with a filter control and pagination. Keep all underlying data/logic (status derivation, attempts, assignments, templates) untouched.
 
-## Root cause
+## Layout
 
-Verified with live data:
-
-- `users.test_manager@1rivet.com.domain_id` = `dom-1776245490169` ✅
-- `users.nikunjkumar.s.patel@1rivet.com.domain_id` = `dom-1776245490169` ✅
-- `assessments` row for Nikunj has **`domain_id = "fixed"`** ❌ (a placeholder string, not a real domain id)
-
-Two issues combine to cause the bug:
-
-1. **Bad data being written** — `src/stores/assignmentStore.ts` (lines 135 and 170) inserts assessments using:
-   ```ts
-   domain_id: template.domain_id ?? 'fixed'
-   ```
-   When a template is not bound to a specific domain, the assessment gets the literal string `'fixed'` instead of the employee's actual domain. The same fallback is also written into the in-memory store at line 170.
-
-2. **Wrong filter on Team Assessments** — `src/pages/TeamAssessmentsPage.tsx` filters team assessments by `a.domain_id === user.domain_id`. The intent is "assessments of employees in my domain", but it's filtering on the assessment's stamped `domain_id`, which can drift from the employee's actual domain (and in this case is `'fixed'`).
-
-## Fix
-
-### 1. `src/pages/TeamAssessmentsPage.tsx` — filter by the employee's domain, not the assessment's domain
-For managers, resolve each assessment's owner domain via `useUserStore` (or the same `users` lookup the page already does via `supabase`), and include the assessment when the employee's `domain_id` matches the manager's `domain_id`. This is consistent with the "managers see data of employees in their domain" rule (memory: `data-visibility`).
-
-Implementation outline:
-- Reuse the existing `users` fetch already running on the page; extend the projection to include `domain_id`.
-- Build a `Map<employeeId, domainId>` and use it in the `teamAssessments` memo:
-  ```ts
-  if (currentRole === 'manager') {
-    const myDomain = user?.domain_id;
-    if (!myDomain) return [];
-    return assessments.filter((a) => employeeDomainMap.get(a.employee_id) === myDomain);
-  }
-  ```
-- Admin branch unchanged (sees all).
-
-### 2. `src/stores/assignmentStore.ts` — stop stamping the literal `'fixed'`
-Replace both occurrences of `template.domain_id ?? 'fixed'` (lines 135 and 170) so the assessment row carries the **employee's** domain when the template is not bound to one:
-
-```ts
-const employeeDomain =
-  template.domain_id ?? (await getEmployeeDomain(employeeId)) ?? null;
-// ...
-domain_id: employeeDomain,
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ My Assessments                              [🔍 Search...]   [▽ Filter]     │
+│ View and take your assigned skill assessments.                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ASSESSMENT DETAILS │ FORMAT       │ ASSIGNED BY    │ STATUS & DATE │ ACTION │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ <name>             │ ❓ N (Type)   │ 👤 Name        │ [Status]      │ [Btn]  │
+│ 🏷 <domain chip>   │ ⏱ X mins     │   sub-label    │ Due/Done date │        │
+└─────────────────────────────────────────────────────────────────────────────┘
+              Showing 1 to N of M assessments                [« 1 2 3 »]
 ```
 
-Where `getEmployeeDomain` is a small inline lookup against `users.domain_id` (we can fetch it once per call). The DB column is `text NOT NULL` per schema, so if both template and employee have no domain, fall back to an empty string `''` rather than `'fixed'` (or, cleaner, alter to nullable in a follow-up — out of scope here). Choosing empty-string keeps the schema intact and avoids the placeholder showing up in any UI filter.
+## Columns
 
-### 3. Backfill the existing broken row
-One-shot migration to repair existing data:
+| Column | Source | Notes |
+|---|---|---|
+| **Assessment Details** | template name (or "Assessment") + domain name chip | Domain resolved from `domains` store via `assessment.domain_id`. Chip uses `Layers` icon + muted bg. |
+| **Format** | `assessment_questions.length` + `is_adaptive ? 'Adaptive' : 'Fixed'` and `duration_minutes` | Two stacked rows with `HelpCircle` and `Clock` icons. Show "Pending" if no questions yet. |
+| **Assigned By** | resolved via existing `assignerNames` lookup; fallback "System Auto-Assign / Automated" when no `assigned_by` | Avatar (initials) + full name + small muted sub-label (role/team if available, else "Automated"). |
+| **Status & Date** | `getEffectiveStatus(...)` with existing badge config | Below the badge: `Due: <created date + duration window>` for active, `Completed: <updated_at>` for approved/evaluated, `Submitted: <date>` for submitted. |
+| **Action** | Status-driven button | `Not Started/In Progress` → **Start →** (primary). `Submitted/Evaluated/Under Review/Approved` → **View Results** (outline). Click navigates to `/assessments/:id`. |
 
-```sql
-UPDATE assessments a
-SET domain_id = u.domain_id
-FROM users u
-WHERE a.employee_id = u.id
-  AND a.domain_id = 'fixed'
-  AND u.domain_id IS NOT NULL;
-```
+## Filter control
 
-This makes Nikunj's existing assessment immediately visible to the manager and fixes any other historical rows created with the placeholder.
+Add a `Popover` next to search with a `Filter` icon button. Inside:
+- **Status** multi-select checkboxes (Not Started, In Progress, Submitted, Evaluated, Under Review, Approved).
+- **Format** radio: All / Adaptive / Fixed.
+- "Clear" + "Apply" footer.
 
-## Files to change
+State held locally; combined with search to drive `filteredMy`.
 
-- `src/pages/TeamAssessmentsPage.tsx` — manager filter uses employee→domain map.
-- `src/stores/assignmentStore.ts` — remove `'fixed'` placeholder; resolve employee domain.
-- New migration — backfill `assessments.domain_id` where it equals `'fixed'`.
+## Pagination
 
-## Verification
+- Local `page` state, `PAGE_SIZE = 10`.
+- Footer row: left `Showing X to Y of Z assessments`, right shadcn `Pagination` component with prev/next + numeric pages.
+- Reset to page 1 when search/filters change.
 
-1. Sign in as `test_manager@1rivet.com` → **Team Assessments** lists Nikunj's assessment.
-2. Open the assessment, take a manager action, return to the list — assessment still visible.
-3. Assigning a template (with no domain bound) to an employee creates an assessment whose `domain_id` matches the employee's domain, not `'fixed'`.
+## Visual / styling
+
+- Use shadcn `Table`, `TableHeader`, `TableRow`, `TableHead`, `TableCell`.
+- Header row: uppercase tracking-wide muted text (matches mockup).
+- Rows: subtle hover (`hover:bg-muted/30`), full row clickable (action button uses `e.stopPropagation`).
+- Domain chip: small rounded pill, `bg-muted text-muted-foreground`, `Layers` icon size 11.
+- Avatar: shadcn `Avatar` with initials fallback (no real images — keep neutral).
+- Loading: 5 skeleton rows mirroring the table structure.
+- Empty state: same icon + copy as today, rendered as a single full-width row inside the table.
+
+## Data wiring (unchanged stores)
+
+Keep all current `useEffect` fetches: `fetchAssessments`, `fetchQuestions`, `fetchSkills`, `fetchDomains`, `fetchAttempts`, `fetchReviews`, `fetchTemplates`, `fetchAssignments`. Continue resolving assigner full names via the existing `users` lookup. Add a `domains` map lookup for the chip.
+
+## Files
+
+- **Edit only**: `src/pages/AssessmentsPage.tsx` (full rewrite of the render layer; preserve hooks/data flow at the top).
+- No store, schema, or route changes.
+- No User Guide change required (purely visual restyle of an existing page).
+
+## Out of scope
+
+- Team Assessments page (manager view) stays as-is.
+- No new status semantics, no new DB fields, no backend changes.
