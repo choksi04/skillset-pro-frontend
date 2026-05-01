@@ -1,302 +1,231 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useSkillStore } from '@/stores/skillStore';
-import { useDomainStore } from '@/stores/domainStore';
-import { useQuestionStore } from '@/stores/questionStore';
-import { useAssessmentStore } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useRegistryStore } from '@/stores/registryStore';
-import { useReviewStore } from '@/stores/reviewStore';
-
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import QuickStartChecklist from '@/components/onboarding/QuickStartChecklist';
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
-  Users, Brain, ClipboardCheck, TrendingUp, AlertCircle, Network,
-  BarChart3, Clock, CheckCircle, FileText, Send,
-} from 'lucide-react';
-import { useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+  Sparkles,
+  ArrowRight,
+  ClipboardList,
+  ClipboardCheck,
+  Users,
+  Brain,
+  Network,
+  FileQuestion,
+  LayoutTemplate,
+  BarChart3,
+  BookOpen,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
+import { UserRole } from "@/types/models";
 
-
-function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-5 pb-4 px-5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{label}</span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</div>
-        </div>
-        <p className="mt-2 text-2xl font-semibold text-card-foreground">{value}</p>
-        {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
+interface ModuleLink {
+  title: string;
+  description: string;
+  to: string;
+  icon: LucideIcon;
+  roles: UserRole[];
 }
 
-/* ──────────────── ADMIN DASHBOARD ──────────────── */
-function AdminDashboard() {
-  const { skills } = useSkillStore();
-  const { domains } = useDomainStore();
-  const { questions } = useQuestionStore();
-  const { assessments } = useAssessmentStore();
-  const { attempts } = useAttemptStore();
-  const { reviews, officialEntries } = useReviewStore();
-  const navigate = useNavigate();
+const MODULES: ModuleLink[] = [
+  {
+    title: "Skill Registry",
+    description: "Self-rate your skills and track your validated registry over time.",
+    to: "/skill-registry",
+    icon: ClipboardList,
+    roles: ["admin", "manager", "employee"],
+  },
+  {
+    title: "My Assessments",
+    description: "Take pending assessments and review evaluated results.",
+    to: "/assessments",
+    icon: ClipboardCheck,
+    roles: ["admin", "manager", "employee"],
+  },
+  {
+    title: "Team Registry",
+    description: "Review and approve skill registries submitted by your team.",
+    to: "/team-registry",
+    icon: Users,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Team Assessments",
+    description: "Monitor assessments assigned across your team.",
+    to: "/team-assessments",
+    icon: ClipboardCheck,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Manager Reviews",
+    description: "Approve, adjust, or request reassessment for completed evaluations.",
+    to: "/manager-reviews",
+    icon: ShieldCheck,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Skill Library",
+    description: "Manage skill categories, skills, and topics across the organization.",
+    to: "/skill-library",
+    icon: Brain,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Domains",
+    description: "Configure functional domains and map skills to them.",
+    to: "/domains",
+    icon: Network,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Question Bank",
+    description: "Author and curate AI-assisted questions linked to skills.",
+    to: "/questions",
+    icon: FileQuestion,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Assessment Templates",
+    description: "Build reusable templates and assign them to employees.",
+    to: "/assessment-templates",
+    icon: LayoutTemplate,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "All Registries",
+    description: "Organization-wide view of skill registries and analytics.",
+    to: "/all-registries",
+    icon: BarChart3,
+    roles: ["admin"],
+  },
+];
 
-  const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
-  const completedAssessments = attempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length;
-  const activeAssessments = assessments.filter((a) => a.status === 'pending' || a.status === 'in_progress').length;
-
+function ModuleCard({ module, onOpen }: { module: ModuleLink; onOpen: (to: string) => void }) {
+  const Icon = module.icon;
   return (
-    <>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<Brain size={20} />} label="Skills Tracked" value={skills.length} sub={`${new Set(skills.map((s) => s.skill_category)).size} categories`} />
-        <StatCard icon={<Network size={20} />} label="Domains" value={domains.length} />
-        <StatCard icon={<ClipboardCheck size={20} />} label="Active Assessments" value={activeAssessments} sub={`${completedAssessments} completed`} />
-        <StatCard icon={<TrendingUp size={20} />} label="Registry Entries" value={officialEntries.length} sub={`${pendingReviews} reviews pending`} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Recent Activity</h3>
-              <div className="space-y-3">
-                {completedAssessments > 0 && (
-                  <ActivityItem text={`${completedAssessments} assessment(s) completed`} time="Recent" />
-                )}
-                {pendingReviews > 0 && (
-                  <ActivityItem text={`${pendingReviews} manager review(s) pending`} time="Action needed" />
-                )}
-                {officialEntries.length > 0 && (
-                  <ActivityItem text={`${officialEntries.length} official registry entries recorded`} time="All time" />
-                )}
-                {completedAssessments === 0 && pendingReviews === 0 && officialEntries.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No recent activity. Complete the setup steps to get started.</p>
-                )}
+    <button
+      type="button"
+      onClick={() => onOpen(module.to)}
+      className="group text-left"
+    >
+      <Card className="h-full transition hover:border-primary/40 hover:shadow-sm">
+        <CardContent className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Icon size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-card-foreground">{module.title}</h3>
+                <ArrowRight
+                  size={14}
+                  className="text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary"
+                />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Action Items</h3>
-              <div className="space-y-2">
-                {skills.length === 0 && <ActionItem text="Add skills to the Skill Library" priority="high" />}
-                {domains.length === 0 && <ActionItem text="Create functional domains" priority="high" />}
-                {questions.length === 0 && <ActionItem text="Generate or add questions" priority="medium" />}
-                {pendingReviews > 0 && <ActionItem text={`Review ${pendingReviews} pending assessment(s)`} priority="high" />}
-                {skills.length > 0 && domains.length > 0 && questions.length > 0 && pendingReviews === 0 && (
-                  <p className="text-xs text-muted-foreground">All caught up! No pending actions.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <QuickStartChecklist />
-        </div>
-      </div>
-    </>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {module.description}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
   );
 }
 
-/* ──────────────── MANAGER DASHBOARD ──────────────── */
-function ManagerDashboard() {
-  const { user } = useAuth();
-  const { assessments } = useAssessmentStore();
-  const { attempts } = useAttemptStore();
-  const { reviews } = useReviewStore();
-  const navigate = useNavigate();
-
-  const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
-  const completedReviews = reviews.filter((r) => r.status === 'completed').length;
-  const teamAssessments = assessments.length;
-
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={<ClipboardCheck size={20} />} label="Team Assessments" value={teamAssessments} />
-        <StatCard icon={<Clock size={20} />} label="Pending Reviews" value={pendingReviews} sub="Awaiting your action" />
-        <StatCard icon={<CheckCircle size={20} />} label="Completed Reviews" value={completedReviews} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Action Items</h3>
-              <div className="space-y-2">
-                {pendingReviews > 0 && (
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={14} className="text-destructive" />
-                      <span className="text-sm text-foreground">{pendingReviews} assessment review(s) pending</span>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/manager-reviews')} className="text-xs">
-                      Review Now
-                    </Button>
-                  </div>
-                )}
-                {pendingReviews === 0 && (
-                  <p className="text-xs text-muted-foreground">No pending reviews. All caught up!</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <QuickStartChecklist />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ──────────────── EMPLOYEE DASHBOARD ──────────────── */
-function EmployeeDashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { submissions } = useRegistryStore();
-  const { assessments } = useAssessmentStore();
-  const { attempts } = useAttemptStore();
-
-  const employeeId = user?.id ?? '';
-  const mySubmission = submissions.find((s) => s.employee_id === employeeId);
-  const myAssessments = assessments.filter((a) => a.employee_id === employeeId);
-  const myAttempts = attempts.filter((a) => a.employee_id === employeeId);
-  const pendingAssessment = myAssessments.find((a) => {
-    const attempt = myAttempts.find((at) => at.assessment_id === a.id);
-    return !attempt || attempt.status === 'in_progress';
-  });
-
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={<Send size={20} />}
-          label="Registry Status"
-          value={mySubmission ? (mySubmission.status === 'submitted' ? 'Submitted' : 'Draft') : 'Not Started'}
-        />
-        <StatCard icon={<ClipboardCheck size={20} />} label="Assessments" value={myAssessments.length} />
-        <StatCard
-          icon={<BarChart3 size={20} />}
-          label="Completed"
-          value={myAttempts.filter((a) => a.status === 'submitted' || a.status === 'evaluated').length}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Pending Actions</h3>
-              <div className="space-y-2">
-                {!mySubmission && (
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={14} className="text-destructive" />
-                      <span className="text-sm text-foreground">Submit your skill registry</span>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/skill-registry')} className="text-xs">
-                      Start Now
-                    </Button>
-                  </div>
-                )}
-                {pendingAssessment && (
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-warning" />
-                      <span className="text-sm text-foreground">Assessment pending</span>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/assessments')} className="text-xs">
-                      Take Assessment
-                    </Button>
-                  </div>
-                )}
-                {mySubmission && !pendingAssessment && (
-                  <p className="text-xs text-muted-foreground">No pending actions. Check back later for results!</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <QuickStartChecklist />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ──────────────── Shared components ──────────────── */
-function ActivityItem({ text, time }: { text: string; time: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-1.5 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm text-foreground">{text}</p>
-        <p className="text-xs text-muted-foreground">{time}</p>
-      </div>
-    </div>
-  );
-}
-
-function ActionItem({ text, priority }: { text: string; priority: 'high' | 'medium' | 'low' }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5">
-      <AlertCircle size={14} className={
-        priority === 'high' ? 'text-destructive' :
-        priority === 'medium' ? 'text-warning' : 'text-muted-foreground'
-      } />
-      <span className="text-sm text-foreground">{text}</span>
-    </div>
-  );
-}
-
-/* ──────────────── MAIN ──────────────── */
 export default function DashboardPage() {
   const { currentRole, user } = useAuth();
-  const { fetchSkills } = useSkillStore();
-  const { fetchDomains } = useDomainStore();
-  const { fetchQuestions } = useQuestionStore();
-  const { fetchAssessments } = useAssessmentStore();
-  const { fetchAttempts } = useAttemptStore();
-  const { fetchRegistry } = useRegistryStore();
-  const { fetchReviews } = useReviewStore();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchSkills();
-    fetchDomains();
-    fetchQuestions();
-    fetchAssessments();
-    fetchAttempts();
-    fetchRegistry();
-    fetchReviews();
-  }, [fetchSkills, fetchDomains, fetchQuestions, fetchAssessments, fetchAttempts, fetchRegistry, fetchReviews]);
+  const visibleModules = useMemo(
+    () => MODULES.filter((m) => m.roles.includes(currentRole)),
+    [currentRole],
+  );
+
+  const firstName = user?.full_name?.split(" ")[0];
 
   return (
-    <div className="space-y-6" data-tour="dashboard">
+    <div className="space-y-8" data-tour="dashboard">
+      {/* Greeting */}
       <div>
         <h2 className="text-2xl font-semibold text-foreground">
-          Welcome back{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''}
+          Welcome back{firstName ? `, ${firstName}` : ""}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {currentRole === 'admin' && 'Overview of your skill intelligence platform.'}
-          {currentRole === 'manager' && 'Your team assessments and reviews at a glance.'}
-          {currentRole === 'employee' && 'Your skill journey and pending actions.'}
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your skill intelligence workspace.
         </p>
       </div>
 
-      {currentRole === 'admin' && <AdminDashboard />}
-      {currentRole === 'manager' && <ManagerDashboard />}
-      {currentRole === 'employee' && <EmployeeDashboard />}
+      {/* Coming Soon hero */}
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
+        <CardContent className="p-6 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Sparkles size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-semibold text-card-foreground">
+                  Dashboard — Coming Soon
+                </h3>
+                <Badge variant="secondary" className="text-[11px]">
+                  In design
+                </Badge>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                We're crafting a focused dashboard with the insights that matter most —
+                skill coverage, assessment progress, and review activity at a glance.
+                In the meantime, the platform is fully usable. Jump into any of the
+                modules below to get started, or open the{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/help")}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  User Guide
+                </button>{" "}
+                to learn more.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Available modules */}
+      <div className="space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">
+              Explore what's available today
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Curated for your role · {currentRole}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleModules.map((m) => (
+            <ModuleCard key={m.to} module={m} onOpen={navigate} />
+          ))}
+        </div>
+      </div>
+
+      {/* Footer help line */}
+      <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+        <BookOpen size={14} />
+        <span>
+          Need a tour of the platform?{" "}
+          <button
+            type="button"
+            onClick={() => navigate("/help")}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Open the User Guide
+          </button>
+        </span>
+      </div>
     </div>
   );
 }
