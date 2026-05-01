@@ -21,12 +21,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from 'lucide-react';
 
+type ReviewStatus = 'approved' | 'pending';
+
 interface SkillEmployee {
   employee_id: string;
   name: string;
   domain: string;
   level: number;
   registryId: string;
+  reviewStatus: ReviewStatus;
 }
 
 interface SkillAgg {
@@ -46,6 +49,7 @@ interface EmployeeAgg {
   selfAvg: number;
   entryCount: number;
   latestRegistryId: string | null;
+  reviewStatus: ReviewStatus;
 }
 
 function avg(values: number[]): number {
@@ -64,9 +68,10 @@ function exportSkillsCSV(rows: SkillAgg[]) {
 }
 
 function exportEmployeesCSV(rows: EmployeeAgg[]) {
-  const header = ['Employee Name', 'Domain', 'Self Avg', 'Skills'];
+  const header = ['Employee Name', 'Domain', 'Self Avg', 'Skills', 'Status'];
   const csv = [header, ...rows.map(r => [
     r.employeeName, r.domainName, String(r.selfAvg), String(r.entryCount),
+    r.reviewStatus === 'approved' ? 'Approved' : 'Pending review',
   ])].map(r => r.join(',')).join('\n');
   downloadCSV(csv, 'registry_by_employees.csv');
 }
@@ -92,7 +97,7 @@ export default function AllRegistriesPage() {
   const [domainFilter, setDomainFilter] = useState('all');
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
-  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ReviewStatus>>({});
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
 
@@ -108,33 +113,33 @@ export default function AllRegistriesPage() {
     [registries]
   );
 
-  // Fetch which submitted registries have an approved manager review
+  // Fetch review status (display-only, does NOT filter rows)
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
     if (ids.length === 0) {
-      setApprovedIds(new Set());
+      setReviewStatuses({});
       return;
     }
     supabase
       .from('registry_reviews')
       .select('registry_id, status, deleted_on')
       .in('registry_id', ids)
-      .eq('status', 'approved')
       .is('deleted_on', null)
       .then(({ data }) => {
-        setApprovedIds(new Set((data ?? []).map((r: any) => r.registry_id)));
+        const map: Record<string, ReviewStatus> = {};
+        (data ?? []).forEach((r: any) => {
+          map[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
+        });
+        setReviewStatuses(map);
       });
   }, [submittedRegistries]);
 
-  // Only approved registries flow into the rest of the pipeline
-  const approvedRegistries = useMemo(
-    () => submittedRegistries.filter((r) => approvedIds.has(r.id)),
-    [submittedRegistries, approvedIds],
-  );
+  const getReviewStatus = (regId: string): ReviewStatus =>
+    reviewStatuses[regId] ?? 'pending';
 
-  // Fetch items for all approved registries
+  // Fetch items for all submitted registries
   useEffect(() => {
-    const ids = approvedRegistries.map((r) => r.id);
+    const ids = submittedRegistries.map((r) => r.id);
     if (ids.length === 0) return;
     supabase.from('skill_registry_items').select('registry_id, skill_id, self_score').in('registry_id', ids).then(({ data }) => {
       if (!data) return;
@@ -145,11 +150,11 @@ export default function AllRegistriesPage() {
       });
       setAllItems(map);
     });
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   // Fetch user names
   useEffect(() => {
-    const empIds = [...new Set(approvedRegistries.map(r => r.employee_id))];
+    const empIds = [...new Set(submittedRegistries.map(r => r.employee_id))];
     if (empIds.length === 0) return;
     supabase.from('users').select('id, full_name').in('id', empIds).then(({ data }) => {
       if (data) {
@@ -158,22 +163,22 @@ export default function AllRegistriesPage() {
         setUserNames(map);
       }
     });
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   const skillMap = useMemo(() => new Map(skills.map(s => [s.id, { skill_name: s.skill_name, skill_category: s.skill_category || 'Uncategorized' }])), [skills]);
   const domainMap = useMemo(() => new Map(domains.map(d => [d.id, d.name])), [domains]);
 
-  // Get latest approved version per employee
+  // Get latest version per employee
   const latestPerEmployee = useMemo(() => {
-    const map = new Map<string, typeof approvedRegistries[0]>();
-    approvedRegistries.forEach((r) => {
+    const map = new Map<string, typeof submittedRegistries[0]>();
+    submittedRegistries.forEach((r) => {
       const existing = map.get(r.employee_id);
       if (!existing || r.version_number > existing.version_number) {
         map.set(r.employee_id, r);
       }
     });
     return map;
-  }, [approvedRegistries]);
+  }, [submittedRegistries]);
 
   // Domain filtering
   const filteredLatest = useMemo(() => {
@@ -211,6 +216,7 @@ export default function AllRegistriesPage() {
           domain: reg ? (domainMap.get(reg.domain_id) || 'Unknown') : 'Unknown',
           level,
           registryId,
+          reviewStatus: getReviewStatus(registryId),
         });
       });
       employees.sort((a, b) => a.name.localeCompare(b.name));
@@ -225,7 +231,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap, userNames, domainMap]);
+  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -244,9 +250,10 @@ export default function AllRegistriesPage() {
         selfAvg: avg(items.map(i => i.self_score)),
         entryCount: items.length,
         latestRegistryId: reg.id,
+        reviewStatus: getReviewStatus(reg.id),
       };
     }).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap]);
+  }, [filteredLatest, allItems, userNames, domainMap, reviewStatuses]);
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
@@ -274,7 +281,7 @@ export default function AllRegistriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">All Registries</h2>
-          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest approved versions.</p>
+          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest submitted versions.</p>
         </div>
         <div className="flex items-center gap-3">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'skills' | 'employees')}>
@@ -324,7 +331,7 @@ export default function AllRegistriesPage() {
         filteredSkills.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
-            <p className="text-sm">No approved registry data found.</p>
+            <p className="text-sm">No submitted registry data found.</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
@@ -364,7 +371,7 @@ export default function AllRegistriesPage() {
                       </TableCell>
                     ))}
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.avgLevel))}`}>{row.avgLevel}</Badge>
+                      <Badge className={`text-[10px] pointer-events-none ${getLevelColorClass(Math.round(row.avgLevel))}`}>{row.avgLevel}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -378,7 +385,7 @@ export default function AllRegistriesPage() {
         filteredEmployees.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Database size={32} className="mb-2 opacity-40" />
-            <p className="text-sm">No approved employee registry data found.</p>
+            <p className="text-sm">No submitted employee registry data found.</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
@@ -389,6 +396,7 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Domain</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Avg</TableHead>
                   <TableHead className="text-xs font-medium text-center">Skills</TableHead>
+                  <TableHead className="text-xs font-medium text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -404,6 +412,13 @@ export default function AllRegistriesPage() {
                       <Badge variant="outline" className="text-[10px]">L{row.selfAvg}</Badge>
                     </TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell className="text-center">
+                      {row.reviewStatus === 'approved' ? (
+                        <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending review</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -441,13 +456,14 @@ export default function AllRegistriesPage() {
                   <TableHead className="text-xs font-medium">Employee</TableHead>
                   <TableHead className="text-xs font-medium">Domain</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Level</TableHead>
+                  <TableHead className="text-xs font-medium text-center">Status</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {drawerEmployees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
                       No employees match your search.
                     </TableCell>
                   </TableRow>
@@ -467,6 +483,13 @@ export default function AllRegistriesPage() {
                         <Badge className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, emp.level)))}`}>
                           L{emp.level}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {emp.reviewStatus === 'approved' ? (
+                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">Approved</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">Pending</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <ChevronRight size={14} />
