@@ -32,6 +32,7 @@ export default function TeamAssessmentsPage() {
   const navigate = useNavigate();
 
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userDomains, setUserDomains] = useState<Record<string, string | null>>({});
   const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
@@ -49,11 +50,16 @@ export default function TeamAssessmentsPage() {
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
+    supabase.from('users').select('id, full_name, domain_id').in('id', missing).then(({ data }) => {
       if (data) {
         setUserNames((prev) => {
           const next = { ...prev };
           data.forEach((u: any) => { next[u.id] = u.full_name; });
+          return next;
+        });
+        setUserDomains((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.domain_id ?? null; });
           return next;
         });
       }
@@ -75,10 +81,12 @@ export default function TeamAssessmentsPage() {
     if (currentRole === 'manager') {
       const domainId = user?.domain_id;
       if (!domainId) return [];
-      return assessments.filter((a) => a.domain_id === domainId);
+      // Filter by the EMPLOYEE's current domain, not the assessment's stamped domain_id.
+      // Assessments created from un-bound templates may carry placeholder domain values.
+      return assessments.filter((a) => userDomains[a.employee_id] === domainId);
     }
     return [];
-  }, [assessments, currentRole, user]);
+  }, [assessments, currentRole, user, userDomains]);
 
   const filteredTeam = useMemo(() => {
     if (!search.trim()) return teamAssessments;

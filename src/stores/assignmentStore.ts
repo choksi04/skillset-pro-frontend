@@ -89,6 +89,19 @@ async function generateAssessmentForTemplate(
   const userId = getCurrentUserId();
   const now = new Date().toISOString();
 
+  // Resolve a real domain_id for the assessment.
+  // Prefer the template's bound domain; otherwise fall back to the employee's domain
+  // so manager visibility (scoped by employee domain) keeps working.
+  let resolvedDomainId: string = template.domain_id ?? '';
+  if (!resolvedDomainId) {
+    const { data: empRow } = await supabase
+      .from('users')
+      .select('domain_id')
+      .eq('id', employeeId)
+      .maybeSingle();
+    resolvedDomainId = (empRow as any)?.domain_id ?? '';
+  }
+
   if (template.type === 'fixed') {
     // Pull the registered question list
     const { data: tplQuestions, error: tqErr } = await supabase
@@ -132,7 +145,7 @@ async function generateAssessmentForTemplate(
         tenant_id: tenantId,
         employee_id: employeeId,
         submission_id: `tmpl-${template.id}`,
-        domain_id: template.domain_id ?? 'fixed',
+        domain_id: resolvedDomainId,
         template_id: template.id,
         status: 'pending',
         duration_minutes: durationMinutes,
@@ -167,7 +180,7 @@ async function generateAssessmentForTemplate(
           tenant_id: tenantId,
           employee_id: employeeId,
           submission_id: `tmpl-${template.id}`,
-          domain_id: template.domain_id ?? 'fixed',
+          domain_id: resolvedDomainId,
           template_id: template.id,
           is_reassessment: false,
           is_adaptive: false,
