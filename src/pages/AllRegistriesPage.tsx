@@ -250,9 +250,10 @@ export default function AllRegistriesPage() {
         selfAvg: avg(items.map(i => i.self_score)),
         entryCount: items.length,
         latestRegistryId: reg.id,
+        reviewStatus: getReviewStatus(reg.id),
       };
     }).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap]);
+  }, [filteredLatest, allItems, userNames, domainMap, reviewStatuses]);
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
