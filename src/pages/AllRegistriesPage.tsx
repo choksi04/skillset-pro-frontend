@@ -371,7 +371,7 @@ export default function AllRegistriesPage() {
                       </TableCell>
                     ))}
                     <TableCell className="text-center">
-                      <Badge className={`text-[10px] ${getLevelColorClass(Math.round(row.avgLevel))}`}>{row.avgLevel}</Badge>
+                      <Badge className={`text-[10px] pointer-events-none ${getLevelColorClass(Math.round(row.avgLevel))}`}>{row.avgLevel}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
