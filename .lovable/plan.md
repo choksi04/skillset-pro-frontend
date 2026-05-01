@@ -1,25 +1,70 @@
-## Add "Top Skill" and "Low Skill" columns to All Registries → By Employee
+## Goal
 
-Enhance the By Employee table on `AllRegistriesPage` to surface each employee's strongest and weakest self-rated skill from their latest submitted registry.
+Replace the current role-based `DashboardPage` with a simple, polished **"Dashboard — Coming Soon"** screen. This is a temporary placeholder until a properly designed dashboard is built. It should reassure users the platform is functional and guide them to the parts of the product that *are* live.
 
-### Definitions
+## Scope
 
-- **Top Skill**: skill with the highest `self_score` in the employee's latest submitted registry. Ties broken alphabetically.
-- **Low Skill**: skill with the lowest `self_score`. Ties broken alphabetically.
-- If the employee has no rated items, show `—`.
+- File touched: `src/pages/DashboardPage.tsx` (full rewrite, kept small)
+- No routing changes, no new components, no store changes, no DB changes
+- Existing data fetching (`fetchSkills`, `fetchAssessments`, etc.) on the dashboard will be **removed** — this fixes a meaningful chunk of the "too many API calls" concern raised earlier, since the landing route currently fires 7 store fetches on mount that the placeholder doesn't need.
 
-### UI changes (`src/pages/AllRegistriesPage.tsx`)
+## UX Design
 
-1. Extend `EmployeeAgg` interface with:
-   - `topSkill: { name: string; level: number } | null`
-   - `lowSkill: { name: string; level: number } | null`
-2. In the `employeeAggs` useMemo, compute top/low by scanning `allItems[reg.id]` and resolving names via `skillMap`.
-3. Add two new `<TableHead>` cells ("Top Skill", "Low Skill") between **Skills** and **Status** columns.
-4. Render each as skill name (text-sm) + a small level badge using `getLevelColorClass` for visual consistency with existing level badges.
-5. Update `exportEmployeesCSV` header + rows to include both columns (name + level, e.g. `"React (L4)"`).
+Single centered, minimal layout. Subtle, neutral, with a small indigo/blue accent — consistent with project visual identity. Works in light + dark mode.
 
-### Notes
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  Welcome back, {first name}                                  │
+│  Your skill intelligence workspace                           │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  [icon]  Dashboard — Coming Soon                       │  │
+│  │                                                        │  │
+│  │  We're crafting a focused dashboard with the           │  │
+│  │  insights that matter most. In the meantime, the       │  │
+│  │  platform is fully usable — jump into the modules     │  │
+│  │  below to get started.                                 │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  Explore what's available today                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ Skill        │  │ Assessments  │  │ Team         │        │
+│  │ Registry     │  │              │  │ Registry *   │        │
+│  │ Self-rate…   │  │ Take/review… │  │ Review team… │        │
+│  │ Open →       │  │ Open →       │  │ Open →       │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  (cards shown depend on role)                                │
+│                                                              │
+│  Need a tour? → Open the User Guide                          │
+└──────────────────────────────────────────────────────────────┘
+```
 
-- No new API calls — data already fetched in `allItems`.
-- No DB or store changes.
-- Follows existing badge/color patterns; semantic tokens preserved.
+### Card visibility by role
+
+- **Employee**: Skill Registry, My Assessments, User Guide
+- **Manager**: Skill Registry, My Assessments, Team Registry, Team Assessments, Manager Reviews, User Guide
+- **Admin**: Skill Library, Domains, Question Bank, Assessment Templates, All Registries, User Guide
+
+Each card: small lucide icon in a soft `bg-primary/10` square, short title, one-line description, subtle `Open →` affordance. Entire card is clickable (uses `useNavigate`).
+
+### Visual details
+
+- Outer container: `space-y-8`, max width `max-w-5xl`
+- Hero card: single `Card` with muted border, soft gradient or plain `bg-card`, small `Sparkles` / `Construction` icon in a rounded square, "Coming Soon" pill badge using existing `Badge` variant
+- Module grid: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`
+- Hover: `hover:border-primary/40 hover:shadow-sm transition` — subtle, no heavy effects
+- Footer line: muted text linking to `/help`
+
+## Technical Notes
+
+- Keep `useAuth()` for greeting + role-based card list
+- Remove all store imports and the big `useEffect` that fetches 7 stores
+- Preserve the `data-tour="dashboard"` attribute on the root so the existing guided tour selectors don't break
+- Drop unused imports (`Progress`, `useSkillStore`, etc.)
+- No new files; no changes to `QuickStartChecklist` (it stays available elsewhere if referenced — verify no other page imports break; it's only used inside DashboardPage today, but the component file remains untouched so nothing else regresses)
+
+## Out of Scope
+
+- No changes to the sidebar, routes, or other pages
+- No new "real" dashboard widgets — that's the next iteration
+- No analytics/telemetry hooks
