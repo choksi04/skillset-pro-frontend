@@ -115,7 +115,11 @@ export default function SkillRegistryPage() {
 
   useEffect(() => {
     if (myRegistries.length > 0) {
-      fetchItemsForRegistries(myRegistries.map((r) => r.id));
+      const ids = myRegistries.map((r) => r.id);
+      fetchItemsForRegistries(ids);
+      // Batch-fetch review statuses for the hero card + version history rows
+      const submittedIds = myRegistries.filter((r) => r.status === 'submitted').map((r) => r.id);
+      if (submittedIds.length > 0) fetchReviewStatusesForRegistries(submittedIds);
     }
   }, [myRegistries]);
 
