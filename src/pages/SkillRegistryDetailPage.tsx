@@ -457,9 +457,19 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <Badge className="text-xs bg-success/15 text-success border-success/20 hover:bg-success/15">
-              {isLatest ? 'Up to date' : `Version ${registry.version_number}`}
-            </Badge>
+            <RegistryStatusBadge
+              status={deriveRegistryStatus({
+                registryStatus: registry.status as 'draft' | 'submitted',
+                ratedCount: ratedItems.length,
+                totalSkills,
+                reviewStatus: reviewStatuses[registry.id] ?? null,
+              })}
+            />
+            {!isLatest && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Version {registry.version_number}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {assignedDomain?.description || 'Submitted self-assessment for this domain.'}
