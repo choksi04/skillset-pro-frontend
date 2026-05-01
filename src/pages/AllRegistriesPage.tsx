@@ -21,12 +21,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from 'lucide-react';
 
+type ReviewStatus = 'approved' | 'pending';
+
 interface SkillEmployee {
   employee_id: string;
   name: string;
   domain: string;
   level: number;
   registryId: string;
+  reviewStatus: ReviewStatus;
 }
 
 interface SkillAgg {
@@ -46,6 +49,7 @@ interface EmployeeAgg {
   selfAvg: number;
   entryCount: number;
   latestRegistryId: string | null;
+  reviewStatus: ReviewStatus;
 }
 
 function avg(values: number[]): number {
