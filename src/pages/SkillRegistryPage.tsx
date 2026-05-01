@@ -85,6 +85,7 @@ export default function SkillRegistryPage() {
   const { domains, mappings, fetchDomains, initialized: domainsInitialized } = useDomainStore();
   const { skills, fetchSkills, initialized: skillsInitialized } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
+  const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const employeeId = user?.id ?? '';
   const tenantId = user?.tenant_id ?? 'tenant-001';
