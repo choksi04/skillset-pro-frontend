@@ -148,7 +148,10 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
     set((s) => {
       const next = new Map(s.reviews);
       next.set(registryId, r);
-      return { reviews: next };
+      return {
+        reviews: next,
+        reviewStatuses: { ...s.reviewStatuses, [registryId]: 'pending' },
+      };
     });
     return r;
   },
