@@ -292,7 +292,7 @@ export default function AllRegistriesPage() {
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap, reviewStatuses]);
+  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses]);
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
