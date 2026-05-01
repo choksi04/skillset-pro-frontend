@@ -222,14 +222,13 @@ export default function TeamRegistryPage() {
     return domains.filter((d) => visible.has(d.id));
   }, [domains, rows]);
 
-  const statusBadge = (s: DerivedStatus) => {
-    if (s === 'up_to_date') {
-      return <Badge className="text-[11px] bg-success/15 text-success border-success/20 hover:bg-success/15 rounded-full px-2.5 py-0.5">Up to date</Badge>;
-    }
-    if (s === 'needs_review') {
-      return <Badge className="text-[11px] bg-warning/15 text-warning border-warning/20 hover:bg-warning/15 rounded-full px-2.5 py-0.5">Needs Review</Badge>;
-    }
-    return <Badge className="text-[11px] bg-primary/10 text-primary border-primary/20 hover:bg-primary/10 rounded-full px-2.5 py-0.5">In Progress</Badge>;
+  const statusBadge = (s: RegistryStatus) => {
+    const cfg = registryStatusConfig[s];
+    return (
+      <Badge className={`text-[11px] rounded-full px-2.5 py-0.5 ${cfg.badgeClass}`}>
+        {cfg.label}
+      </Badge>
+    );
   };
 
   return (
@@ -265,9 +264,10 @@ export default function TeamRegistryPage() {
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="up_to_date">Up to date</SelectItem>
-                    <SelectItem value="needs_review">Needs Review</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="incomplete">Incomplete Submission</SelectItem>
+                    <SelectItem value="review_pending">Review Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
