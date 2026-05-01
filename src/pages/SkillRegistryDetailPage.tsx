@@ -391,6 +391,30 @@ export default function SkillRegistryDetailPage() {
   const latestVersion = submittedVersions[0];
   const isLatest = latestVersion ? latestVersion.id === registry.id : true;
 
+  // Latest manager review status for THIS registry (used for the header badge when on latest version)
+  const [reviewStatus, setReviewStatus] = useState<'pending' | 'approved' | null>(null);
+  useEffect(() => {
+    if (!registry?.id || registry.status !== 'submitted') {
+      setReviewStatus(null);
+      return;
+    }
+    supabase
+      .from('registry_reviews')
+      .select('status, completed_at, created_at')
+      .eq('registry_id', registry.id)
+      .is('deleted_on', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) {
+          setReviewStatus(null);
+          return;
+        }
+        setReviewStatus(data.status === 'approved' || data.status === 'completed' ? 'approved' : 'pending');
+      });
+  }, [registry?.id, registry?.status]);
+
   // Stats
   const totalSkills = domainSkills.length;
   const ratedItems = allItems;
@@ -450,8 +474,26 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <Badge className="text-xs bg-success/15 text-success border-success/20 hover:bg-success/15">
-              {isLatest ? 'Up to date' : `Version ${registry.version_number}`}
+            <Badge
+              className={`text-xs ${
+                isLatest
+                  ? registryStatusConfig[deriveRegistryStatus({
+                      registryStatus: 'submitted',
+                      ratedCount: ratedItems.length,
+                      totalSkills,
+                      reviewStatus,
+                    })].badgeClass
+                  : 'bg-muted text-muted-foreground border-border'
+              }`}
+            >
+              {isLatest
+                ? registryStatusConfig[deriveRegistryStatus({
+                    registryStatus: 'submitted',
+                    ratedCount: ratedItems.length,
+                    totalSkills,
+                    reviewStatus,
+                  })].label
+                : `Version ${registry.version_number}`}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
