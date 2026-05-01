@@ -520,7 +520,6 @@ export default function AllRegistriesPage() {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-xs font-medium">Employee</TableHead>
-                  <TableHead className="text-xs font-medium">Domain</TableHead>
                   <TableHead className="text-xs font-medium text-center">Self Level</TableHead>
                   <TableHead className="text-xs font-medium text-center">Status</TableHead>
                   <TableHead className="w-8" />
@@ -543,8 +542,10 @@ export default function AllRegistriesPage() {
                         setSelectedSkill(null);
                       }}
                     >
-                      <TableCell className="text-sm font-medium">{emp.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{emp.domain}</TableCell>
+                      <TableCell>
+                        <h5 className="text-sm font-medium"> {row.employeeName} </h5>
+                        <p className="text-xs text-muted-foreground">{row.domainName}</p>
+                      </TableCell>
                       <TableCell className="text-center">
                         <Badge className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, emp.level)))}`}>
                           L{emp.level}
