@@ -216,6 +216,7 @@ export default function AllRegistriesPage() {
           domain: reg ? (domainMap.get(reg.domain_id) || 'Unknown') : 'Unknown',
           level,
           registryId,
+          reviewStatus: getReviewStatus(registryId),
         });
       });
       employees.sort((a, b) => a.name.localeCompare(b.name));
