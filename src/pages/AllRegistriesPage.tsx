@@ -78,7 +78,8 @@ function exportSkillsCSV(rows: SkillAgg[]) {
 }
 
 function exportEmployeesCSV(rows: EmployeeAgg[]) {
-  const header = ["Employee Name", "Domain", "Self Avg", "Skills", "Status"];
+  const header = ["Employee Name", "Domain", "Self Avg", "Skills", "Top Skill", "Low Skill", "Status"];
+  const fmt = (s: { name: string; level: number } | null) => (s ? `${s.name} (L${s.level})` : "—");
   const csv = [
     header,
     ...rows.map((r) => [
@@ -86,10 +87,12 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
       r.domainName,
       String(r.selfAvg),
       String(r.entryCount),
+      fmt(r.topSkill),
+      fmt(r.lowSkill),
       r.reviewStatus === "approved" ? "Approved" : "Pending review",
     ]),
   ]
-    .map((r) => r.join(","))
+    .map((r) => r.map((c) => (c.includes(",") ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
     .join("\n");
   downloadCSV(csv, "registry_by_employees.csv");
 }
