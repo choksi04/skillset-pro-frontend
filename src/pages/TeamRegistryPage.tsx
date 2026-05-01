@@ -126,6 +126,37 @@ export default function TeamRegistryPage() {
     if (ids.length > 0) fetchItemsForRegistries(ids);
   }, [groupedByEmployee]);
 
+  // Fetch latest manager review per registry (for status derivation)
+  useEffect(() => {
+    const ids = Array.from(groupedByEmployee.values()).map((regs) => regs[0].id);
+    if (ids.length === 0) {
+      setReviewStatuses({});
+      return;
+    }
+    supabase
+      .from('registry_reviews')
+      .select('registry_id, status, completed_at, created_at')
+      .in('registry_id', ids)
+      .is('deleted_on', null)
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, 'pending' | 'approved'> = {};
+        // Keep latest review per registry
+        const latest = new Map<string, any>();
+        data.forEach((r: any) => {
+          const cur = latest.get(r.registry_id);
+          const ts = r.completed_at ?? r.created_at;
+          if (!cur || new Date(ts).getTime() > new Date(cur.completed_at ?? cur.created_at).getTime()) {
+            latest.set(r.registry_id, r);
+          }
+        });
+        latest.forEach((r, regId) => {
+          map[regId] = r.status === 'approved' || r.status === 'completed' ? 'approved' : 'pending';
+        });
+        setReviewStatuses(map);
+      });
+  }, [groupedByEmployee]);
+
   // Build display rows
   const rows = useMemo(() => {
     return Array.from(groupedByEmployee.entries()).map(([empId, regs]) => {
