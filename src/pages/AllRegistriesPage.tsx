@@ -281,7 +281,7 @@ export default function AllRegistriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">All Registries</h2>
-          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest approved versions.</p>
+          <p className="text-sm text-muted-foreground mt-1">Organization-wide skill registry data from latest submitted versions.</p>
         </div>
         <div className="flex items-center gap-3">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'skills' | 'employees')}>
