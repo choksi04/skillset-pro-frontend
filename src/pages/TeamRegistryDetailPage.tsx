@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { RatingLevel } from "@/stores/registryStore";
 import { Badge } from "@/components/ui/badge";
+import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -248,15 +249,7 @@ export default function TeamRegistryDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold text-foreground">{employee?.full_name || registry.employee_id}</h2>
-                <Badge
-                  className={`text-[11px] ${
-                    isApproved
-                      ? "bg-success/15 text-success border-success/20"
-                      : "bg-warning/15 text-warning border-warning/20"
-                  }`}
-                >
-                  {isApproved ? "Approved" : "Pending Review"}
-                </Badge>
+                <RegistryStatusBadge status={isApproved ? 'approved' : 'review_pending'} size="sm" />
               </div>
               <p className="text-xs text-muted-foreground">
                 {employee?.designation || "—"}
