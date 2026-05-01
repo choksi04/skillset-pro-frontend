@@ -266,6 +266,16 @@ export default function AllRegistriesPage() {
     return filteredLatest
       .map((reg) => {
         const items = allItems[reg.id] || [];
+        const named = items
+          .map((i) => ({ name: skillMap.get(i.skill_id)?.skill_name || i.skill_id, level: i.self_score }))
+          .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
+        const topSkill = named.length ? { name: named[0].name, level: named[0].level } : null;
+        const lowSkill = named.length
+          ? (() => {
+              const sortedAsc = [...named].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+              return { name: sortedAsc[0].name, level: sortedAsc[0].level };
+            })()
+          : null;
         return {
           employee_id: reg.employee_id,
           employeeName: userNames[reg.employee_id] || reg.employee_id.slice(0, 8),
@@ -274,6 +284,8 @@ export default function AllRegistriesPage() {
           entryCount: items.length,
           latestRegistryId: reg.id,
           reviewStatus: getReviewStatus(reg.id),
+          topSkill,
+          lowSkill,
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
