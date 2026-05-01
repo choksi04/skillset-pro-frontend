@@ -1,32 +1,38 @@
 ## Goal
-Replace the teal/green `--accent` token (used by `hover:bg-accent` on buttons, dropdowns, sidebar items, etc.) with a subtle neutral gray that matches the surrounding UI surfaces in both light and dark mode.
 
-## Why
-`--accent` is currently set to a saturated teal (`174 62% 40%`), which causes the entire button/menu item background to flash green on hover — visually loud and inconsistent with the minimalist neutral palette.
+Restore the **All Registries** page to show all **submitted** registries (latest version per employee), regardless of manager approval. Surface the review status alongside each row so users can tell what's been approved vs. still pending.
 
-## Change
+## Changes — `src/pages/AllRegistriesPage.tsx`
 
-**File:** `src/index.css`
+### 1. Drop the approval filter
 
-### Light mode (line 25–26)
-```diff
--    --accent: 174 62% 40%;
--    --accent-foreground: 0 0% 100%;
-+    --accent: 210 15% 93%;        /* same as --secondary, soft cool gray */
-+    --accent-foreground: 220 25% 18%;
-```
+- Remove `approvedIds` state and the `useEffect` that filters by `registry_reviews.status = 'approved'`.
+- Remove `approvedRegistries` derived list.
+- All downstream pipelines (items fetch, user-name fetch, latest-per-employee, skill aggregation, employee aggregation) use `submittedRegistries` directly.
 
-### Dark mode (line 68–69)
-```diff
--    --accent: 174 62% 45%;
--    --accent-foreground: 0 0% 100%;
-+    --accent: 220 18% 18%;        /* same as --secondary, soft dark gray */
-+    --accent-foreground: 210 15% 92%;
-```
+### 2. Fetch review status (not as a filter, just for display)
 
-This aligns `accent` with the existing `secondary` surface so hover states on ghost/outline buttons, dropdown items, sidebar links, and command menu rows blend in naturally instead of standing out in green. Foreground keeps text readable on the new neutral surface.
+- New `useEffect` that fetches `registry_reviews` rows for current submitted registry IDs and stores a `Map<registryId, 'approved' | 'pending'>`. Registries with no review row → treated as `pending`.
+
+### 3. Surface status in both views
+
+- **By Skills** view: add a small "Approved / Pending" indicator inside the employees drill-down drawer next to each employee row (since a skill aggregates many employees with different statuses).
+- **By Employee** view: add a new "Status" column showing a `Badge`:
+  - `Approved` — neutral/success styling
+  - `Pending review` — muted/outline styling
+- CSV export for the employees view includes the new Status column.
+
+### 4. Copy updates
+
+- Page subtitle: "Organization-wide skill registry data from latest **submitted** versions."
+- Empty states revert to: "No submitted registry data found." / "No submitted employee registry data found."
+
+5. UI enhacements
+  1. In Avg. Level column there is still background hover effect, remove that. and for L1 & L3, it is showing the grayout like color for L1 & L3 only, make it better color to show properly. Refer the attached screenshot to review and refer:  
+
 
 ## Out of scope
-- No changes to `--primary` (the brand blue stays).
-- No changes to `--sidebar-accent` (already neutral).
-- No component code changes — the existing `hover:bg-accent` / `hover:text-accent-foreground` classes pick up the new values automatically.
+
+- No DB schema or migration changes.
+- No changes to Team Registry / approval flow.
+- No filter toggle for status (kept minimal per project UI principles); can be added later if needed.
