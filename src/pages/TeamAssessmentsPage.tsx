@@ -50,11 +50,16 @@ export default function TeamAssessmentsPage() {
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name').in('id', missing).then(({ data }) => {
+    supabase.from('users').select('id, full_name, domain_id').in('id', missing).then(({ data }) => {
       if (data) {
         setUserNames((prev) => {
           const next = { ...prev };
           data.forEach((u: any) => { next[u.id] = u.full_name; });
+          return next;
+        });
+        setUserDomains((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.domain_id ?? null; });
           return next;
         });
       }
