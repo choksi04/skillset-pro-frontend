@@ -71,11 +71,11 @@ export default function TeamAssessmentsPage() {
   };
 
   const teamAssessments = useMemo(() => {
-    if (currentRole === 'admin') return assessments.filter((a) => a.employee_id !== user?.id);
+    if (currentRole === 'admin') return assessments;
     if (currentRole === 'manager') {
       const domainId = user?.domain_id;
       if (!domainId) return [];
-      return assessments.filter((a) => a.employee_id !== user?.id && a.domain_id === domainId);
+      return assessments.filter((a) => a.domain_id === domainId);
     }
     return [];
   }, [assessments, currentRole, user]);
