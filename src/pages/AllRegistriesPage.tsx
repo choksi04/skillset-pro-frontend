@@ -47,6 +47,8 @@ interface EmployeeAgg {
   entryCount: number;
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
+  topSkill: { name: string; level: number } | null;
+  lowSkill: { name: string; level: number } | null;
 }
 
 function avg(values: number[]): number {
