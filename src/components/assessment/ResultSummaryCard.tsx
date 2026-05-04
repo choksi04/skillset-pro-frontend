@@ -77,6 +77,21 @@ export default function ResultSummaryCard({ attempt, review }: Props) {
       : null;
   const showVerified = verifiedAvg != null && review?.status === "completed";
 
+  // Per-skill manager comments lookup
+  const skillReviewMap = useMemo(
+    () => new Map((review?.skill_reviews ?? []).map((sr: any) => [sr.skill_id, sr])),
+    [review?.skill_reviews]
+  );
+  const reviewCompleted = review?.status === "completed";
+  const overallComment = (review?.overall_comment ?? "").trim();
+  const completedAt = review?.completed_at
+    ? new Date(review.completed_at).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-5">
       <div className="flex items-center gap-2">
