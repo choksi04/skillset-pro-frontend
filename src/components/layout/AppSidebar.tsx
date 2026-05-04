@@ -79,7 +79,12 @@ const sidebarGroups: SidebarGroup[] = [
         icon: <SlidersHorizontal size={18} />,
         roles: ["admin"],
       },
-      { title: "Assessment Templates", href: "/assessment-templates", icon: <LayoutTemplate size={18} />, roles: ["admin", "manager"] },
+      {
+        title: "Assessment Templates",
+        href: "/assessment-templates",
+        icon: <LayoutTemplate size={18} />,
+        roles: ["admin", "manager"],
+      },
       { title: "Users", href: "/users", icon: <Users size={18} />, roles: ["admin"] },
     ],
   },
@@ -132,7 +137,7 @@ export default function AppSidebar() {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-[220px] text-xs">
-                  You're using an early version — your feedback shapes what comes next.
+                  You're using an early version — your feedback shapes what comes next. Reach out to Team Aekatra.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
