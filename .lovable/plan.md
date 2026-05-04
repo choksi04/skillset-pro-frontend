@@ -1,26 +1,47 @@
-## Add "Beta" label to sidebar
+# Show Manager Comments in Result Summary
 
-Add a subtle Beta indicator in the sidebar that signals the product is evolving and invites feedback — using positive, forward-looking language rather than disclaimers about bugs.
+The employee's `My Assessments > Detail` page already renders `ResultSummaryCard` with the `review` prop available. We will extend that single component — no page-level changes needed.
 
-### Placement
+## Changes
 
-Inside the existing logo header in `src/components/layout/AppSidebar.tsx`, next to the "SIAP" title, add a small "Beta" pill badge. This keeps it always visible without taking extra vertical space.
+### 1. `src/components/assessment/ResultSummaryCard.tsx`
 
-Additionally, add a one-line tooltip on hover with the positive message:
+**a) Add a "Manager Comment" column to the Skill-wise breakdown table**
 
-> "You're using an early version — your feedback shapes what comes next."
+- Build a lookup map: `skill_id → { verified_level, manager_comment }` from `review?.skill_reviews`.
+- Add a new rightmost `<th>Manager Comment</th>` column.
+- For each row, render the comment as small muted text.
+  - If review is missing or status !== `completed`: show `—` with tooltip "Pending manager review".
+  - If review completed but comment empty: show "No comment" in muted italic.
+  - Otherwise show the comment text (wrap nicely, `whitespace-pre-wrap`, `text-xs`). If comment is long, add the ellipsis and show comment in native browser tool with "title" attribute.
 
-### Visual design
+**b) Add an "Overall Manager Comment" section below the breakdown table**
 
-- Small rounded pill, indigo/blue accent matching the brand (`bg-primary/15 text-primary` or `border border-primary/30`)
-- Text: `Beta` (10px, medium weight, uppercase tracking)
-- Sits inline to the right of the "SIAP" wordmark
-- Tooltip uses existing shadcn `Tooltip` component
+A new `<div>` block (Card-style: `rounded-lg border border-border p-4`) with:
 
-### Files to change
+- Header: small label "Overall Manager Comment" + reviewer status badge (Approved / Pending).
+- Body — three states:
+  1. **No review yet** OR `review.status !== 'completed'`:
+    "Assessment is still under manager review."
+  2. **Completed but `overall_comment` empty/whitespace**:
+    "Manager approved this assessment without additional comments." (muted italic)
+  3. **Completed with comment**:
+    Render `review.overall_comment` in `whitespace-pre-wrap text-sm text-foreground`.
+- When completed, show small footer: "Reviewed on {formatted completed_at}".
 
-- `src/components/layout/AppSidebar.tsx` — add the Beta pill + tooltip in the logo block
+## State Matrix (for clarity)
 
-No other files need updating. No memory changes required (purely cosmetic, not a recurring rule).
 
-Remove the "Role" section from the sidebar as well.
+| Review state                 | Per-skill cell              | Overall section                                 |
+| ---------------------------- | --------------------------- | ----------------------------------------------- |
+| No review                    | —                           | "Assessment is still under manager review."     |
+| `pending` / `in_progress`    | —                           | "Assessment is still under manager review."     |
+| `completed`, comment empty   | "No comment" (italic muted) | "Manager approved without additional comments." |
+| `completed`, comment present | Comment text                | Comment text + reviewed date                    |
+
+
+## Files
+
+- `src/components/assessment/ResultSummaryCard.tsx` (edit only)
+
+No DB, store, or routing changes — `review.skill_reviews[].manager_comment` and `review.overall_comment` are already fetched by `reviewStore.fetchReviews`.

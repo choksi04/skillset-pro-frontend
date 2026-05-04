@@ -3,7 +3,7 @@ import { AssessmentAttempt } from "@/stores/attemptStore";
 import { useSkillStore } from "@/stores/skillStore";
 import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Award } from "lucide-react";
+import { CheckCircle, XCircle, Award, MessageSquare } from "lucide-react";
 
 interface Props {
   attempt: AssessmentAttempt;
