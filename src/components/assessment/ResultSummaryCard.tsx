@@ -155,19 +155,22 @@ export default function ResultSummaryCard({ attempt, review }: Props) {
                 <tr className="text-muted-foreground">
                   <th className="text-left px-3 py-2 font-medium">Skill</th>
                   <th className="text-center px-3 py-2 font-medium">Correct / Total</th>
-                  <th className="text-right px-3 py-2 font-medium">Achieved Level</th>
+                  <th className="text-center px-3 py-2 font-medium">Achieved Level</th>
+                  <th className="text-left px-3 py-2 font-medium">Manager Comment</th>
                 </tr>
               </thead>
               <tbody>
                 {breakdown.map((b) => {
                   const skill = skillMap.get(b.skill_id);
+                  const sr: any = skillReviewMap.get(b.skill_id);
+                  const skillComment = (sr?.manager_comment ?? "").trim();
                   return (
-                    <tr key={b.skill_id} className="border-t border-border">
+                    <tr key={b.skill_id} className="border-t border-border align-top">
                       <td className="px-3 py-2 text-foreground">{skill?.skill_name ?? b.skill_id}</td>
                       <td className="px-3 py-2 text-center text-muted-foreground">
                         {b.correct} / {b.total}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-center">
                         {b.achieved != null ? (
                           <Badge variant="outline" className="text-[10px]">
                             {getFormattedLevelLabel(competencyLevels, b.achieved)}
@@ -176,11 +179,71 @@ export default function ResultSummaryCard({ attempt, review }: Props) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
+                      <td className="px-3 py-2 text-left max-w-[280px]">
+                        {!reviewCompleted ? (
+                          <span
+                            className="text-muted-foreground"
+                            title="Pending manager review"
+                          >
+                            —
+                          </span>
+                        ) : skillComment ? (
+                          <p
+                            className="text-xs text-foreground whitespace-pre-wrap line-clamp-3"
+                            title={skillComment}
+                          >
+                            {skillComment}
+                          </p>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">No comment</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Overall Manager Comment */}
+          <div className="rounded-lg border border-border p-4 mt-4 bg-muted/10">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={14} className="text-primary" />
+                <p className="text-xs font-semibold text-foreground">Overall Manager Comment</p>
+              </div>
+              {reviewCompleted ? (
+                <Badge className="text-[10px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">
+                  Approved
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] h-5 px-2">
+                  Pending Review
+                </Badge>
+              )}
+            </div>
+
+            {!reviewCompleted ? (
+              <p className="text-xs text-muted-foreground italic">
+                Assessment is still under manager review.
+              </p>
+            ) : overallComment ? (
+              <>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{overallComment}</p>
+                {completedAt && (
+                  <p className="text-[10px] text-muted-foreground mt-2">Reviewed on {completedAt}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground italic">
+                  Manager approved this assessment without additional comments.
+                </p>
+                {completedAt && (
+                  <p className="text-[10px] text-muted-foreground mt-2">Reviewed on {completedAt}</p>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
