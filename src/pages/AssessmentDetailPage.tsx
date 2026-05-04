@@ -14,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import EvalResults from "@/components/assessment/EvalResults";
 import ResultSummaryCard from "@/components/assessment/ResultSummaryCard";
 import ManagerReviewPanel from "@/components/assessment/ManagerReviewPanel";
-import ManagerFeedbackPanel from "@/components/assessment/ManagerFeedbackPanel";
 import AddQuestionDialog from "@/components/assessment/AddQuestionDialog";
 import AdaptiveRunner from "@/components/assessment/AdaptiveRunner";
 import { useAdaptiveEngineStore } from "@/stores/adaptiveEngineStore";
@@ -731,11 +730,6 @@ export default function AssessmentDetailPage() {
       {/* Manager Review Panel (inline for team assessments) */}
       {!isOwner && review && attempt && (
         <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
-      )}
-
-      {/* Manager Feedback (read-only) — shown to the employee once review is completed */}
-      {isOwner && review && review.status === "completed" && attempt && (
-        <ManagerFeedbackPanel review={review} />
       )}
 
       {/* Confirm Regenerate Dialog */}
