@@ -121,16 +121,24 @@ export default function AppSidebar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
           <Brain size={16} className="text-sidebar-primary-foreground" />
         </div>
-        <div>
-          <h1 className="text-sm font-semibold text-sidebar-accent-foreground leading-none">SIAP</h1>
-          <p className="text-[10px] text-sidebar-muted leading-none mt-0.5">Skill Intelligence Platform</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-sm font-semibold text-sidebar-accent-foreground leading-none">SIAP</h1>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-primary cursor-default">
+                    Beta
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[220px] text-xs">
+                  You're using an early version — your feedback shapes what comes next.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <p className="text-[10px] text-sidebar-muted leading-none mt-1">Skill Intelligence Platform</p>
         </div>
-      </div>
-
-      {/* Role */}
-      <div className="px-5 py-2.5 border-b border-sidebar-border">
-        <p className="text-[10px] uppercase tracking-wider text-sidebar-muted">Role</p>
-        <p className="text-xs font-medium text-sidebar-accent-foreground mt-0.5">{roleLabels[currentRole]}</p>
       </div>
 
       {/* Navigation */}
