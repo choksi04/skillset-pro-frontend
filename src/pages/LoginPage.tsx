@@ -2,14 +2,9 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Brain,
-  LogIn,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
   Target,
   BarChart3,
@@ -57,27 +52,11 @@ function FeatureRow({
 }
 
 export default function LoginPage() {
-  const { isAuthenticated, login, loginWithAzure } = useAuth();
-  const [email, setEmail] = useState("");
+  const { isAuthenticated, loginWithAzure } = useAuth();
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [azureLoading, setAzureLoading] = useState(false);
-  const [showEmail, setShowEmail] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) {
-      setError("Please enter your email.");
-      return;
-    }
-    setError("");
-    setLoading(true);
-    const result = await login(email);
-    if (!result.success) setError(result.error ?? "Login failed.");
-    setLoading(false);
-  };
 
   const handleAzureLogin = async () => {
     setError("");
@@ -183,55 +162,6 @@ export default function LoginPage() {
                 <AlertCircle size={14} className="shrink-0" />
                 <span>{error}</span>
               </div>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-background px-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Or for external collaborators
-              </span>
-            </div>
-          </div>
-
-          {/* Email collapsible */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setShowEmail(!showEmail)}
-              aria-expanded={showEmail}
-              aria-label="Toggle email sign-in"
-              className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              Use email instead
-              {showEmail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-
-            {showEmail && (
-              <form onSubmit={handleEmailSubmit} className="space-y-3 rounded-lg border border-border bg-card p-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
-                    Email address
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    className="h-10 text-sm"
-                  />
-                </div>
-                <Button type="submit" variant="outline" className="w-full gap-2" disabled={loading}>
-                  <LogIn size={14} />
-                  {loading ? "Signing in…" : "Sign In"}
-                </Button>
-              </form>
             )}
           </div>
 
