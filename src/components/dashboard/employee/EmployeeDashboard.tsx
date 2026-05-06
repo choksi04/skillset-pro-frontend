@@ -34,10 +34,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
-import { StatCard } from './shared/StatCard';
-import { SectionHeader } from './shared/SectionHeader';
-import { EmptyState } from './shared/EmptyState';
-import { ActionList, type ActionListItem } from './shared/ActionList';
+import { StatCard } from '../shared/StatCard';
+import { SectionHeader } from '../shared/SectionHeader';
+import { EmptyState } from '../shared/EmptyState';
+import { ActionList, type ActionListItem } from '../shared/ActionList';
 
 function formatRelative(dateStr: string | null | undefined): string {
   if (!dateStr) return 'Never';
