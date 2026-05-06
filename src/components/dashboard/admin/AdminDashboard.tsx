@@ -7,9 +7,7 @@ import {
   Scale,
   AlertTriangle,
   CheckCircle2,
-  Network,
   ListTodo,
-  ArrowRight,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,16 +18,12 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
-
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
 
 import { StatCard } from '../shared/StatCard';
 import { SectionHeader } from '../shared/SectionHeader';
-import { EmptyState } from '../shared/EmptyState';
 import { ActionList, type ActionListItem } from '../shared/ActionList';
+import { SkillHeatmap } from './SkillHeatmap';
 
 interface UserLite {
   id: string;
@@ -207,42 +201,6 @@ export function AdminDashboard() {
     return gapSum / valAcc.size;
   }, [latestApprovedPerEmployee, items, attempts]);
 
-  // ─── Insight: Skill Heatmap (Domain × Category) ───
-  const heatmap = useMemo(() => {
-    // For each employee with an approved registry, gather (domain, category, level)
-    const acc = new Map<string, { sum: number; n: number }>(); // key: domainId|categoryId
-    latestApprovedPerEmployee.forEach((reg) => {
-      const empDomain = reg.domain_id;
-      const its = items.get(reg.id) ?? [];
-      its.forEach((i) => {
-        const skill = skills.find((s) => s.id === i.skill_id);
-        if (!skill) return;
-        const catId = skill.skill_category;
-        if (!catId) return;
-        if (i.self_score === null || i.self_score === undefined) return;
-        const k = `${empDomain}|${catId}`;
-        const cur = acc.get(k) ?? { sum: 0, n: 0 };
-        cur.sum += i.self_score;
-        cur.n += 1;
-        acc.set(k, cur);
-      });
-    });
-
-    const domainList = domains.filter((d) => d.status === 'active');
-    const catList = categories.filter((c) => c.status === 'active');
-
-    const cells: Record<string, Record<string, number | null>> = {};
-    domainList.forEach((d) => {
-      cells[d.id] = {};
-      catList.forEach((c) => {
-        const v = acc.get(`${d.id}|${c.id}`);
-        cells[d.id][c.id] = v && v.n > 0 ? v.sum / v.n : null;
-      });
-    });
-
-    return { domains: domainList, categories: catList, cells };
-  }, [latestApprovedPerEmployee, items, skills, domains, categories]);
-
   // ─── Action lane: My Attention queue ───
   const attentionItems: ActionListItem[] = useMemo(() => {
     const out: ActionListItem[] = [];
@@ -380,96 +338,15 @@ export function AdminDashboard() {
       </div>
 
       {/* Insight: Skill Heatmap (Domain × Category) */}
-      <div className="space-y-3">
-        <SectionHeader
-          title="Skill Heatmap"
-          description="Average validated level by domain × skill category."
-          action={
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1 text-xs"
-              onClick={() => navigate('/all-registries')}
-            >
-              See all registries <ArrowRight size={14} />
-            </Button>
-          }
-        />
-        <Card>
-          <CardContent className="p-4">
-            {loading ? (
-              <Skeleton className="h-72 w-full" />
-            ) : heatmap.domains.length === 0 || heatmap.categories.length === 0 ? (
-              <EmptyState
-                icon={Network}
-                title="No domains or categories yet"
-                description="Configure domains and skill categories to populate the heatmap."
-                action={
-                  <Button size="sm" variant="outline" onClick={() => navigate('/domains')}>
-                    Manage domains
-                  </Button>
-                }
-              />
-            ) : latestApprovedPerEmployee.size === 0 ? (
-              <EmptyState
-                icon={CheckCircle2}
-                title="No approved registries yet"
-                description="The heatmap fills in once managers start approving team registries."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-xs">
-                  <thead>
-                    <tr>
-                      <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium text-muted-foreground">
-                        Domain
-                      </th>
-                      {heatmap.categories.map((c) => (
-                        <th
-                          key={c.id}
-                          className="px-2 py-2 text-center font-medium text-muted-foreground"
-                          title={c.name}
-                        >
-                          <span className="line-clamp-2 inline-block max-w-[110px]">{c.name}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {heatmap.domains.map((d) => (
-                      <tr key={d.id} className="border-t border-border">
-                        <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium text-foreground">
-                          <div className="truncate" title={d.name}>{d.name}</div>
-                        </td>
-                        {heatmap.categories.map((c) => {
-                          const v = heatmap.cells[d.id]?.[c.id] ?? null;
-                          return (
-                            <td key={c.id} className="px-2 py-2 text-center">
-                              {v === null ? (
-                                <span className="text-muted-foreground">—</span>
-                              ) : (
-                                <span
-                                  className={
-                                    'inline-flex h-6 min-w-[36px] items-center justify-center rounded-md px-2 text-[11px] font-medium ' +
-                                    getLevelColorClass(Math.round(v))
-                                  }
-                                  title={`Avg L${v.toFixed(2)}`}
-                                >
-                                  {v.toFixed(1)}
-                                </span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <SkillHeatmap
+        loading={loading}
+        domains={domains}
+        categories={categories}
+        skills={skills}
+        registries={registries}
+        items={items}
+        reviewStatuses={reviewStatuses}
+      />
 
       {/* Action lane */}
       <div className="space-y-3">
