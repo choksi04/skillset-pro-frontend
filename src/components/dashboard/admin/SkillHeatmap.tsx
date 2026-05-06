@@ -5,8 +5,13 @@ import { CheckCircle2, Network, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Tooltip,
   TooltipContent,
@@ -39,10 +44,14 @@ interface SkillHeatmapProps {
   reviewStatuses: Record<string, string | undefined>;
 }
 
+type Mode = 'approved' | 'all_submitted';
+
 interface CellAgg {
   sum: number;
   itemCount: number;
   employees: Set<string>;
+  hasPending: boolean;
+  lastApprovedAt: number; // 0 if none
 }
 
 function formatRelative(date: Date | null): string {
@@ -69,30 +78,33 @@ export function SkillHeatmap({
 }: SkillHeatmapProps) {
   const navigate = useNavigate();
   const { levels } = useCompetencyLevelStore();
-  const [hideEmpty, setHideEmpty] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<Mode>('approved');
 
-  // Latest APPROVED registry per employee
-  const latestApprovedPerEmployee = useMemo(() => {
+  // Pick the qualifying registry per employee based on mode.
+  // Registries are pre-sorted by version_number desc, so iterate in order
+  // and take the FIRST matching one per employee.
+  const qualifyingPerEmployee = useMemo(() => {
     const out = new Map<string, SkillRegistry>();
     registries.forEach((r) => {
-      if (
-        r.status === 'submitted' &&
-        reviewStatuses[r.id] === 'approved' &&
-        !out.has(r.employee_id)
-      ) {
+      if (r.status !== 'submitted') return;
+      if (out.has(r.employee_id)) return;
+      if (mode === 'approved') {
+        if (reviewStatuses[r.id] === 'approved') out.set(r.employee_id, r);
+      } else {
         out.set(r.employee_id, r);
       }
     });
     return out;
-  }, [registries, reviewStatuses]);
+  }, [registries, reviewStatuses, mode]);
 
-  // Aggregate cells: domainId|categoryId -> { sum, itemCount, employees }
+  // Aggregate cells: domainId|categoryId
   const { cells, lastUpdated } = useMemo(() => {
     const acc = new Map<string, CellAgg>();
     let maxTs = 0;
-    latestApprovedPerEmployee.forEach((reg) => {
-      const ts = new Date(reg.modified_at ?? reg.created_at).getTime();
+    qualifyingPerEmployee.forEach((reg) => {
+      const ts = new Date(reg.modified_at ?? reg.submitted_at ?? reg.created_at).getTime();
       if (ts > maxTs) maxTs = ts;
+      const isApproved = reviewStatuses[reg.id] === 'approved';
       const empDomain = reg.domain_id;
       if (!empDomain) return;
       const its = items.get(reg.id) ?? [];
@@ -101,10 +113,20 @@ export function SkillHeatmap({
         if (!skill?.skill_category) return;
         if (i.self_score === null || i.self_score === undefined) return;
         const k = `${empDomain}|${skill.skill_category}`;
-        const cur = acc.get(k) ?? { sum: 0, itemCount: 0, employees: new Set() };
+        const cur =
+          acc.get(k) ??
+          {
+            sum: 0,
+            itemCount: 0,
+            employees: new Set<string>(),
+            hasPending: false,
+            lastApprovedAt: 0,
+          };
         cur.sum += i.self_score;
         cur.itemCount += 1;
         cur.employees.add(reg.employee_id);
+        if (!isApproved) cur.hasPending = true;
+        if (isApproved && ts > cur.lastApprovedAt) cur.lastApprovedAt = ts;
         acc.set(k, cur);
       });
     });
@@ -112,7 +134,7 @@ export function SkillHeatmap({
       cells: acc,
       lastUpdated: maxTs > 0 ? new Date(maxTs) : null,
     };
-  }, [latestApprovedPerEmployee, items, skills]);
+  }, [qualifyingPerEmployee, items, skills, reviewStatuses]);
 
   const activeDomains = useMemo(
     () => domains.filter((d) => d.status === 'active'),
@@ -123,42 +145,13 @@ export function SkillHeatmap({
     [categories],
   );
 
-  // Determine which rows/cols have any data
-  const populatedDomainIds = useMemo(() => {
-    const s = new Set<string>();
-    cells.forEach((_, k) => s.add(k.split('|')[0]));
-    return s;
-  }, [cells]);
-
-  const populatedCategoryIds = useMemo(() => {
-    const s = new Set<string>();
-    cells.forEach((_, k) => s.add(k.split('|')[1]));
-    return s;
-  }, [cells]);
-
-  // Auto-detect sparseness for default toggle
-  const sparseDefault = useMemo(() => {
-    const total = activeDomains.length * activeCategories.length;
-    if (total === 0) return false;
-    return cells.size / total < 0.5;
-  }, [cells.size, activeDomains.length, activeCategories.length]);
-
-  const effectiveHideEmpty = hideEmpty === null ? sparseDefault : hideEmpty;
-
-  const visibleDomains = effectiveHideEmpty
-    ? activeDomains.filter((d) => populatedDomainIds.has(d.id))
-    : activeDomains;
-  const visibleCategories = effectiveHideEmpty
-    ? activeCategories.filter((c) => populatedCategoryIds.has(c.id))
-    : activeCategories;
-
-  // Row totals (per visible domain)
+  // Row totals
   const rowTotals = useMemo(() => {
     const m = new Map<string, { sum: number; n: number }>();
-    visibleDomains.forEach((d) => {
+    activeDomains.forEach((d) => {
       let sum = 0;
       let n = 0;
-      visibleCategories.forEach((c) => {
+      activeCategories.forEach((c) => {
         const v = cells.get(`${d.id}|${c.id}`);
         if (v) {
           sum += v.sum / v.itemCount;
@@ -168,15 +161,15 @@ export function SkillHeatmap({
       m.set(d.id, { sum, n });
     });
     return m;
-  }, [visibleDomains, visibleCategories, cells]);
+  }, [activeDomains, activeCategories, cells]);
 
-  // Column totals (per visible category)
+  // Column totals
   const colTotals = useMemo(() => {
     const m = new Map<string, { sum: number; n: number }>();
-    visibleCategories.forEach((c) => {
+    activeCategories.forEach((c) => {
       let sum = 0;
       let n = 0;
-      visibleDomains.forEach((d) => {
+      activeDomains.forEach((d) => {
         const v = cells.get(`${d.id}|${c.id}`);
         if (v) {
           sum += v.sum / v.itemCount;
@@ -186,10 +179,21 @@ export function SkillHeatmap({
       m.set(c.id, { sum, n });
     });
     return m;
-  }, [visibleDomains, visibleCategories, cells]);
+  }, [activeDomains, activeCategories, cells]);
 
   const totalCells = activeDomains.length * activeCategories.length;
   const populatedCells = cells.size;
+
+  // Total active employees who have any submitted registry (as denominator)
+  const employeesWithAnySubmitted = useMemo(() => {
+    const s = new Set<string>();
+    registries.forEach((r) => {
+      if (r.status === 'submitted') s.add(r.employee_id);
+    });
+    return s.size;
+  }, [registries]);
+
+  const employeesIncluded = qualifyingPerEmployee.size;
 
   const sortedLevels = useMemo(
     () =>
@@ -199,7 +203,6 @@ export function SkillHeatmap({
     [levels],
   );
 
-  // ─── Render branches ───
   const renderBody = () => {
     if (loading) {
       return (
@@ -246,33 +249,41 @@ export function SkillHeatmap({
       );
     }
 
-    if (latestApprovedPerEmployee.size === 0) {
+    if (qualifyingPerEmployee.size === 0) {
+      const isApprovedMode = mode === 'approved';
       return (
         <EmptyState
           icon={CheckCircle2}
-          title="No approved registries yet"
-          description="The heatmap fills in once managers start approving team registries."
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate('/all-registries')}
-              className="gap-1"
-            >
-              Open All Registries <ArrowRight size={14} />
-            </Button>
+          title={
+            isApprovedMode
+              ? 'No approved registries yet'
+              : 'No submitted registries yet'
           }
-        />
-      );
-    }
-
-    if (visibleDomains.length === 0 || visibleCategories.length === 0) {
-      return (
-        <EmptyState
-          icon={Network}
-          title="No populated rows or columns to show"
-          description="Toggle “Show only populated” off to see the full grid."
-          compact
+          description={
+            isApprovedMode
+              ? `0 of ${employeesWithAnySubmitted} employee${employeesWithAnySubmitted === 1 ? '' : 's'} have an approved registry. Switch to “All submitted” to include in-flight data.`
+              : 'Once employees submit a registry, the heatmap will start filling in.'
+          }
+          action={
+            isApprovedMode && employeesWithAnySubmitted > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMode('all_submitted')}
+              >
+                Show all submitted
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate('/all-registries')}
+                className="gap-1"
+              >
+                Open All Registries <ArrowRight size={14} />
+              </Button>
+            )
+          }
         />
       );
     }
@@ -286,7 +297,7 @@ export function SkillHeatmap({
                 <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium text-muted-foreground">
                   Domain
                 </th>
-                {visibleCategories.map((c) => (
+                {activeCategories.map((c) => (
                   <th
                     key={c.id}
                     className="px-2 py-2 text-center font-medium text-muted-foreground"
@@ -301,7 +312,7 @@ export function SkillHeatmap({
               </tr>
             </thead>
             <tbody>
-              {visibleDomains.map((d) => {
+              {activeDomains.map((d) => {
                 const row = rowTotals.get(d.id);
                 const rowAvg = row && row.n > 0 ? row.sum / row.n : null;
                 return (
@@ -309,7 +320,7 @@ export function SkillHeatmap({
                     <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium text-foreground">
                       <div className="truncate" title={d.name}>{d.name}</div>
                     </td>
-                    {visibleCategories.map((c) => {
+                    {activeCategories.map((c) => {
                       const v = cells.get(`${d.id}|${c.id}`);
                       if (!v) {
                         return (
@@ -319,6 +330,7 @@ export function SkillHeatmap({
                         );
                       }
                       const avg = v.sum / v.itemCount;
+                      const lastApproved = v.lastApprovedAt > 0 ? new Date(v.lastApprovedAt) : null;
                       return (
                         <td key={c.id} className="px-2 py-2 text-center">
                           <Tooltip>
@@ -331,11 +343,17 @@ export function SkillHeatmap({
                                   )
                                 }
                                 className={
-                                  'inline-flex h-6 min-w-[40px] items-center justify-center rounded-md px-2 text-[11px] font-medium transition hover:ring-2 hover:ring-primary/40 focus:outline-none focus:ring-2 focus:ring-primary ' +
+                                  'relative inline-flex h-6 min-w-[40px] items-center justify-center rounded-md px-2 text-[11px] font-medium transition hover:ring-2 hover:ring-primary/40 focus:outline-none focus:ring-2 focus:ring-primary ' +
                                   getLevelColorClass(Math.round(avg))
                                 }
                               >
                                 {avg.toFixed(1)}
+                                {v.hasPending ? (
+                                  <span
+                                    className="absolute -right-1 -top-1 inline-block h-2 w-2 rounded-full bg-warning ring-2 ring-card"
+                                    aria-label="includes pending"
+                                  />
+                                ) : null}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-xs">
@@ -347,6 +365,14 @@ export function SkillHeatmap({
                                 {v.employees.size === 1 ? '' : 's'} · {v.itemCount} rating
                                 {v.itemCount === 1 ? '' : 's'}
                               </div>
+                              {lastApproved ? (
+                                <div className="text-muted-foreground">
+                                  Last approved {formatRelative(lastApproved)}
+                                </div>
+                              ) : null}
+                              {v.hasPending ? (
+                                <div className="text-warning">Includes unapproved data</div>
+                              ) : null}
                             </TooltipContent>
                           </Tooltip>
                         </td>
@@ -368,7 +394,7 @@ export function SkillHeatmap({
                 <td className="sticky left-0 z-10 bg-muted/30 px-3 py-2 font-semibold text-muted-foreground">
                   Avg
                 </td>
-                {visibleCategories.map((c) => {
+                {activeCategories.map((c) => {
                   const col = colTotals.get(c.id);
                   const colAvg = col && col.n > 0 ? col.sum / col.n : null;
                   return (
@@ -389,7 +415,7 @@ export function SkillHeatmap({
           </table>
         </div>
 
-        {/* Legend + footer note */}
+        {/* Legend */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
           <div className="flex flex-wrap items-center gap-2">
             {sortedLevels.map((l) => (
@@ -407,42 +433,37 @@ export function SkillHeatmap({
             <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               — No data
             </span>
-          </div>
-          <div className="text-[11px] text-muted-foreground">
-            {populatedCells} of {totalCells} cell{totalCells === 1 ? '' : 's'} populated
+            {mode === 'all_submitted' ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span className="inline-block h-2 w-2 rounded-full bg-warning" />
+                Includes pending
+              </span>
+            ) : null}
           </div>
         </div>
       </TooltipProvider>
     );
   };
 
-  const showToggle =
-    !loading &&
-    activeDomains.length > 0 &&
-    activeCategories.length > 0 &&
-    latestApprovedPerEmployee.size > 0;
+  const showCoverage = !loading && activeDomains.length > 0 && activeCategories.length > 0;
 
   return (
     <div className="space-y-3">
       <SectionHeader
         title="Skill Heatmap"
-        description="Average validated level by domain × skill category."
+        description="Average self-rated level by domain × skill category, sourced from employee registries."
         action={
           <div className="flex items-center gap-3">
-            {showToggle ? (
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="heatmap-hide-empty"
-                  checked={effectiveHideEmpty}
-                  onCheckedChange={(v) => setHideEmpty(v)}
-                />
-                <Label
-                  htmlFor="heatmap-hide-empty"
-                  className="text-xs text-muted-foreground"
-                >
-                  Show only populated
-                </Label>
-              </div>
+            {!loading ? (
+              <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
+                <SelectTrigger className="h-8 w-[160px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="approved">Approved only</SelectItem>
+                  <SelectItem value="all_submitted">All submitted</SelectItem>
+                </SelectContent>
+              </Select>
             ) : null}
             {lastUpdated ? (
               <span className="hidden text-[11px] text-muted-foreground sm:inline">
@@ -460,6 +481,35 @@ export function SkillHeatmap({
           </div>
         }
       />
+
+      {/* Coverage strip */}
+      {showCoverage ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="rounded-md border border-border bg-card px-3 py-2 text-xs">
+            <div className="text-muted-foreground">Employees included</div>
+            <div className="mt-0.5 font-semibold text-foreground">
+              {employeesIncluded}{' '}
+              <span className="font-normal text-muted-foreground">
+                of {employeesWithAnySubmitted} submitted
+              </span>
+            </div>
+          </div>
+          <div className="rounded-md border border-border bg-card px-3 py-2 text-xs">
+            <div className="text-muted-foreground">Cells populated</div>
+            <div className="mt-0.5 font-semibold text-foreground">
+              {populatedCells}{' '}
+              <span className="font-normal text-muted-foreground">of {totalCells}</span>
+            </div>
+          </div>
+          <div className="rounded-md border border-border bg-card px-3 py-2 text-xs">
+            <div className="text-muted-foreground">Source</div>
+            <div className="mt-0.5 font-semibold text-foreground">
+              {mode === 'approved' ? 'Approved registries only' : 'All submitted registries'}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <Card>
         <CardContent className="p-4">{renderBody()}</CardContent>
       </Card>

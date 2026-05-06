@@ -1,62 +1,69 @@
-# Admin Skill Heatmap — Polish & Extract
+## Why the heatmap looks empty
 
-## Context
+The widget today silently drops data through three stacked filters:
 
-The Admin Skill Heatmap (Domain × Skill Category, fed by approved registries) already ships in `src/components/dashboard/admin/AdminDashboard.tsx` as part of Phase 1. It renders a color-coded grid, has Skeleton loading, and has two empty states. This task tightens it into a proper, reusable widget with better signal density, a legend, click-through, and stronger empty/loading affordances.
+1. Registry must be **Approved** (manager reviewed, status `approved`).
+2. Only the **latest version** per employee is considered — even if that latest is unapproved while an older version is approved.
+3. Skills must map to an **active category** and employee's domain must be **active**.
 
-No data model changes. No new tables. No backend work.
+Your DB has 8 approved registries, but many employees' newest version is still pending review, so they get excluded entirely. Result: a near-empty grid.
 
-## What changes
+The "Show only populated" toggle is a workaround for sparseness — it doesn't help the admin understand *why* cells are empty.
 
-### 1. Extract to its own component
+## Goals
 
-Create `src/components/dashboard/admin/SkillHeatmap.tsx` and move all heatmap logic (data aggregation + render) out of `AdminDashboard.tsx`. The Admin dashboard just renders `<SkillHeatmap />` inside the existing section.
+- Use registry data that actually exists in the system.
+- Tell the admin clearly what the heatmap is showing and what's missing.
+- Drop the populated-toggle — replace it with a meaningful control.
 
-Props:
-- `loading: boolean`
-- `domains`, `categories`, `skills`, `registries`, `items`, `reviewStatuses` (passed from parent so we don't re-fetch)
-- `onNavigateRegistries: () => void` — used by empty-state CTA and "See all"
+## Changes
 
-### 2. Aggregation upgrades
+### 1. Use **latest approved registry per employee** (not "latest if it happens to be approved")
 
-The cell value stays the **mean self_score across approved-registry items** for `(employee.domain_id, skill.skill_category)`. We additionally track:
+Walk all submitted registries in version-desc order and pick the **first approved one** for each employee. This unlocks all 8 approved registries in your DB instead of only those where the newest version is approved.
 
-- `employeeCount` — distinct employees that contributed to the cell
-- `itemCount` — total scored items in the cell
+### 2. Add a "data source" mode toggle
 
-These power the tooltip: `"Avg L3.2 · 4 employees · 11 ratings"`.
+Replace the populated/empty toggle with a single Select:
 
-### 3. Visual upgrades
+- **Approved only** (default) — current behavior, validated data.
+- **All submitted** — include submitted-but-unreviewed registries so the heatmap fills in earlier in the cycle. Cells get a small "pending" dot when they include unapproved data.
 
-- **Legend row** below the table: 5 swatches (L1…L5) using `getLevelColorClass`, plus a "—" swatch labelled "No data". Pulls labels dynamically from `useCompetencyLevelStore` (per project rule: levels are dynamic).
-- **Row totals column** on the right: per-domain average across all populated categories.
-- **Column totals row** at the bottom: per-category average across all populated domains.
-- **Hide-empty toggle** (small `Switch` in the section header): "Show only populated rows/columns". Default ON when there is sparse data (>50% empty cells), OFF otherwise.
-- Cell click navigates to `/all-registries?domain=<id>&category=<id>` (filter params already understood — if not yet supported, link still resolves to `/all-registries` and we file a follow-up; we will not touch AllRegistriesPage in this task).
+This answers the real question: "do I want validated truth, or current self-reported state?"
 
-### 4. Empty / loading states
+### 3. Always show the full active-domain × active-category grid
 
-Three explicit branches, all rendered inside the same `Card` so layout doesn't shift:
+No more hiding rows/columns. Sparseness is information — a fully empty row means that domain hasn't been validated yet, which is a finding the admin needs to see.
 
-| Condition | Shown |
-|---|---|
-| `loading` | A "ghost" heatmap: Skeleton header row + 4 Skeleton body rows of 6 cells each (uses real grid, not a single big Skeleton). |
-| `domains.length === 0 \|\| categories.length === 0` | EmptyState: "Set up your skill framework first" → CTA "Manage domains" + secondary "Manage skill framework". |
-| `latestApprovedPerEmployee.size === 0` | EmptyState: "No approved registries yet" with a 1-line explainer of what unlocks this widget (managers approving team registries) and a secondary CTA "Open All Registries". |
-| Some domains/categories populated, others empty | Render the table with "—" in empty cells and a soft footer note: `"X of Y cells populated"`. |
+### 4. Add a coverage strip above the grid
 
-### 5. SectionHeader
+Three small stats so the admin understands the denominator at a glance:
 
-Keep current header but add a small "Updated just now" timestamp on the right (derived from `max(modified_at)` across approved registries we used) so admins know freshness at a glance.
+- `Employees included: X of Y` (how many had a qualifying registry)
+- `Cells populated: X of Y`
+- `Mode: Approved only | All submitted`
+
+### 5. Improve empty-state copy
+
+When zero cells fill, replace the generic message with an explanation of which gate failed:
+
+- No active domains/categories → existing "Set up framework" CTA.
+- No qualifying registries in current mode → "0 of N employees have an approved registry. Switch to All submitted to include in-flight data."
+
+### 6. Tooltip stays, plus add: "Last approved: <date>" per cell
+
+Helps spot stale validation.
+
+### 7. Remove the auto-sparse toggle and the `hideEmpty` state entirely
+
+Simpler component, fewer hidden behaviors.
 
 ## Files
 
-- **edit** `src/components/dashboard/admin/AdminDashboard.tsx` — remove inline heatmap block, render `<SkillHeatmap … />`, pass already-fetched data.
-- **create** `src/components/dashboard/admin/SkillHeatmap.tsx` — the widget.
-- No store changes, no migrations, no edge functions.
+- `src/components/dashboard/admin/SkillHeatmap.tsx` — replace toggle with mode select, change aggregation to "latest approved per employee", add coverage strip, update empty states.
+- No DB or store changes needed.
 
-## Out of scope (intentionally)
+## Out of scope
 
-- Replacing `self_score` with true validated/manager scores at the cell level (waits for a dedicated approved-score join; tracked separately).
-- Filters at the dashboard level (admin-wide domain/manager/skill filters belong to Phase 2 per the approved blueprint).
-- Drilldown page changes.
+- Pulling assessment AI scores into the heatmap (that would be a separate "Validated vs AI" view).
+- Click-through filters on `/all-registries` already work; no change.
