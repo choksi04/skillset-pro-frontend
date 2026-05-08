@@ -23,7 +23,13 @@ import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
 import { StatCard } from '../shared/StatCard';
 import { SectionHeader } from '../shared/SectionHeader';
 import { ActionList, type ActionListItem } from '../shared/ActionList';
+import { FilterBar } from '../shared/FilterBar';
 import { SkillHeatmap } from './SkillHeatmap';
+import { TopSkillsPanel } from './TopSkillsPanel';
+import { DomainReadiness } from './DomainReadiness';
+import { ManagerActivity } from './ManagerActivity';
+import { SelfRatingBias } from './SelfRatingBias';
+import { AdminFiltersProvider, useAdminFilters } from './AdminFiltersContext';
 
 interface UserLite {
   id: string;
