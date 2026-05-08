@@ -92,7 +92,7 @@ export function DomainReadiness({
           registryStatus: reg.status,
           ratedCount,
           totalSkills,
-          reviewStatus: reviewStatuses[reg.id] ?? null,
+          reviewStatus: (reviewStatuses[reg.id] as 'pending' | 'approved' | 'completed' | undefined) ?? null,
         });
         if (status === 'approved') approved += 1;
         else if (status === 'review_pending') reviewPending += 1;
