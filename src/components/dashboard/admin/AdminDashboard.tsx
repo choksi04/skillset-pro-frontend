@@ -345,6 +345,9 @@ function AdminDashboardInner() {
         />
       </div>
 
+      {/* Filters */}
+      <AdminFilterControls domains={domains} categories={categories} users={users} />
+
       {/* Insight: Skill Heatmap (Domain × Category) */}
       <SkillHeatmap
         loading={loading}
@@ -354,6 +357,20 @@ function AdminDashboardInner() {
         registries={registries}
         items={items}
         reviewStatuses={reviewStatuses}
+      />
+
+      {/* Insights row 2: capability detail */}
+      <FilteredInsightsRow2
+        loading={loading}
+        registries={registries}
+        items={items}
+        reviewStatuses={reviewStatuses}
+        skills={skills}
+        mappings={mappings}
+        domains={domains}
+        users={users}
+        attempts={attempts}
+        reviews={reviews}
       />
 
       {/* Action lane */}
