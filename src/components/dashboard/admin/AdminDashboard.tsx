@@ -29,6 +29,7 @@ interface UserLite {
   id: string;
   full_name: string;
   domain_id: string | null;
+  role: string;
 }
 
 const ATTENTION_DRAFT_DAYS = 14;
@@ -67,7 +68,7 @@ export function AdminDashboard() {
     setUsersLoading(true);
     supabase
       .from('users')
-      .select('id, full_name, domain_id, status')
+      .select('id, full_name, domain_id, status, role')
       .eq('status', 'active')
       .is('deleted_on', null)
       .then(({ data, error }) => {
@@ -81,6 +82,7 @@ export function AdminDashboard() {
               id: u.id,
               full_name: u.full_name,
               domain_id: u.domain_id ?? null,
+              role: u.role ?? 'employee',
             })),
           );
         }
