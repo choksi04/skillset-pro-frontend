@@ -41,7 +41,7 @@ interface UserLite {
 const ATTENTION_DRAFT_DAYS = 14;
 const STALE_REVIEW_HOURS = 24;
 
-export function AdminDashboard() {
+function AdminDashboardInner() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
