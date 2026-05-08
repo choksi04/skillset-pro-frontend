@@ -150,7 +150,7 @@ export function SkillHeatmap({
       cells: acc,
       lastUpdated: maxTs > 0 ? new Date(maxTs) : null,
     };
-  }, [qualifyingPerEmployee, items, skills, reviewStatuses]);
+  }, [qualifyingPerEmployee, items, skillById, categoryIdByKey, reviewStatuses]);
 
   const activeDomains = useMemo(
     () => domains.filter((d) => d.status === 'active'),
