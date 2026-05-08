@@ -97,7 +97,21 @@ export function SkillHeatmap({
     return out;
   }, [registries, reviewStatuses, mode]);
 
-  // Aggregate cells: domainId|categoryId
+  // Build category resolver: skills.skill_category stores the category NAME,
+  // but we render columns keyed by category ID. Map both ways to the canonical ID.
+  const categoryIdByKey = useMemo(() => {
+    const m = new Map<string, string>();
+    categories.forEach((c) => {
+      if (c.status !== 'active') return;
+      m.set(c.id, c.id);
+      if (c.name) m.set(c.name.toLowerCase(), c.id);
+    });
+    return m;
+  }, [categories]);
+
+  const skillById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
+
+  // Aggregate cells: domainId|categoryId (canonical)
   const { cells, lastUpdated } = useMemo(() => {
     const acc = new Map<string, CellAgg>();
     let maxTs = 0;
@@ -109,10 +123,12 @@ export function SkillHeatmap({
       if (!empDomain) return;
       const its = items.get(reg.id) ?? [];
       its.forEach((i) => {
-        const skill = skills.find((s) => s.id === i.skill_id);
+        const skill = skillById.get(i.skill_id);
         if (!skill?.skill_category) return;
         if (i.self_score === null || i.self_score === undefined) return;
-        const k = `${empDomain}|${skill.skill_category}`;
+        const catId = categoryIdByKey.get(skill.skill_category) ?? categoryIdByKey.get(skill.skill_category.toLowerCase());
+        if (!catId) return; // category inactive or missing — skip
+        const k = `${empDomain}|${catId}`;
         const cur =
           acc.get(k) ??
           {
@@ -134,7 +150,7 @@ export function SkillHeatmap({
       cells: acc,
       lastUpdated: maxTs > 0 ? new Date(maxTs) : null,
     };
-  }, [qualifyingPerEmployee, items, skills, reviewStatuses]);
+  }, [qualifyingPerEmployee, items, skillById, categoryIdByKey, reviewStatuses]);
 
   const activeDomains = useMemo(
     () => domains.filter((d) => d.status === 'active'),
