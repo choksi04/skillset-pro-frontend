@@ -390,3 +390,139 @@ function AdminDashboardInner() {
     </div>
   );
 }
+
+// ── Inner subcomponents that consume the AdminFilters context ──
+
+function AdminFilterControls({
+  domains,
+  categories,
+  users,
+}: {
+  domains: ReturnType<typeof useDomainStore>['domains'];
+  categories: ReturnType<typeof useSkillStore>['categories'];
+  users: { id: string; full_name: string; role: string }[];
+}) {
+  const { filters, setFilter, reset } = useAdminFilters();
+  const filterDefs = [
+    {
+      key: 'domainId',
+      label: 'Domain',
+      options: domains
+        .filter((d) => d.status === 'active')
+        .map((d) => ({ value: d.id, label: d.name })),
+    },
+    {
+      key: 'managerId',
+      label: 'Manager',
+      options: users
+        .filter((u) => u.role === 'manager' || u.role === 'admin')
+        .map((u) => ({ value: u.id, label: u.full_name })),
+    },
+    {
+      key: 'categoryName',
+      label: 'Category',
+      options: categories
+        .filter((c) => c.status === 'active')
+        .map((c) => ({ value: c.name, label: c.name })),
+    },
+  ];
+  return (
+    <FilterBar
+      filters={filterDefs}
+      values={filters as unknown as Record<string, string>}
+      onChange={(k, v) => setFilter(k as keyof typeof filters, v)}
+      onReset={reset}
+    />
+  );
+}
+
+function FilteredInsightsRow2({
+  loading,
+  registries,
+  items,
+  reviewStatuses,
+  skills,
+  mappings,
+  domains,
+  users,
+  attempts,
+  reviews,
+}: {
+  loading: boolean;
+  registries: ReturnType<typeof useSkillRegistryStore>['registries'];
+  items: ReturnType<typeof useSkillRegistryStore>['items'];
+  reviewStatuses: ReturnType<typeof useRegistryReviewStore>['reviewStatuses'];
+  skills: ReturnType<typeof useSkillStore>['skills'];
+  mappings: ReturnType<typeof useDomainStore>['mappings'];
+  domains: ReturnType<typeof useDomainStore>['domains'];
+  users: { id: string; full_name: string; domain_id: string | null; role: string }[];
+  attempts: ReturnType<typeof useAttemptStore>['attempts'];
+  reviews: ReturnType<typeof useReviewStore>['reviews'];
+}) {
+  const { filters } = useAdminFilters();
+  const totalSkillsByDomain = useMemo(() => {
+    const m = new Map<string, number>();
+    mappings.forEach((mp) => m.set(mp.domain_id, (m.get(mp.domain_id) ?? 0) + 1));
+    return m;
+  }, [mappings]);
+  const domainLeadByDomain = useMemo(() => {
+    const m = new Map<string, string | null>();
+    domains.forEach((d) => m.set(d.id, d.domain_lead_id));
+    return m;
+  }, [domains]);
+
+  return (
+    <div className="space-y-6">
+      <TopSkillsPanel
+        loading={loading}
+        registries={registries}
+        items={items}
+        reviewStatuses={reviewStatuses}
+        skills={skills}
+        mappings={mappings}
+        domainFilter={filters.domainId || undefined}
+        categoryFilter={filters.categoryName || undefined}
+      />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <DomainReadiness
+          loading={loading}
+          domains={domains}
+          registries={registries}
+          items={items}
+          reviewStatuses={reviewStatuses}
+          employees={users.map((u) => ({ id: u.id, domain_id: u.domain_id }))}
+          totalSkillsByDomain={totalSkillsByDomain}
+          domainFilter={filters.domainId || undefined}
+        />
+        <ManagerActivity
+          loading={loading}
+          users={users}
+          reviews={reviews}
+          registries={registries}
+          reviewStatuses={reviewStatuses}
+          domainLeadByDomain={domainLeadByDomain}
+          domainFilter={filters.domainId || undefined}
+        />
+      </div>
+      <SelfRatingBias
+        loading={loading}
+        domains={domains}
+        registries={registries}
+        items={items}
+        reviewStatuses={reviewStatuses}
+        attempts={attempts}
+        domainFilter={filters.domainId || undefined}
+      />
+    </div>
+  );
+}
+
+// Public wrapper that provides the filter context.
+export function AdminDashboard() {
+  return (
+    <AdminFiltersProvider>
+      <AdminDashboardInner />
+    </AdminFiltersProvider>
+  );
+}
+
