@@ -398,8 +398,8 @@ function AdminFilterControls({
   categories,
   users,
 }: {
-  domains: ReturnType<typeof useDomainStore>['domains'];
-  categories: ReturnType<typeof useSkillStore>['categories'];
+  domains: ReturnType<typeof useDomainStore.getState>['domains'];
+  categories: ReturnType<typeof useSkillStore.getState>['categories'];
   users: { id: string; full_name: string; role: string }[];
 }) {
   const { filters, setFilter, reset } = useAdminFilters();
@@ -449,15 +449,15 @@ function FilteredInsightsRow2({
   reviews,
 }: {
   loading: boolean;
-  registries: ReturnType<typeof useSkillRegistryStore>['registries'];
-  items: ReturnType<typeof useSkillRegistryStore>['items'];
-  reviewStatuses: ReturnType<typeof useRegistryReviewStore>['reviewStatuses'];
-  skills: ReturnType<typeof useSkillStore>['skills'];
-  mappings: ReturnType<typeof useDomainStore>['mappings'];
-  domains: ReturnType<typeof useDomainStore>['domains'];
+  registries: ReturnType<typeof useSkillRegistryStore.getState>['registries'];
+  items: ReturnType<typeof useSkillRegistryStore.getState>['items'];
+  reviewStatuses: ReturnType<typeof useRegistryReviewStore.getState>['reviewStatuses'];
+  skills: ReturnType<typeof useSkillStore.getState>['skills'];
+  mappings: ReturnType<typeof useDomainStore.getState>['mappings'];
+  domains: ReturnType<typeof useDomainStore.getState>['domains'];
   users: { id: string; full_name: string; domain_id: string | null; role: string }[];
-  attempts: ReturnType<typeof useAttemptStore>['attempts'];
-  reviews: ReturnType<typeof useReviewStore>['reviews'];
+  attempts: ReturnType<typeof useAttemptStore.getState>['attempts'];
+  reviews: ReturnType<typeof useReviewStore.getState>['reviews'];
 }) {
   const { filters } = useAdminFilters();
   const totalSkillsByDomain = useMemo(() => {
