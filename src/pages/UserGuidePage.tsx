@@ -376,6 +376,7 @@ export default function UserGuidePage() {
       <div className="space-y-3">
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
         {navigationGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
+        {dashboardOverview.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         {currentRole === 'admin' && setupFlowGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
       </div>
 
