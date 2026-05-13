@@ -178,9 +178,27 @@ const adminGuide: GuideStep[] = [
       'Export registry data as CSV for external reporting.',
     ],
   },
+  {
+    title: 'Admin Dashboard Widgets',
+    description: 'Org-wide analytics for admins. The top filter bar (Domain, Manager, Skill Category) scopes every widget below.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'Filters bar — Domain, Manager, and Skill Category. Filters apply to every widget on the page; click "Clear" to reset.',
+      'KPI: Workforce Coverage — % of employees with at least one approved validated skill. Source: users + approved entries in the validated registry.',
+      'KPI: Throughput (30d) — assessments submitted in the last 30 days, with a delta vs the prior 30-day window. Source: assessment_attempts.submitted_at.',
+      'KPI: Avg Validated Level — mean approved level across the org (or filtered scope). Source: latest approved registry entries.',
+      'KPI: Self vs Validated Gap — average difference between employee self-rating and the manager-validated level. A bias indicator: positive = over-rating, negative = under-rating.',
+      'My Attention — actionable counts that need admin follow-up: pending reviews stuck on inactive managers, employees with no domain, domains missing skills/questions/templates.',
+      'Domain Readiness — per-domain progress bar across the four setup checks (skills mapped, questions published, templates active, employees ready). Helps spot domains that are not assessment-ready.',
+      'Top 5 Skill Strengths — skills with the highest average approved level. Useful for identifying organizational expertise.',
+      'Top 5 Skill Gaps — skills with the lowest average approved level. Drives upskilling and hiring decisions.',
+      'Self-Rating Bias by Domain — average self-vs-validated delta per domain. Highlights teams that consistently over- or under-rate themselves.',
+      'Manager Activity — per-manager review throughput, pending review counts, and average turnaround. Helps spot bottlenecks in the review pipeline.',
+      'Skill Heatmap — Domain × Category matrix of average validated level. Click a cell to drill into the underlying skills and employees.',
+      'Data input: none directly. Widgets are derived live from registries, assessments, reviews, users, and domains. To improve numbers, complete the Setup Flow and have employees/managers progress through their workflows.',
+    ],
+  },
 ];
-
-const managerGuide: GuideStep[] = [
   {
     title: 'Team Registry',
     description: 'View your team members\' skill registry submissions, current versions, and full history.',
