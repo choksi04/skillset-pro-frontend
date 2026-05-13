@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Pencil, Shield, Users, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Pencil, Shield, Users, AlertTriangle, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { getCurrentUserId } from '@/lib/audit';
 
