@@ -70,6 +70,21 @@ const setupFlowGuide: GuideStep[] = [
   },
 ];
 
+const dashboardOverview: GuideStep[] = [
+  {
+    title: 'Dashboard Overview',
+    description: 'The Dashboard is your role-aware home — it adapts to show the metrics, alerts, and shortcuts that matter to you.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'Admins, Managers, and Employees each see a different layout — admins get org-wide analytics, managers see team-scoped data, employees see their own progress.',
+      'Two persistent banners may appear at the top: "SIAP is in Beta" (early-stage product notice) and "Experimental dashboard" (widgets and metrics may evolve). Dismiss them with the X — they reappear in a new session.',
+      'Admins also see a Setup Progress bar (in the sidebar) and a Quick-Start Checklist until the platform is fully configured.',
+      'No data entry happens on the dashboard. Every widget is read-only and reflects the current state of your skills, registries, assessments, and reviews.',
+      'Data refreshes when the page loads — return to the Dashboard to see the latest numbers.',
+    ],
+  },
+];
+
 const adminGuide: GuideStep[] = [
   {
     title: 'Skill Library',
