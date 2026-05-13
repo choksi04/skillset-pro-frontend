@@ -1,32 +1,35 @@
-## Add Dashboard Notice Banner
+# Users Page — Filters & Sticky Pagination
 
-Add a dismissible info/alert section at the very top of the dashboard (above all role-specific content) that conveys two messages to users.
+## 1. Filters (toolbar)
 
-### Where
-- Render inside `src/pages/DashboardPage.tsx`, above the role switch, so it appears for Admin, Manager, and Employee dashboards in one place.
+Extend the existing toolbar (next to the search input) with three dropdowns built using the shared `SearchableSelect` (matching `DomainsPage` style):
 
-### What it shows
-A single shadcn `Alert` (or compact card) using `Info` icon and muted/primary-tinted styling, containing two stacked items:
+- **Domain** — options: `All Domains`, `No domain`, plus all domains from `useDomainStore`.
+- **Role** — options: `All Roles`, `Admin`, `Manager`, `Employee`.
+- **Status** — options: `All Status`, `Active`, `Disabled`.
 
-1. **Experimental Dashboard**
-   - Title: "Experimental dashboard"
-   - Body: "This dashboard is experimental and will continue to evolve. Layout, widgets, and metrics may change in upcoming releases."
+Add a `Clear` ghost button (right side) when any filter is non-default.
 
-2. **Application in Beta**
-   - Title: "SIAP is in Beta"
-   - Body: same wording aligned with the existing Beta badge tooltip — "You're using an early version — your feedback shapes what comes next. Reach out to Team Aekatra."
+State: extend local state with `domainFilter`, `roleFilter`, `statusFilter` (default `'all'`).
 
-### New component
-- `src/components/dashboard/shared/DashboardNotice.tsx`
-  - Self-contained, presentational only.
-  - Uses semantic tokens (`bg-primary/5`, `border-primary/20`, `text-muted-foreground`, etc.) — no hardcoded colors.
-  - Uses lucide `Info` / `Sparkles` icons for the two rows.
-  - Includes a dismiss (×) button that hides it for the session via `sessionStorage` key `dashboard-notice-dismissed` (so it returns next session, since it's important context). No DB writes.
+Update the `filtered` memo to apply search + the three filters together. Reset pagination to page 1 whenever filters or search change.
 
-### Wiring
-- Import `DashboardNotice` in `DashboardPage.tsx` and render above the role-based dashboard with a small bottom margin.
+## 2. Sticky Pagination (bottom)
 
-### Out of scope
-- No changes to the sidebar Beta badge.
-- No persistence in DB, no per-user dismiss tracking.
-- No changes to dashboard widgets themselves.
+Reuse the project's existing sticky pagination pattern (per memory `mem://style/ui-patterns/sticky-pagination`). I'll inspect `QuestionBankPage`/similar to copy the exact sticky styling so it overlaps container padding consistently.
+
+- Page size: **20** (default), with a small page-size selector (10 / 20 / 50).
+- Controls: `Prev`, page number indicator (`Page X of Y`), `Next`, plus a count summary (`Showing 1–20 of 84`).
+- Sticky to the bottom of the viewport, full-width, with backdrop/border so it sits above the table when scrolling.
+- Hidden when `filtered.length <= pageSize`.
+
+Slice `filtered` with `(page-1)*pageSize` for rendering.
+
+## 3. Out of scope
+
+- No backend/query changes — filtering & pagination remain client-side (consistent with current full-table fetch).
+- No changes to the Add/Edit dialog or stats cards.
+
+## Files
+
+- `src/pages/UsersPage.tsx` — add filter state + UI, pagination state + sticky control, slice rendered rows.

@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Pencil, Shield, Users, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Pencil, Shield, Users, AlertTriangle, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { getCurrentUserId } from '@/lib/audit';
 
@@ -46,6 +46,11 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [domainFilter, setDomainFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
 
@@ -63,10 +68,32 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); fetchDomains(); }, [fetchDomains]);
 
   const filtered = useMemo(() =>
-    users.filter((u) =>
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-    ), [users, search]);
+    users.filter((u) => {
+      const q = search.toLowerCase();
+      const matchesSearch = !q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      const matchesDomain =
+        domainFilter === 'all' ||
+        (domainFilter === 'none' ? !u.domain_id : u.domain_id === domainFilter);
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+      const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
+      return matchesSearch && matchesDomain && matchesRole && matchesStatus;
+    }), [users, search, domainFilter, roleFilter, statusFilter]);
+
+  const hasActiveFilters = domainFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all';
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize],
+  );
+
+  useEffect(() => { setPage(1); }, [search, domainFilter, roleFilter, statusFilter, pageSize]);
+
+  const clearFilters = () => {
+    setDomainFilter('all');
+    setRoleFilter('all');
+    setStatusFilter('all');
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -183,6 +210,38 @@ export default function UsersPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
         </div>
+        <Select value={domainFilter} onValueChange={setDomainFilter}>
+          <SelectTrigger className="w-[160px] h-9 text-sm"><SelectValue placeholder="Domain" /></SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value="all">All Domains</SelectItem>
+            <SelectItem value="none">No domain</SelectItem>
+            {domains.map((d) => (
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Role" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="employee">Employee</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="disabled">Disabled</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-9 gap-1 text-xs" onClick={clearFilters}>
+            <X size={12} /> Clear
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -214,7 +273,7 @@ export default function UsersPage() {
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10 text-sm text-muted-foreground">No users found.</TableCell></TableRow>
             ) : (
-              filtered.map((u) => {
+              paged.map((u) => {
                 const domain = domains.find((d) => d.id === u.domain_id);
                 const needsDomain = (u.role === 'employee' || u.role === 'manager') && !u.domain_id;
                 return (
@@ -261,6 +320,77 @@ export default function UsersPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination — sticky bottom */}
+      {!loading && filtered.length > 0 && (
+        <div className="sticky -bottom-6 border-t border-border bg-background py-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} users
+            </p>
+            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+              <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft size={14} /> Previous
+              </Button>
+              {(() => {
+                const pages: (number | 'ellipsis')[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 3) pages.push('ellipsis');
+                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                    pages.push(i);
+                  }
+                  if (currentPage < totalPages - 2) pages.push('ellipsis');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, idx) =>
+                  p === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="px-2 text-muted-foreground text-sm">…</span>
+                  ) : (
+                    <Button
+                      key={p}
+                      variant={currentPage === p ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  )
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next <ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
