@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronRight, Play, Shield, Users, User,
   Brain, Network, HelpCircle, ClipboardCheck, BarChart3, CheckCircle, Sparkles,
   SlidersHorizontal, RefreshCw, Database, FileText, Bell, Layers, Award,
+  LayoutDashboard,
 } from 'lucide-react';
 
 interface GuideStep {
