@@ -236,6 +236,21 @@ const managerGuide: GuideStep[] = [
       'Click "Finalize Review" when every skill has an action — the verified levels are written to the validated registry.',
     ],
   },
+  {
+    title: 'Manager Dashboard Widgets',
+    description: 'Team-scoped overview for managers. All metrics are limited to employees in domains you manage.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'KPI: Team Size — number of active employees across the domains you manage.',
+      'KPI: Pending My Review — assessments waiting for your action. Click through to jump straight into the Reviews queue.',
+      'KPI: Team Avg Validated Level — mean approved level across your team. A quick read on overall team capability.',
+      'KPI: Reassessments Open — outstanding reassessment requests you have raised that are not yet completed.',
+      'Team Skill Matrix — Skill × Employee grid of validated levels. Empty cells mean the skill has not been validated yet for that employee.',
+      'Review Queue — shortcut list of pending reviews. Each row links to the assessment with its inline review panel.',
+      'Stuck Employees — team members blocked or inactive: missing domain, no recent registry submission, overdue assessment, or open reassessment.',
+      'Data input: none directly. Numbers update as your team submits registries, completes assessments, and you finalize reviews.',
+    ],
+  },
 ];
 
 const employeeGuide: GuideStep[] = [
