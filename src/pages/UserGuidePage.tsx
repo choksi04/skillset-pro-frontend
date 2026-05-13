@@ -199,6 +199,8 @@ const adminGuide: GuideStep[] = [
     ],
   },
 ];
+
+const managerGuide: GuideStep[] = [
   {
     title: 'Team Registry',
     description: 'View your team members\' skill registry submissions, current versions, and full history.',
