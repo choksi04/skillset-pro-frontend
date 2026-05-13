@@ -298,6 +298,20 @@ const employeeGuide: GuideStep[] = [
       'Once your manager reviews, the Verified Level appears alongside the Achieved Level — this is what gets written to your validated registry.',
     ],
   },
+  {
+    title: 'My Dashboard Widgets',
+    description: 'Your personal home — progress, pending tasks, and what to do next.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'KPI: My Registry — current registry state (Draft, Incomplete, Review Pending, or Approved). Click through to open My Registry.',
+      'KPI: Skills Assessed — number of skills you have completed an assessment for at least once.',
+      'KPI: My Avg Level — your average validated (manager-approved) level across all your skills.',
+      'KPI: Open Tasks — combined count of pending assessments and any draft registry waiting for submission.',
+      'My Skill Snapshot — your skills grouped by category, showing self-rating vs validated level side by side. Highlights where your perception differs from validated capability.',
+      'What\'s next — suggested next actions tailored to your state (e.g. submit your registry, start a pending assessment, review feedback).',
+      'Data input: none directly. Numbers update automatically as you submit your registry, take assessments, and your manager completes reviews.',
+    ],
+  },
 ];
 
 function GuideSectionCard({ step, defaultOpen = false }: { step: GuideStep; defaultOpen?: boolean }) {
