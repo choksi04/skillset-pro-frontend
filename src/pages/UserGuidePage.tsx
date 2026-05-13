@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronRight, Play, Shield, Users, User,
   Brain, Network, HelpCircle, ClipboardCheck, BarChart3, CheckCircle, Sparkles,
   SlidersHorizontal, RefreshCw, Database, FileText, Bell, Layers, Award,
+  LayoutDashboard,
 } from 'lucide-react';
 
 interface GuideStep {
@@ -65,6 +66,21 @@ const setupFlowGuide: GuideStep[] = [
       'Step 6: Create an Assessment Template (adaptive or fixed) under Settings → Assessment Templates and pick the skills to be assessed.',
       'Step 7: Create an assessment from a template and assign it to employees from the Assessment Templates page.',
       'Track your progress via the Setup Progress indicator in the sidebar.',
+    ],
+  },
+];
+
+const dashboardOverview: GuideStep[] = [
+  {
+    title: 'Dashboard Overview',
+    description: 'The Dashboard is your role-aware home — it adapts to show the metrics, alerts, and shortcuts that matter to you.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'Admins, Managers, and Employees each see a different layout — admins get org-wide analytics, managers see team-scoped data, employees see their own progress.',
+      'Two persistent banners may appear at the top: "SIAP is in Beta" (early-stage product notice) and "Experimental dashboard" (widgets and metrics may evolve). Dismiss them with the X — they reappear in a new session.',
+      'Admins also see a Setup Progress bar (in the sidebar) and a Quick-Start Checklist until the platform is fully configured.',
+      'No data entry happens on the dashboard. Every widget is read-only and reflects the current state of your skills, registries, assessments, and reviews.',
+      'Data refreshes when the page loads — return to the Dashboard to see the latest numbers.',
     ],
   },
 ];
@@ -162,6 +178,26 @@ const adminGuide: GuideStep[] = [
       'Export registry data as CSV for external reporting.',
     ],
   },
+  {
+    title: 'Admin Dashboard Widgets',
+    description: 'Org-wide analytics for admins. The top filter bar (Domain, Manager, Skill Category) scopes every widget below.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'Filters bar — Domain, Manager, and Skill Category. Filters apply to every widget on the page; click "Clear" to reset.',
+      'KPI: Workforce Coverage — % of employees with at least one approved validated skill. Source: users + approved entries in the validated registry.',
+      'KPI: Throughput (30d) — assessments submitted in the last 30 days, with a delta vs the prior 30-day window. Source: assessment_attempts.submitted_at.',
+      'KPI: Avg Validated Level — mean approved level across the org (or filtered scope). Source: latest approved registry entries.',
+      'KPI: Self vs Validated Gap — average difference between employee self-rating and the manager-validated level. A bias indicator: positive = over-rating, negative = under-rating.',
+      'My Attention — actionable counts that need admin follow-up: pending reviews stuck on inactive managers, employees with no domain, domains missing skills/questions/templates.',
+      'Domain Readiness — per-domain progress bar across the four setup checks (skills mapped, questions published, templates active, employees ready). Helps spot domains that are not assessment-ready.',
+      'Top 5 Skill Strengths — skills with the highest average approved level. Useful for identifying organizational expertise.',
+      'Top 5 Skill Gaps — skills with the lowest average approved level. Drives upskilling and hiring decisions.',
+      'Self-Rating Bias by Domain — average self-vs-validated delta per domain. Highlights teams that consistently over- or under-rate themselves.',
+      'Manager Activity — per-manager review throughput, pending review counts, and average turnaround. Helps spot bottlenecks in the review pipeline.',
+      'Skill Heatmap — Domain × Category matrix of average validated level. Click a cell to drill into the underlying skills and employees.',
+      'Data input: none directly. Widgets are derived live from registries, assessments, reviews, users, and domains. To improve numbers, complete the Setup Flow and have employees/managers progress through their workflows.',
+    ],
+  },
 ];
 
 const managerGuide: GuideStep[] = [
@@ -198,6 +234,21 @@ const managerGuide: GuideStep[] = [
       'Reassess — request a fresh attempt; the employee is re-issued the assessment for that skill.',
       'Add optional per-skill comments to provide feedback to the employee.',
       'Click "Finalize Review" when every skill has an action — the verified levels are written to the validated registry.',
+    ],
+  },
+  {
+    title: 'Manager Dashboard Widgets',
+    description: 'Team-scoped overview for managers. All metrics are limited to employees in domains you manage.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'KPI: Team Size — number of active employees across the domains you manage.',
+      'KPI: Pending My Review — assessments waiting for your action. Click through to jump straight into the Reviews queue.',
+      'KPI: Team Avg Validated Level — mean approved level across your team. A quick read on overall team capability.',
+      'KPI: Reassessments Open — outstanding reassessment requests you have raised that are not yet completed.',
+      'Team Skill Matrix — Skill × Employee grid of validated levels. Empty cells mean the skill has not been validated yet for that employee.',
+      'Review Queue — shortcut list of pending reviews. Each row links to the assessment with its inline review panel.',
+      'Stuck Employees — team members blocked or inactive: missing domain, no recent registry submission, overdue assessment, or open reassessment.',
+      'Data input: none directly. Numbers update as your team submits registries, completes assessments, and you finalize reviews.',
     ],
   },
 ];
@@ -245,6 +296,20 @@ const employeeGuide: GuideStep[] = [
       'No percentages or numeric "AI Scores" — the result is expressed purely as a competency level.',
       'Per-question details below show your answer, the correct answer (for MCQs), and AI feedback (for open-ended answers).',
       'Once your manager reviews, the Verified Level appears alongside the Achieved Level — this is what gets written to your validated registry.',
+    ],
+  },
+  {
+    title: 'My Dashboard Widgets',
+    description: 'Your personal home — progress, pending tasks, and what to do next.',
+    icon: <LayoutDashboard size={16} />,
+    steps: [
+      'KPI: My Registry — current registry state (Draft, Incomplete, Review Pending, or Approved). Click through to open My Registry.',
+      'KPI: Skills Assessed — number of skills you have completed an assessment for at least once.',
+      'KPI: My Avg Level — your average validated (manager-approved) level across all your skills.',
+      'KPI: Open Tasks — combined count of pending assessments and any draft registry waiting for submission.',
+      'My Skill Snapshot — your skills grouped by category, showing self-rating vs validated level side by side. Highlights where your perception differs from validated capability.',
+      'What\'s next — suggested next actions tailored to your state (e.g. submit your registry, start a pending assessment, review feedback).',
+      'Data input: none directly. Numbers update automatically as you submit your registry, take assessments, and your manager completes reviews.',
     ],
   },
 ];
@@ -311,6 +376,7 @@ export default function UserGuidePage() {
       <div className="space-y-3">
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
         {navigationGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
+        {dashboardOverview.map((s) => <GuideSectionCard key={s.title} step={s} />)}
         {currentRole === 'admin' && setupFlowGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
       </div>
 
