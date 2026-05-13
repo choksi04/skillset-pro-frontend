@@ -46,6 +46,11 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [domainFilter, setDomainFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
 
@@ -63,10 +68,32 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); fetchDomains(); }, [fetchDomains]);
 
   const filtered = useMemo(() =>
-    users.filter((u) =>
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-    ), [users, search]);
+    users.filter((u) => {
+      const q = search.toLowerCase();
+      const matchesSearch = !q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      const matchesDomain =
+        domainFilter === 'all' ||
+        (domainFilter === 'none' ? !u.domain_id : u.domain_id === domainFilter);
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+      const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
+      return matchesSearch && matchesDomain && matchesRole && matchesStatus;
+    }), [users, search, domainFilter, roleFilter, statusFilter]);
+
+  const hasActiveFilters = domainFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all';
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize],
+  );
+
+  useEffect(() => { setPage(1); }, [search, domainFilter, roleFilter, statusFilter, pageSize]);
+
+  const clearFilters = () => {
+    setDomainFilter('all');
+    setRoleFilter('all');
+    setStatusFilter('all');
+  };
 
   const openCreate = () => {
     setEditing(null);
