@@ -45,7 +45,7 @@ export default function DomainDetailPage() {
   const navigate = useNavigate();
   const { domains, mappings, fetchDomains, updateDomain, removeMapping, checkDomainDeletable, deleteDomain } = useDomainStore();
   const { skills, fetchSkills, initialized } = useSkillStore();
-  const { currentRole } = useAuth();
+  const { currentRole, user: authUser, refreshUser } = useAuth();
   const isAdmin = currentRole === 'admin';
 
   const [editOpen, setEditOpen] = useState(false);
@@ -106,9 +106,12 @@ export default function DomainDetailPage() {
   }, [domain?.domain_lead_id, domainUsers]);
 
   const eligibleLeads = useMemo(
-    () => domainUsers.filter((u) => (u.role === 'manager' || u.role === 'admin') && u.status === 'active'),
+    () => domainUsers.filter((u) => u.status === 'active'),
     [domainUsers]
   );
+
+  const isDomainLead = !!authUser && !!domain?.domain_lead_id && authUser.id === domain.domain_lead_id;
+  const canManage = isAdmin || isDomainLead;
 
   const filteredDomainUsers = useMemo(() => {
     if (!userSearch) return domainUsers;
@@ -119,6 +122,18 @@ export default function DomainDetailPage() {
   const handleSetLead = async (userId: string) => {
     const leadId = userId === 'none' ? null : userId;
     await updateDomain(id!, { domain_lead_id: leadId } as any);
+    // Auto-promote newly assigned lead to manager role if currently employee
+    if (leadId) {
+      const target = domainUsers.find((u) => u.id === leadId);
+      if (target && target.role === 'employee') {
+        const auditId = getCurrentUserId();
+        await supabase.from('users').update({
+          role: 'manager', modified_by: auditId, modified_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', leadId);
+        await fetchDomainUsers();
+        if (authUser?.id === leadId) await refreshUser();
+      }
+    }
     toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
   };
 
@@ -249,14 +264,16 @@ export default function DomainDetailPage() {
               {domain.description || 'No description provided.'}
             </p>
           </div>
-          {isAdmin && (
+          {canManage && (
             <div className="flex items-center gap-2 shrink-0">
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
                 <Pencil size={14} /> Edit
               </Button>
-              <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
-                <Trash2 size={14} /> Delete
-              </Button>
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
+                  <Trash2 size={14} /> Delete
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -273,7 +290,7 @@ export default function DomainDetailPage() {
         ) : (
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
-        {isAdmin && (
+        {canManage && (
           <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
             <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
               <SelectValue placeholder="Assign lead…" />
@@ -309,7 +326,7 @@ export default function DomainDetailPage() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-8 h-9 text-sm" />
               </div>
-              {isAdmin && (
+              {canManage && (
                 <Popover open={addUserOpen} onOpenChange={setAddUserOpen}>
                   <PopoverTrigger asChild>
                     <Button size="sm" className="gap-1.5" onClick={handleOpenAddUser}>
@@ -383,7 +400,7 @@ export default function DomainDetailPage() {
                     <TableHead>Email</TableHead>
                     <TableHead className="w-[100px]">Role</TableHead>
                     <TableHead className="w-[80px]">Status</TableHead>
-                    {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                    {canManage && <TableHead className="w-[70px] text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -407,7 +424,7 @@ export default function DomainDetailPage() {
                           {u.status}
                         </Badge>
                       </TableCell>
-                      {isAdmin && (
+                      {canManage && (
                         <TableCell className="text-right">
                           <button
                             onClick={() => setRemoveTarget(u)}
@@ -434,7 +451,7 @@ export default function DomainDetailPage() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search skills..." value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} className="pl-8 h-9 text-sm" />
               </div>
-              {isAdmin && (
+              {canManage && (
                 <Button variant="outline" size="sm" onClick={() => setManageSkillsOpen(true)} className="gap-1.5">
                   <Settings2 size={14} /> Manage Skills
                 </Button>
@@ -445,7 +462,7 @@ export default function DomainDetailPage() {
               <div className="text-center py-10 text-sm text-muted-foreground">
                 <FolderOpen size={32} className="mx-auto mb-3 text-muted-foreground/40" />
                 <p>No skills mapped yet.</p>
-                {isAdmin && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
+                {canManage && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
               </div>
             ) : mappedByCategory.size === 0 && skillSearch ? (
               <div className="text-center py-10 text-sm text-muted-foreground">No matching skills.</div>
@@ -465,7 +482,7 @@ export default function DomainDetailPage() {
                             <TableHead>Skill Name</TableHead>
                             <TableHead>Tags</TableHead>
                             <TableHead className="w-[80px]">Status</TableHead>
-                            {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                            {canManage && <TableHead className="w-[70px] text-right">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -484,7 +501,7 @@ export default function DomainDetailPage() {
                                   {skill.status}
                                 </Badge>
                               </TableCell>
-                              {isAdmin && (
+                              {canManage && (
                                 <TableCell className="text-right">
                                   <button
                                     onClick={() => setRemoveSkillTarget({ mappingId: skill.mappingId, skillName: skill.skill_name })}

@@ -33,7 +33,7 @@ export default function SkillFrameworkPage() {
     useSkillStore();
   const { currentRole } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = currentRole === "admin";
+  const isAdmin = currentRole === "admin" || currentRole === "manager";
 
   useEffect(() => {
     fetchSkills();
