@@ -106,9 +106,12 @@ export default function DomainDetailPage() {
   }, [domain?.domain_lead_id, domainUsers]);
 
   const eligibleLeads = useMemo(
-    () => domainUsers.filter((u) => (u.role === 'manager' || u.role === 'admin') && u.status === 'active'),
+    () => domainUsers.filter((u) => u.status === 'active'),
     [domainUsers]
   );
+
+  const isDomainLead = !!authUser && !!domain?.domain_lead_id && authUser.id === domain.domain_lead_id;
+  const canManage = isAdmin || isDomainLead;
 
   const filteredDomainUsers = useMemo(() => {
     if (!userSearch) return domainUsers;
