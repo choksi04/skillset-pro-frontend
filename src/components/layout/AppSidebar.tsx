@@ -15,8 +15,6 @@ import {
   BarChart3,
   BookOpen,
   LogOut,
-  Moon,
-  Sun,
   LayoutDashboard,
   Database,
   FileText,
