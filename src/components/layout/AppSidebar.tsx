@@ -112,7 +112,7 @@ const roleLabels: Record<UserRole, string> = {
 export default function AppSidebar() {
   const { user, currentRole, logout } = useAuth();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const visibleGroups = sidebarGroups
     .map((group) => ({
