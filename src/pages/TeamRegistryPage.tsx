@@ -312,9 +312,13 @@ export default function TeamRegistryPage() {
                   {rows.length === 0 ? (
                     <div className="flex flex-col items-center text-center">
                       <Users size={28} className="text-muted-foreground mb-3" />
-                      <h3 className="text-base font-semibold text-foreground mb-1">No Registries Yet</h3>
+                      <h3 className="text-base font-semibold text-foreground mb-1">
+                        {notDomainLead ? 'Not a Domain Lead' : 'No Registries Yet'}
+                      </h3>
                       <p className="text-sm text-muted-foreground max-w-md">
-                        No team members have submitted their skill registries yet.
+                        {notDomainLead
+                          ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
+                          : 'No team members have submitted their skill registries yet.'}
                       </p>
                     </div>
                   ) : (
