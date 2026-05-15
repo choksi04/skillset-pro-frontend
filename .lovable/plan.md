@@ -1,69 +1,120 @@
-# User Guide — Add "Dashboard" section
+# Role Capabilities — Current vs Proposed
 
-Add a new role-aware **Dashboard** chapter to the Help & Tutorial page (`src/pages/UserGuidePage.tsx`) covering every widget on the role-specific dashboards: what it shows, why it matters, and where its data comes from. No business-logic changes — guide content only.
+Goal of this step: agree on the capability matrix per feature for **Admin**, **Manager (incl. Domain Lead)**, and **Employee**, before touching any code. No implementation in this plan — only scope confirmation.
 
-## Structure
+Conventions:
 
-Add one shared overview card (always visible) plus three new role-scoped sections appended to each tab's existing guide array.
+- ✅ full access · 👁 view only · ❌ no access · 🟡 scoped (own domain / own data)
+- "Manager" = user with `role = manager`. "Domain Lead" = manager additionally set as `domain_lead_id` on a domain.
 
-### 1. Shared overview (new array `dashboardOverview`)
+---
 
-- **Dashboard Overview** — explains the dashboard adapts to the user's role; lists the two persistent banners (Beta, Experimental dashboard) and the Quick-Start Checklist / Setup Progress for admins. Notes data refreshes on load and reflects current DB state (no manual input).
+## 1. Skill Library (Categories / Skills / Topics)
 
-### 2. Admin tab — append to `adminGuide`
 
-Single "Admin Dashboard Widgets" card listing each widget with purpose + data source:
+| Capability                                    | Admin (now → proposed) | Manager (now → proposed) | Employee |
+| --------------------------------------------- | ---------------------- | ------------------------ | -------- |
+| View library                                  | ✅ → ✅                  | 👁 → 👁 *(list)*         | ❌        |
+| Create / edit / disable / delete **Category** | ✅ → ✅                  | ❌ → **✅**                | ❌        |
+| Create / edit / disable / delete **Skill**    | ✅ → ✅                  | ❌ → **✅**                | ❌        |
+| Add / edit / remove **Topics**                | ✅ → ✅                  | ❌ → **✅**                | ❌        |
 
-- **Filters bar** — Domain, Manager, Skill Category. Scopes every widget below.
-- **KPI cards**:
-  - *Workforce Coverage* — % of employees with at least one approved validated skill.
-  - *Throughput (30d)* — assessments submitted in the last 30 days, with delta vs prior 30d.
-  - *Avg Validated Level* — mean approved level across the org.
-  - *Self vs Validated Gap* — average difference between self-rating and validated level (bias indicator).
-- **My Attention** — actionable counts (pending reviews you can act on, stuck employees, domains missing setup).
-- **Domain Readiness** — per-domain bar showing setup status (skills mapped, questions, templates, employees ready).
-- **Top 5 Skill Strengths** — highest avg approved levels across the org.
-- **Top 5 Skill Gaps** — lowest avg approved levels — drives upskilling decisions.
-- **Self-Rating Bias by Domain** — average self-vs-validated delta per domain.
-- **Manager Activity** — per-manager review throughput and pending counts.
-- **Skill Heatmap** — Domain × Category matrix of avg validated level; click a cell to drill in.
 
-Note: all data is derived from registries, assessments, reviews, users, and domains tables — admins do not enter dashboard data directly; they influence it by configuring the framework and by employees/managers completing workflow steps.
+Note: Open scope (any category / any skill), **not** restricted to manager's domain — per your call to keep it simple now.
 
-### 3. Manager tab — append to `managerGuide`
+---
 
-Single "Manager Dashboard Widgets" card:
+## 2. Domains
 
-- **KPI cards**:
-  - *Team Size* — employees in domains you manage.
-  - *Pending My Review* — assessments waiting for your action.
-  - *Team Avg Validated Level* — mean approved level for your team.
-  - *Reassessments Open* — outstanding reassessment requests you raised.
-- **Team Skill Matrix** — Skill × Employee grid of validated levels for your team.
-- **Review Queue** — shortcut list of pending reviews (links into the Reviews page).
-- **Stuck Employees** — team members blocked (no domain, no recent submission, overdue assessment).
 
-Data source: scoped to domains you manage; populated by team activity — nothing to enter directly on the dashboard.
+| Capability                     | Admin  | Manager — not a Domain Lead | Manager — Domain Lead of domain X | Employee |
+| ------------------------------ | ------ | --------------------------- | --------------------------------- | -------- |
+| View domain list               | ✅ → ✅  | 👁 → 👁                     | 👁 → 👁                           | ❌        |
+| Create domain                  | ✅ → ✅  | ❌ → ❌                       | ❌ → ❌                             | ❌        |
+| Edit domain (name/desc/status) | ✅ → ✅  | ❌ → ❌                       | ❌ → **✅ (only domain X)**         | ❌        |
+| Delete domain                  | ✅ → ✅  | ❌ → ❌                       | ❌ → ❌                             | ❌        |
+| Assign / change Domain Lead    | ✅ → ✅  | ❌ → ❌                       | ❌ → **✅ (only domain X)**         | ❌        |
+| View users in domain           | 👁 → ✅ | 👁 → 👁                     | 👁 → **✅ (domain X)**             | ❌        |
+| Add / remove users in domain   | ✅ → ✅  | ❌ → ❌                       | ❌ → **✅ (domain X)**              | ❌        |
+| Map / unmap skills to domain   | ✅ → ✅  | ❌ → ❌                       | ❌ → **✅ (domain X)**              | ❌        |
 
-### 4. Employee tab — append to `employeeGuide`
 
-Single "My Dashboard Widgets" card:
+Open question — see Q1 below: should *any* manager be able to manage domains where they're **assigned** (employee_domain_assignments) but not Lead?
 
-- **KPI cards**:
-  - *My Registry* — current version state (Draft / Submitted / Approved).
-  - *Skills Assessed* — count of skills with a completed assessment.
-  - *My Avg Level* — your average validated level.
-  - *Open Tasks* — pending assessments + draft registry reminders.
-- **My Skill Snapshot** — your skills grouped by category with self vs validated levels.
-- **What's next** — suggested next actions (e.g. submit registry, take pending assessment).
+---
 
-Data source: your own registry, assessments, and reviews — populated automatically as you complete workflow steps.
+## 3. Question Bank
 
-## Files
 
-- `src/pages/UserGuidePage.tsx` — add `dashboardOverview` array, render it in the always-visible section; append "Admin Dashboard Widgets", "Manager Dashboard Widgets", and "My Dashboard Widgets" entries into `adminGuide`, `managerGuide`, `employeeGuide` respectively. Reuse existing `GuideSectionCard` component and `LayoutDashboard` (or existing) icon.
+| Capability                                     | Admin | Manager                    | Employee |
+| ---------------------------------------------- | ----- | -------------------------- | -------- |
+| View questions                                 | ✅ → ✅ | ✅ → ✅                      | ❌        |
+| Create / edit / delete questions (manual + AI) | ✅ → ✅ | ✅ → ✅ *(already in place)* | ❌        |
 
-## Out of scope
 
-- No changes to dashboard components themselves.
-- No new tooltips or help popovers on dashboard widgets (guide-only update).
+No change. Already open to manager.
+
+---
+
+## 4. Assessment Templates
+
+
+| Capability                                    | Admin | Manager                    | Employee |
+| --------------------------------------------- | ----- | -------------------------- | -------- |
+| View templates                                | ✅ → ✅ | ✅ → ✅                      | ❌        |
+| Create / edit / delete templates (any domain) | ✅ → ✅ | ✅ → ✅ *(already in place)* | ❌        |
+| Assign templates to employees                 | ✅ → ✅ | ✅ → ✅                      | ❌        |
+
+
+No change.
+
+---
+
+## 5. Team Registry & Team Assessments
+
+
+| Capability                | Admin         | Manager (Domain Lead of X) | Employee |
+| ------------------------- | ------------- | -------------------------- | -------- |
+| View Team Registry        | ✅ all domains | 🟡 only domain X           | ❌        |
+| Approve / adjust registry | ✅             | 🟡 domain X                | ❌        |
+| View Team Assessments     | ✅ all         | 🟡 domain X                | ❌        |
+| Review assessment results | ✅             | 🟡 domain X                | ❌        |
+
+
+No change — current behavior matches.
+
+---
+
+## 6. Admin-only areas (unchanged)
+
+Users, Assessment Config, All Registries, Setup Progress — remain **Admin only**.
+
+---
+
+## 7. Employee (unchanged)
+
+Self registry, take assigned assessments, view own results, dashboard. No admin-style operations anywhere.
+
+---
+
+## Net changes from this plan
+
+1. **Skill Library** opens fully to Manager (Categories, Skills, Topics — create/edit/disable/delete).
+2. **Domain detail** becomes editable for the Manager who is that domain's **Domain Lead**: edit metadata, assign Lead, manage users in domain, map skills.
+3. **Domain list / create / delete** stays Admin-only.
+4. Sidebar + RoleGuard already allow `manager` on `/skill-library` and `/domains`; only the in-page `isAdmin` gates need to be relaxed (with Domain-Lead checks where scoped).
+
+---
+
+## Open questions before I write the implementation plan
+
+**Q1 — Domain edit scope for managers:** Should domain editing be limited to *Domain Lead* only, or to **any manager assigned to that domain** (via `employee_domain_assignments`)?   
+Ans: Only domain lead. Manager is an additional role, so basically, someone assigned as domain lead, we can assign them a manager role automatically.
+
+**Q2 — Reassigning Domain Lead:** When a Domain Lead reassigns the lead role to someone else, should they immediately lose edit rights on that domain? (Default: yes.) Ans: Yes
+
+**Q3 — Adding users to a domain (Domain Lead):** Limited to picking from existing users, or also create new user accounts? Ans: pick existing only — user creation stays Admin.)
+
+**Q4 — Skill Library deletes by Manager:** Same safety rules as Admin (block delete if skill/category in use), correct? (Default: yes, identical guardrails.)
+
+Once you confirm Q1–Q4, I'll produce the implementation plan (files to touch, gating logic, UI changes).
