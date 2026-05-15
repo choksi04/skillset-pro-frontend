@@ -271,7 +271,7 @@ export default function DomainDetailPage() {
                   <Pencil size={14} /> Edit
                 </Button>
               )}
-              {isAdmin && (
+              {canManage && (
                 <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
                   <Trash2 size={14} /> Delete
                 </Button>
@@ -292,7 +292,7 @@ export default function DomainDetailPage() {
         ) : (
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
-        {isAdmin && (
+        {canManage && (
           <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
             <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
               <SelectValue placeholder="Assign lead…" />
@@ -328,7 +328,7 @@ export default function DomainDetailPage() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-8 h-9 text-sm" />
               </div>
-              {isAdmin && (
+              {canManage && (
                 <Popover open={addUserOpen} onOpenChange={setAddUserOpen}>
                   <PopoverTrigger asChild>
                     <Button size="sm" className="gap-1.5" onClick={handleOpenAddUser}>
@@ -402,7 +402,7 @@ export default function DomainDetailPage() {
                     <TableHead>Email</TableHead>
                     <TableHead className="w-[100px]">Role</TableHead>
                     <TableHead className="w-[80px]">Status</TableHead>
-                    {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                    {canManage && <TableHead className="w-[70px] text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -426,7 +426,7 @@ export default function DomainDetailPage() {
                           {u.status}
                         </Badge>
                       </TableCell>
-                      {isAdmin && (
+                      {canManage && (
                         <TableCell className="text-right">
                           <button
                             onClick={() => setRemoveTarget(u)}
@@ -453,7 +453,7 @@ export default function DomainDetailPage() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search skills..." value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} className="pl-8 h-9 text-sm" />
               </div>
-              {isAdmin && (
+              {canManage && (
                 <Button variant="outline" size="sm" onClick={() => setManageSkillsOpen(true)} className="gap-1.5">
                   <Settings2 size={14} /> Manage Skills
                 </Button>
@@ -464,7 +464,7 @@ export default function DomainDetailPage() {
               <div className="text-center py-10 text-sm text-muted-foreground">
                 <FolderOpen size={32} className="mx-auto mb-3 text-muted-foreground/40" />
                 <p>No skills mapped yet.</p>
-                {isAdmin && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
+                {canManage && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
               </div>
             ) : mappedByCategory.size === 0 && skillSearch ? (
               <div className="text-center py-10 text-sm text-muted-foreground">No matching skills.</div>
@@ -484,7 +484,7 @@ export default function DomainDetailPage() {
                             <TableHead>Skill Name</TableHead>
                             <TableHead>Tags</TableHead>
                             <TableHead className="w-[80px]">Status</TableHead>
-                            {isAdmin && <TableHead className="w-[70px] text-right">Actions</TableHead>}
+                            {canManage && <TableHead className="w-[70px] text-right">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -503,7 +503,7 @@ export default function DomainDetailPage() {
                                   {skill.status}
                                 </Badge>
                               </TableCell>
-                              {isAdmin && (
+                              {canManage && (
                                 <TableCell className="text-right">
                                   <button
                                     onClick={() => setRemoveSkillTarget({ mappingId: skill.mappingId, skillName: skill.skill_name })}
