@@ -251,6 +251,31 @@ const managerGuide: GuideStep[] = [
       'Data input: none directly. Numbers update as your team submits registries, completes assessments, and you finalize reviews.',
     ],
   },
+  {
+    title: 'Skill Library Management',
+    description: 'Managers have full access to the Skill Library and can shape the catalog used across the organization.',
+    icon: <Shield size={16} />,
+    steps: [
+      'Create, edit, disable, or delete Skill Categories.',
+      'Add new Skills under any category, edit details, manage tags, and toggle status.',
+      'Add, edit, or remove Topics within any skill to refine AI question generation.',
+      'Open scope: not restricted to your domain — you can curate library entries used by other domains too.',
+      'Safety rules still apply: items in active use (mapped to domains, used in questions) cannot be deleted.',
+    ],
+  },
+  {
+    title: 'Domain Lead Powers',
+    description: 'When you are set as the Domain Lead of a domain, you gain edit rights on that specific domain.',
+    icon: <Crown size={16} />,
+    steps: [
+      'Edit the domain name, description, and status.',
+      'Assign or change the Domain Lead — when you reassign to someone else, you immediately lose edit rights.',
+      'Add or remove users from your domain (pick from existing users — only Admins can create new accounts).',
+      'Map or unmap skills to your domain via Manage Skills.',
+      'You cannot create or delete domains — that remains Admin-only.',
+      'Note: when an Admin assigns an Employee as Domain Lead, that user is automatically promoted to the Manager role.',
+    ],
+  },
 ];
 
 const employeeGuide: GuideStep[] = [
