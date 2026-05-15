@@ -184,34 +184,28 @@ export default function AppSidebar() {
 
       {/* Footer */}
       <div className="border-t border-sidebar-border">
-        {/* Theme toggle */}
-        <div className="px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] text-sidebar-muted">Theme</span>
-          <button
-            onClick={toggleTheme}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-        </div>
-
-        {/* User info */}
-        <div className="border-t border-sidebar-border px-4 py-3">
+        <div className="px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
-              {user?.full_name
-                ?.split(" ")
-                .map((n) => n[0])
-                .join("") || "?"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-sidebar-accent-foreground">{user?.full_name}</p>
-              <p className="truncate text-[10px] text-sidebar-muted">{user?.email}</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              className="flex items-center gap-2.5 min-w-0 flex-1 rounded-md p-1 -m-1 hover:bg-sidebar-accent/50 transition-colors text-left"
+              title="View profile"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground shrink-0">
+                {user?.full_name
+                  ?.split(" ")
+                  .map((n) => n[0])
+                  .join("") || "?"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-sidebar-accent-foreground">{user?.full_name}</p>
+                <p className="truncate text-[10px] text-sidebar-muted">{user?.email}</p>
+              </div>
+            </button>
             <button
               onClick={logout}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
               title="Sign out"
             >
               <LogOut size={14} />
@@ -219,6 +213,8 @@ export default function AppSidebar() {
           </div>
         </div>
       </div>
+
+      <ProfileSheet open={profileOpen} onOpenChange={setProfileOpen} />
     </aside>
   );
 }
