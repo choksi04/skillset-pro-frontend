@@ -135,16 +135,22 @@ export default function TeamAssessmentsPage() {
     return d?.name ?? null;
   };
 
-  // Manager scope
+  // Domains the current manager leads
+  const ledDomainIds = useMemo(() => {
+    if (currentRole !== 'manager' || !user) return new Set<string>();
+    return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
+  }, [domains, currentRole, user]);
+  const notDomainLead = currentRole === 'manager' && ledDomainIds.size === 0;
+
+  // Manager scope — only domains the manager leads
   const teamAssessments = useMemo(() => {
     if (currentRole === 'admin') return assessments;
     if (currentRole === 'manager') {
-      const domainId = user?.domain_id;
-      if (!domainId) return [];
-      return assessments.filter((a) => userMeta[a.employee_id]?.domain_id === domainId);
+      if (ledDomainIds.size === 0) return [];
+      return assessments.filter((a) => a.domain_id && ledDomainIds.has(a.domain_id));
     }
     return [];
-  }, [assessments, currentRole, user, userMeta]);
+  }, [assessments, currentRole, ledDomainIds]);
 
   // Per-assessment derived skill level + verification
   const computeRow = (a: Assessment) => {
