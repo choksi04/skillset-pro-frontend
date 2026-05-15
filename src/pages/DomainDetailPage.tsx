@@ -264,14 +264,18 @@ export default function DomainDetailPage() {
               {domain.description || 'No description provided.'}
             </p>
           </div>
-          {isAdmin && (
+          {(canManage || isAdmin) && (
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-                <Pencil size={14} /> Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
-                <Trash2 size={14} /> Delete
-              </Button>
+              {canManage && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+                  <Pencil size={14} /> Edit
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={handleOpenDelete} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30">
+                  <Trash2 size={14} /> Delete
+                </Button>
+              )}
             </div>
           )}
         </div>
