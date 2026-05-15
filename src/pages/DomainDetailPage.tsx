@@ -45,7 +45,7 @@ export default function DomainDetailPage() {
   const navigate = useNavigate();
   const { domains, mappings, fetchDomains, updateDomain, removeMapping, checkDomainDeletable, deleteDomain } = useDomainStore();
   const { skills, fetchSkills, initialized } = useSkillStore();
-  const { currentRole } = useAuth();
+  const { currentRole, user: authUser, refreshUser } = useAuth();
   const isAdmin = currentRole === 'admin';
 
   const [editOpen, setEditOpen] = useState(false);
@@ -119,6 +119,18 @@ export default function DomainDetailPage() {
   const handleSetLead = async (userId: string) => {
     const leadId = userId === 'none' ? null : userId;
     await updateDomain(id!, { domain_lead_id: leadId } as any);
+    // Auto-promote newly assigned lead to manager role if currently employee
+    if (leadId) {
+      const target = domainUsers.find((u) => u.id === leadId);
+      if (target && target.role === 'employee') {
+        const auditId = getCurrentUserId();
+        await supabase.from('users').update({
+          role: 'manager', modified_by: auditId, modified_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', leadId);
+        await fetchDomainUsers();
+        if (authUser?.id === leadId) await refreshUser();
+      }
+    }
     toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
   };
 
