@@ -76,13 +76,23 @@ export default function TeamRegistryPage() {
     fetchLevels();
   }, []);
 
-  // Role-scoped registries
+  // Domains the current manager leads
+  const ledDomainIds = useMemo(() => {
+    if (currentRole !== 'manager' || !user) return new Set<string>();
+    return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
+  }, [domains, currentRole, user]);
+
+  // Role-scoped registries (admin sees all; manager sees only domains they lead)
   const teamRegistries = useMemo(() => {
     if (currentRole === 'admin') return registries;
-    const managerDomainId = user?.domain_id;
-    if (!managerDomainId) return [];
-    return registries.filter((r) => r.domain_id === managerDomainId);
-  }, [registries, currentRole, user]);
+    if (currentRole === 'manager') {
+      if (ledDomainIds.size === 0) return [];
+      return registries.filter((r) => ledDomainIds.has(r.domain_id));
+    }
+    return [];
+  }, [registries, currentRole, ledDomainIds]);
+
+  const notDomainLead = currentRole === 'manager' && ledDomainIds.size === 0;
 
   // Group by employee → latest version
   const groupedByEmployee = useMemo(() => {
