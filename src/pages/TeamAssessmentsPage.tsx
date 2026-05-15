@@ -367,7 +367,9 @@ export default function TeamAssessmentsPage() {
                   <div className="flex flex-col items-center justify-center">
                     <ClipboardCheck size={32} className="text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground text-center max-w-md">
-                      {teamAssessments.length === 0
+                      {notDomainLead
+                        ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
+                        : teamAssessments.length === 0
                         ? 'No team assessments yet.'
                         : 'No assessments match the current filters.'}
                     </p>
