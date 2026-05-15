@@ -47,7 +47,7 @@ export default function CategoryDetailPage() {
   const { skills, categories, topics, fetchSkills, toggleSkillStatus, deleteSkill, loading, initialized } =
     useSkillStore();
   const { currentRole } = useAuth();
-  const isAdmin = currentRole === "admin";
+  const isAdmin = currentRole === "admin" || currentRole === "manager";
 
   useEffect(() => {
     fetchSkills();
