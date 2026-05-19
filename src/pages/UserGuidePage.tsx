@@ -379,7 +379,7 @@ export default function UserGuidePage() {
           <h2 className="text-2xl font-semibold text-foreground">Help & Tutorial</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Comprehensive guide for every role — learn how to use the platform effectively.
-            The in-app tour is now a brief dashboard intro; this User Guide is the source of truth for step-by-step instructions. Press <kbd className="px-1.5 py-0.5 rounded border bg-muted text-[10px]">Esc</kbd> at any time to exit the tour.
+            The in-app tour is a quick, role-aware walkthrough of the sidebar menu; this User Guide is the source of truth for detailed step-by-step instructions. Press <kbd className="px-1.5 py-0.5 rounded border bg-muted text-[10px]">Esc</kbd> at any time to exit the tour.
           </p>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={restartTour}>
