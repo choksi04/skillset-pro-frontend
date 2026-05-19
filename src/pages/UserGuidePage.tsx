@@ -467,6 +467,8 @@ export default function UserGuidePage() {
         </div>
       </div>
 
+      <CompetencyLevelsCard />
+
       <div className="space-y-3">
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
         {navigationGuide.map((s) => <GuideSectionCard key={s.title} step={s} />)}
