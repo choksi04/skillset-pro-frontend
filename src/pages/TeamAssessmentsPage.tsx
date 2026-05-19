@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
-import { getEffectiveStatus, getAchievedLevelFromAttempt } from '@/lib/assessmentStatus';
+import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from '@/lib/assessmentStatus';
 
 const PAGE_SIZE = 10;
 
@@ -58,6 +58,14 @@ function getInitials(name: string) {
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('') || '?';
 }
+
+function formatDate(d: string | Date) {
+  return new Date(d).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+const COMPLETE_STATUSES = new Set(['submitted', 'evaluated', 'under_review', 'approved']);
 
 export default function TeamAssessmentsPage() {
   const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
@@ -334,10 +342,10 @@ export default function TeamAssessmentsPage() {
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Employee</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assessment Info</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Format Details</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Skill Level</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assessment Details</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Achieved Level</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Verified Level</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -378,12 +386,22 @@ export default function TeamAssessmentsPage() {
               </TableRow>
             ) : (
               paged.map((a) => {
-                const { attempt, status, verified, levelLabel, hasLevel } = computeRow(a);
+                const { attempt, status, assessmentReviews } = computeRow(a);
                 const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
                 const designation = getDesignation(a.employee_id);
                 const domainName = getDomainName(a);
                 const formatLabel = a.is_adaptive ? 'Adaptive' : 'Fixed';
                 const questionCount = a.assessment_questions.length;
+                const isCompleted = COMPLETE_STATUSES.has(status);
+
+                let dateLine: string | null = null;
+                if (status === 'approved' || status === 'evaluated') {
+                  dateLine = `Completed: ${formatDate(a.updated_at)}`;
+                } else if (status === 'submitted' || status === 'under_review') {
+                  dateLine = `Submitted: ${formatDate(a.updated_at)}`;
+                } else {
+                  dateLine = `Created: ${formatDate(a.created_at)}`;
+                }
 
                 let actionEl: JSX.Element;
                 if (status === 'pending') {
@@ -472,53 +490,47 @@ export default function TeamAssessmentsPage() {
                           </Badge>
                         )}
                       </div>
-                    </TableCell>
-
-                    <TableCell className="align-top">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <HelpCircle size={13} />
-                        <span className="text-foreground">{questionCount > 0 ? `${questionCount} Qs` : '—'}</span>
-                        <span className="text-muted-foreground">({formatLabel})</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock size={13} />
-                        <span>{a.duration_minutes} mins</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="align-top">
-                      <div className={`text-sm font-medium ${hasLevel ? 'text-card-foreground' : 'text-muted-foreground'}`}>
-                        {levelLabel}
-                      </div>
-                      <div className="mt-1">
-                        {verified ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-success">
-                            <CheckCircle2 size={11} /> Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <AlertCircle size={11} /> Unverified
-                          </span>
-                        )}
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <HelpCircle size={12} />
+                          <span className="text-foreground">{questionCount > 0 ? questionCount : '—'}</span>
+                          <span>({formatLabel})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={12} />
+                          {a.duration_minutes} mins
+                        </span>
                       </div>
                     </TableCell>
 
                     <TableCell className="align-top">
                       <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
+                      {dateLine && (
+                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="align-top">
                       {(() => {
-                        const { level, correct, total } = getAchievedLevelFromAttempt(attempt);
-                        if (level == null) return null;
+                        if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
+                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
-                          <div className="mt-1.5 space-y-0.5">
-                            <Badge className="text-[10px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-                              {getFormattedLevelLabel(levels, level)}
-                            </Badge>
-                            {total > 0 && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {correct} / {total} correct
-                              </div>
-                            )}
-                          </div>
+                          <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                            {getFormattedLevelLabel(levels, level)}
+                          </Badge>
+                        );
+                      })()}
+                    </TableCell>
+
+                    <TableCell className="align-top">
+                      {(() => {
+                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
+                        return (
+                          <Badge className="text-[11px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">
+                            {getFormattedLevelLabel(levels, level)}
+                          </Badge>
                         );
                       })()}
                     </TableCell>

@@ -111,3 +111,30 @@ export function getAchievedLevelFromAttempt(
 
   return { level, correct: totals.correct, total: totals.total };
 }
+
+/**
+ * Verified Level derivation — the manager-approved final level.
+ *
+ * Returns the rounded average of `skill_reviews[].verified_level` from the
+ * completed review for the given attempt. Returns `{ level: null }` if no
+ * completed review exists for that attempt.
+ */
+export function getVerifiedLevelFromReviews(
+  reviews: Array<{
+    attempt_id?: string;
+    status: string;
+    skill_reviews?: Array<{ verified_level?: number | null }>;
+  }>,
+  attemptId: string | null | undefined,
+): { level: number | null } {
+  if (!attemptId) return { level: null };
+  const review = reviews.find(
+    (r) => r.attempt_id === attemptId && r.status === "completed",
+  );
+  if (!review) return { level: null };
+  const lvls = (review.skill_reviews ?? [])
+    .map((sr) => sr.verified_level)
+    .filter((l): l is number => typeof l === "number");
+  if (lvls.length === 0) return { level: null };
+  return { level: Math.round(lvls.reduce((a, b) => a + b, 0) / lvls.length) };
+}

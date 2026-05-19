@@ -30,7 +30,7 @@ import {
   ClipboardCheck, Search, ArrowRight, HelpCircle, Clock, Layers,
   Filter as FilterIcon, Bot,
 } from "lucide-react";
-import { getEffectiveStatus, getAchievedLevelFromAttempt } from "@/lib/assessmentStatus";
+import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 
 const PAGE_SIZE = 10;
@@ -258,13 +258,16 @@ export default function AssessmentsPage() {
                 Assessment Details
               </TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Format
+                Status
               </TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Assigned By
               </TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Status & Date
+                Achieved Level
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Verified Level
               </TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
                 Action
@@ -277,11 +280,11 @@ export default function AssessmentsPage() {
                 <TableRow key={i}>
                   <TableCell>
                     <Skeleton className="h-4 w-48 mb-2" />
-                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-32" />
                   </TableCell>
                   <TableCell>
-                    <Skeleton className="h-3 w-24 mb-2" />
-                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-5 w-20 mb-2 rounded-full" />
+                    <Skeleton className="h-3 w-24" />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -292,10 +295,8 @@ export default function AssessmentsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-20 mb-2 rounded-full" />
-                    <Skeleton className="h-3 w-28" />
-                  </TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                   <TableCell className="text-right">
                     <Skeleton className="h-8 w-24 ml-auto" />
                   </TableCell>
@@ -303,7 +304,7 @@ export default function AssessmentsPage() {
               ))
             ) : paged.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="py-16">
+                <TableCell colSpan={6} className="py-16">
                   <div className="flex flex-col items-center justify-center">
                     <ClipboardCheck size={32} className="text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground text-center max-w-md">
@@ -367,20 +368,24 @@ export default function AssessmentsPage() {
                           </Badge>
                         )}
                       </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <HelpCircle size={12} />
+                          <span className="text-foreground">{questionCount > 0 ? questionCount : "—"}</span>
+                          <span>({formatLabel})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={12} />
+                          {a.duration_minutes} mins
+                        </span>
+                      </div>
                     </TableCell>
 
                     <TableCell className="align-top">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <HelpCircle size={13} />
-                        <span className="text-foreground">
-                          {questionCount > 0 ? questionCount : "—"}
-                        </span>
-                        <span className="text-muted-foreground">({formatLabel})</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock size={13} />
-                        <span>{a.duration_minutes} mins</span>
-                      </div>
+                      <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
+                      {dateLine && (
+                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
+                      )}
                     </TableCell>
 
                     <TableCell className="align-top">
@@ -402,24 +407,26 @@ export default function AssessmentsPage() {
                     </TableCell>
 
                     <TableCell className="align-top">
-                      <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
-                      {dateLine && (
-                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
-                      )}
-                      {isCompleted && (() => {
-                        const { level, correct, total } = getAchievedLevelFromAttempt(attempt);
-                        if (level == null) return null;
+                      {(() => {
+                        if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
+                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
-                          <div className="mt-1.5 space-y-0.5">
-                            <Badge className="text-[10px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-                              {getFormattedLevelLabel(competencyLevels, level)}
-                            </Badge>
-                            {total > 0 && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {correct} / {total} correct
-                              </div>
-                            )}
-                          </div>
+                          <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                            {getFormattedLevelLabel(competencyLevels, level)}
+                          </Badge>
+                        );
+                      })()}
+                    </TableCell>
+
+                    <TableCell className="align-top">
+                      {(() => {
+                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
+                        return (
+                          <Badge className="text-[11px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">
+                            {getFormattedLevelLabel(competencyLevels, level)}
+                          </Badge>
                         );
                       })()}
                     </TableCell>
