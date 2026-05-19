@@ -9,8 +9,8 @@ import { useReviewStore } from '@/stores/reviewStore';
 import { useTemplateStore } from '@/stores/templateStore';
 import {
   useCompetencyLevelStore,
-  scoreToLevelDynamic,
   getLevelLabelByNumber,
+  getFormattedLevelLabel,
 } from '@/stores/competencyLevelStore';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
-import { getEffectiveStatus } from '@/lib/assessmentStatus';
+import { getEffectiveStatus, getAchievedLevelFromAttempt } from '@/lib/assessmentStatus';
 
 const PAGE_SIZE = 10;
 
@@ -161,12 +161,12 @@ export default function TeamAssessmentsPage() {
 
     let levelLabel = 'N/A';
     let hasLevel = false;
-    if (attempt?.total_ai_score != null && levels.length > 0) {
-      const lvl = scoreToLevelDynamic(levels, attempt.total_ai_score);
-      levelLabel = getLevelLabelByNumber(levels, lvl);
+    const achieved = getAchievedLevelFromAttempt(attempt);
+    if (achieved.level != null && levels.length > 0) {
+      levelLabel = getLevelLabelByNumber(levels, achieved.level);
       hasLevel = true;
     }
-    return { attempt, assessmentReviews, status, verified, levelLabel, hasLevel };
+    return { attempt, assessmentReviews, status, verified, levelLabel, hasLevel, achieved };
   };
 
   // Filter
@@ -505,19 +505,22 @@ export default function TeamAssessmentsPage() {
 
                     <TableCell className="align-top">
                       <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
-                      {attempt?.total_ai_score != null && (
-                        <div
-                          className={`text-xs font-semibold mt-1 ${
-                            attempt.total_ai_score >= 75
-                              ? 'text-success'
-                              : attempt.total_ai_score >= 50
-                                ? 'text-warning'
-                                : 'text-destructive'
-                          }`}
-                        >
-                          {attempt.total_ai_score}%
-                        </div>
-                      )}
+                      {(() => {
+                        const { level, correct, total } = getAchievedLevelFromAttempt(attempt);
+                        if (level == null) return null;
+                        return (
+                          <div className="mt-1.5 space-y-0.5">
+                            <Badge className="text-[10px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                              {getFormattedLevelLabel(levels, level)}
+                            </Badge>
+                            {total > 0 && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {correct} / {total} correct
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
 
                     <TableCell className="align-top text-right">
