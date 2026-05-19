@@ -30,7 +30,7 @@ import {
   ClipboardCheck, Search, ArrowRight, HelpCircle, Clock, Layers,
   Filter as FilterIcon, Bot,
 } from "lucide-react";
-import { getEffectiveStatus, getAchievedLevelFromAttempt } from "@/lib/assessmentStatus";
+import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 
 const PAGE_SIZE = 10;
