@@ -366,12 +366,12 @@ export default function AssessmentsPage() {
                           </Badge>
                         )}
 
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <HelpCircle size={12} />
                           <span className="text-foreground">{questionCount > 0 ? questionCount : "—"}</span>
                           <span>({formatLabel})</span>
                         </span>
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock size={12} />
                           {a.duration_minutes} mins
                         </span>
