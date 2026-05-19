@@ -1,71 +1,82 @@
-import { useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAssessmentStore, Assessment, assessmentStatusConfig } from '@/stores/assessmentStore';
-import { useAttemptStore } from '@/stores/attemptStore';
-import { useQuestionStore } from '@/stores/questionStore';
-import { useSkillStore } from '@/stores/skillStore';
-import { useDomainStore } from '@/stores/domainStore';
-import { useReviewStore } from '@/stores/reviewStore';
-import { useTemplateStore } from '@/stores/templateStore';
-import {
-  useCompetencyLevelStore,
-  getLevelLabelByNumber,
-  getFormattedLevelLabel,
-} from '@/stores/competencyLevelStore';
+import { useMemo, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAssessmentStore, Assessment, assessmentStatusConfig } from "@/stores/assessmentStore";
+import { useAttemptStore } from "@/stores/attemptStore";
+import { useQuestionStore } from "@/stores/questionStore";
+import { useSkillStore } from "@/stores/skillStore";
+import { useDomainStore } from "@/stores/domainStore";
+import { useReviewStore } from "@/stores/reviewStore";
+import { useTemplateStore } from "@/stores/templateStore";
+import { useCompetencyLevelStore, getLevelLabelByNumber, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
-  Pagination, PaginationContent, PaginationItem, PaginationLink,
-  PaginationNext, PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
-  ClipboardCheck, Search, ArrowRight, UserCheck, HelpCircle, Clock,
-  Layers, Filter as FilterIcon, Bell, CheckCircle2, AlertCircle,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
-import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from '@/lib/assessmentStatus';
+  ClipboardCheck,
+  Search,
+  ArrowRight,
+  UserCheck,
+  HelpCircle,
+  Clock,
+  Layers,
+  Filter as FilterIcon,
+  Bell,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
+import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 
 const PAGE_SIZE = 10;
 
 const STATUS_FILTERS: { key: string; label: string }[] = [
-  { key: 'pending', label: 'Not Started' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'submitted', label: 'Submitted' },
-  { key: 'evaluated', label: 'Evaluated' },
-  { key: 'under_review', label: 'Under Review' },
-  { key: 'approved', label: 'Approved' },
+  { key: "pending", label: "Not Started" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "submitted", label: "Submitted" },
+  { key: "evaluated", label: "Evaluated" },
+  { key: "under_review", label: "Under Review" },
+  { key: "approved", label: "Approved" },
 ];
 
 function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('') || '?';
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
 }
 
 function formatDate(d: string | Date) {
   return new Date(d).toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
-const COMPLETE_STATUSES = new Set(['submitted', 'evaluated', 'under_review', 'approved']);
+const COMPLETE_STATUSES = new Set(["submitted", "evaluated", "under_review", "approved"]);
 
 export default function TeamAssessmentsPage() {
   const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
@@ -83,19 +94,25 @@ export default function TeamAssessmentsPage() {
     Record<string, { full_name: string; designation: string | null; domain_id: string | null }>
   >({});
   const [namesLoading, setNamesLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [reminderPending, setReminderPending] = useState<Record<string, boolean>>({});
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [formatFilter, setFormatFilter] = useState<'all' | 'adaptive' | 'fixed'>('all');
-  const [verifFilter, setVerifFilter] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [formatFilter, setFormatFilter] = useState<"all" | "adaptive" | "fixed">("all");
+  const [verifFilter, setVerifFilter] = useState<"all" | "verified" | "unverified">("all");
 
   useEffect(() => {
-    fetchAssessments(); fetchQuestions(); fetchSkills(); fetchDomains();
-    fetchAttempts(); fetchReviews(); fetchTemplates(); fetchLevels();
+    fetchAssessments();
+    fetchQuestions();
+    fetchSkills();
+    fetchDomains();
+    fetchAttempts();
+    fetchReviews();
+    fetchTemplates();
+    fetchLevels();
   }, []);
 
   useEffect(() => {
@@ -108,35 +125,38 @@ export default function TeamAssessmentsPage() {
     }
     setNamesLoading(true);
     supabase
-      .from('users')
-      .select('id, full_name, designation, domain_id')
-      .in('id', missing)
-      .then(({ data }) => {
-        if (data) {
-          setUserMeta((prev) => {
-            const next = { ...prev };
-            data.forEach((u: any) => {
-              next[u.id] = {
-                full_name: u.full_name,
-                designation: u.designation ?? null,
-                domain_id: u.domain_id ?? null,
-              };
+      .from("users")
+      .select("id, full_name, designation, domain_id")
+      .in("id", missing)
+      .then(
+        ({ data }) => {
+          if (data) {
+            setUserMeta((prev) => {
+              const next = { ...prev };
+              data.forEach((u: any) => {
+                next[u.id] = {
+                  full_name: u.full_name,
+                  designation: u.designation ?? null,
+                  domain_id: u.domain_id ?? null,
+                };
+              });
+              return next;
             });
-            return next;
-          });
-        }
-        setNamesLoading(false);
-      }, () => setNamesLoading(false));
+          }
+          setNamesLoading(false);
+        },
+        () => setNamesLoading(false),
+      );
   }, [assessments, initialized]);
 
-  const getName = (id: string) => userMeta[id]?.full_name || '—';
+  const getName = (id: string) => userMeta[id]?.full_name || "—";
   const getDesignation = (id: string) => userMeta[id]?.designation || null;
   const getAssessmentName = (a: Assessment) => {
     if (a.template_id) {
       const t = templates.find((x) => x.id === a.template_id);
       if (t?.name) return t.name;
     }
-    return 'Skill Registry Assessment';
+    return "Skill Registry Assessment";
   };
   const getDomainName = (a: Assessment) => {
     const d = domains.find((x) => x.id === a.domain_id);
@@ -145,15 +165,15 @@ export default function TeamAssessmentsPage() {
 
   // Domains the current manager leads
   const ledDomainIds = useMemo(() => {
-    if (currentRole !== 'manager' || !user) return new Set<string>();
+    if (currentRole !== "manager" || !user) return new Set<string>();
     return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
   }, [domains, currentRole, user]);
-  const notDomainLead = currentRole === 'manager' && ledDomainIds.size === 0;
+  const notDomainLead = currentRole === "manager" && ledDomainIds.size === 0;
 
   // Manager scope — only domains the manager leads
   const teamAssessments = useMemo(() => {
-    if (currentRole === 'admin') return assessments;
-    if (currentRole === 'manager') {
+    if (currentRole === "admin") return assessments;
+    if (currentRole === "manager") {
       if (ledDomainIds.size === 0) return [];
       return assessments.filter((a) => a.domain_id && ledDomainIds.has(a.domain_id));
     }
@@ -165,9 +185,9 @@ export default function TeamAssessmentsPage() {
     const attempt = getAttemptForAssessment(a.id);
     const assessmentReviews = reviews.filter((r) => r.assessment_id === a.id);
     const status = getEffectiveStatus(a, attempt, assessmentReviews);
-    const verified = assessmentReviews.some((r) => r.status === 'completed');
+    const verified = assessmentReviews.some((r) => r.status === "completed");
 
-    let levelLabel = 'N/A';
+    let levelLabel = "N/A";
     let hasLevel = false;
     const achieved = getAchievedLevelFromAttempt(attempt);
     if (achieved.level != null && levels.length > 0) {
@@ -182,28 +202,31 @@ export default function TeamAssessmentsPage() {
     let list = teamAssessments;
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((a) =>
-        getName(a.employee_id).toLowerCase().includes(q) ||
-        getAssessmentName(a).toLowerCase().includes(q) ||
-        (getDomainName(a) ?? '').toLowerCase().includes(q),
+      list = list.filter(
+        (a) =>
+          getName(a.employee_id).toLowerCase().includes(q) ||
+          getAssessmentName(a).toLowerCase().includes(q) ||
+          (getDomainName(a) ?? "").toLowerCase().includes(q),
       );
     }
-    if (formatFilter !== 'all') {
-      list = list.filter((a) => (formatFilter === 'adaptive' ? a.is_adaptive : !a.is_adaptive));
+    if (formatFilter !== "all") {
+      list = list.filter((a) => (formatFilter === "adaptive" ? a.is_adaptive : !a.is_adaptive));
     }
-    if (statusFilter.length > 0 || verifFilter !== 'all') {
+    if (statusFilter.length > 0 || verifFilter !== "all") {
       list = list.filter((a) => {
         const { status, verified } = computeRow(a);
         if (statusFilter.length > 0 && !statusFilter.includes(status)) return false;
-        if (verifFilter === 'verified' && !verified) return false;
-        if (verifFilter === 'unverified' && verified) return false;
+        if (verifFilter === "verified" && !verified) return false;
+        if (verifFilter === "unverified" && verified) return false;
         return true;
       });
     }
     return list;
   }, [teamAssessments, search, formatFilter, statusFilter, verifFilter, userMeta, templates, domains, reviews, levels]);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, formatFilter, verifFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, formatFilter, verifFilter]);
 
   const total = filteredTeam.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -211,30 +234,29 @@ export default function TeamAssessmentsPage() {
   const pageStart = (safePage - 1) * PAGE_SIZE;
   const paged = filteredTeam.slice(pageStart, pageStart + PAGE_SIZE);
 
-  const showLoadingRows =
-    !initialized || namesLoading ||
-    teamAssessments.some((a) => !(a.employee_id in userMeta));
+  const showLoadingRows = !initialized || namesLoading || teamAssessments.some((a) => !(a.employee_id in userMeta));
 
   const toggleStatus = (key: string) =>
     setStatusFilter((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
   const clearFilters = () => {
-    setStatusFilter([]); setFormatFilter('all'); setVerifFilter('all');
+    setStatusFilter([]);
+    setFormatFilter("all");
+    setVerifFilter("all");
   };
-  const filterCount =
-    statusFilter.length + (formatFilter !== 'all' ? 1 : 0) + (verifFilter !== 'all' ? 1 : 0);
+  const filterCount = statusFilter.length + (formatFilter !== "all" ? 1 : 0) + (verifFilter !== "all" ? 1 : 0);
 
   const sendReminder = async (a: Assessment) => {
     if (!user?.tenant_id) return;
     setReminderPending((p) => ({ ...p, [a.id]: true }));
     try {
       const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const { error } = await supabase.from('notifications').insert({
+      const { error } = await supabase.from("notifications").insert({
         id: notifId,
         tenant_id: user.tenant_id,
-        target_role: 'employee',
+        target_role: "employee",
         target_user_id: a.employee_id,
         message: `Reminder: please complete your assessment "${getAssessmentName(a)}".`,
-        type: 'assessment_reminder',
+        type: "assessment_reminder",
         reference_id: a.id,
         action_link: `/assessments/${a.id}`,
         read: false,
@@ -242,7 +264,7 @@ export default function TeamAssessmentsPage() {
       if (error) throw error;
       toast.success(`Reminder sent to ${getName(a.employee_id)}`);
     } catch (err: any) {
-      toast.error(`Failed to send reminder: ${err?.message ?? 'Unknown error'}`);
+      toast.error(`Failed to send reminder: ${err?.message ?? "Unknown error"}`);
     } finally {
       setTimeout(() => setReminderPending((p) => ({ ...p, [a.id]: false })), 1500);
     }
@@ -286,10 +308,7 @@ export default function TeamAssessmentsPage() {
                   <div className="space-y-1.5">
                     {STATUS_FILTERS.map((s) => (
                       <label key={s.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox
-                          checked={statusFilter.includes(s.key)}
-                          onCheckedChange={() => toggleStatus(s.key)}
-                        />
+                        <Checkbox checked={statusFilter.includes(s.key)} onCheckedChange={() => toggleStatus(s.key)} />
                         <span className="text-foreground">{s.label}</span>
                       </label>
                     ))}
@@ -299,13 +318,15 @@ export default function TeamAssessmentsPage() {
                   <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Format</p>
                   <RadioGroup value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
                     {[
-                      { v: 'all', l: 'All' },
-                      { v: 'adaptive', l: 'Adaptive' },
-                      { v: 'fixed', l: 'Fixed' },
+                      { v: "all", l: "All" },
+                      { v: "adaptive", l: "Adaptive" },
+                      { v: "fixed", l: "Fixed" },
                     ].map((o) => (
                       <div key={o.v} className="flex items-center gap-2">
                         <RadioGroupItem value={o.v} id={`tfmt-${o.v}`} />
-                        <Label htmlFor={`tfmt-${o.v}`} className="text-sm cursor-pointer">{o.l}</Label>
+                        <Label htmlFor={`tfmt-${o.v}`} className="text-sm cursor-pointer">
+                          {o.l}
+                        </Label>
                       </div>
                     ))}
                   </RadioGroup>
@@ -314,19 +335,23 @@ export default function TeamAssessmentsPage() {
                   <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Verification</p>
                   <RadioGroup value={verifFilter} onValueChange={(v) => setVerifFilter(v as any)}>
                     {[
-                      { v: 'all', l: 'All' },
-                      { v: 'verified', l: 'Verified' },
-                      { v: 'unverified', l: 'Unverified' },
+                      { v: "all", l: "All" },
+                      { v: "verified", l: "Verified" },
+                      { v: "unverified", l: "Unverified" },
                     ].map((o) => (
                       <div key={o.v} className="flex items-center gap-2">
                         <RadioGroupItem value={o.v} id={`tver-${o.v}`} />
-                        <Label htmlFor={`tver-${o.v}`} className="text-sm cursor-pointer">{o.l}</Label>
+                        <Label htmlFor={`tver-${o.v}`} className="text-sm cursor-pointer">
+                          {o.l}
+                        </Label>
                       </div>
                     ))}
                   </RadioGroup>
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
-                  <Button variant="ghost" size="sm" className="h-8" onClick={clearFilters}>Clear</Button>
+                  <Button variant="ghost" size="sm" className="h-8" onClick={clearFilters}>
+                    Clear
+                  </Button>
                 </div>
               </div>
             </PopoverContent>
@@ -341,12 +366,24 @@ export default function TeamAssessmentsPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Employee</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assessment Details</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Achieved Level</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Verified Level</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Action</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Employee
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Assessment Details
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Status
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Achieved Level
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Verified Level
+              </TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
+                Action
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -362,11 +399,24 @@ export default function TeamAssessmentsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-3 w-24 mb-2" /><Skeleton className="h-3 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20 mb-2" /><Skeleton className="h-3 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-40 mb-2" />
+                    <Skeleton className="h-3 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-3 w-24 mb-2" />
+                    <Skeleton className="h-3 w-16" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20 mb-2" />
+                    <Skeleton className="h-3 w-16" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-8 w-24 ml-auto" />
+                  </TableCell>
                 </TableRow>
               ))
             ) : paged.length === 0 ? (
@@ -378,8 +428,8 @@ export default function TeamAssessmentsPage() {
                       {notDomainLead
                         ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
                         : teamAssessments.length === 0
-                        ? 'No team assessments yet.'
-                        : 'No assessments match the current filters.'}
+                          ? "No team assessments yet."
+                          : "No assessments match the current filters."}
                     </p>
                   </div>
                 </TableCell>
@@ -390,50 +440,59 @@ export default function TeamAssessmentsPage() {
                 const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
                 const designation = getDesignation(a.employee_id);
                 const domainName = getDomainName(a);
-                const formatLabel = a.is_adaptive ? 'Adaptive' : 'Fixed';
+                const formatLabel = a.is_adaptive ? "Adaptive" : "Fixed";
                 const questionCount = a.assessment_questions.length;
                 const isCompleted = COMPLETE_STATUSES.has(status);
 
                 let dateLine: string | null = null;
-                if (status === 'approved' || status === 'evaluated') {
+                if (status === "approved" || status === "evaluated") {
                   dateLine = `Completed: ${formatDate(a.updated_at)}`;
-                } else if (status === 'submitted' || status === 'under_review') {
+                } else if (status === "submitted" || status === "under_review") {
                   dateLine = `Submitted: ${formatDate(a.updated_at)}`;
                 } else {
                   dateLine = `Created: ${formatDate(a.created_at)}`;
                 }
 
                 let actionEl: JSX.Element;
-                if (status === 'pending') {
+                if (status === "pending") {
                   actionEl = (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5"
                       disabled={!!reminderPending[a.id]}
-                      onClick={(e) => { e.stopPropagation(); sendReminder(a); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendReminder(a);
+                      }}
                     >
                       <Bell size={13} />
-                      {reminderPending[a.id] ? 'Sending…' : 'Send Reminder'}
+                      {reminderPending[a.id] ? "Sending…" : "Send Reminder"}
                     </Button>
                   );
-                } else if (status === 'in_progress' || status === 'submitted') {
+                } else if (status === "in_progress" || status === "submitted") {
                   actionEl = (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/team-assessments/${a.id}`); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/team-assessments/${a.id}`);
+                      }}
                     >
                       View Progress
                     </Button>
                   );
-                } else if (status === 'evaluated' || status === 'under_review') {
+                } else if (status === "evaluated" || status === "under_review") {
                   actionEl = (
                     <Button
                       size="sm"
                       className="h-8 gap-1"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/team-assessments/${a.id}`); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/team-assessments/${a.id}`);
+                      }}
                     >
                       Review <ArrowRight size={13} />
                     </Button>
@@ -444,7 +503,10 @@ export default function TeamAssessmentsPage() {
                       variant="outline"
                       size="sm"
                       className="h-8"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/team-assessments/${a.id}`); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/team-assessments/${a.id}`);
+                      }}
                     >
                       View Results
                     </Button>
@@ -452,11 +514,7 @@ export default function TeamAssessmentsPage() {
                 }
 
                 return (
-                  <TableRow
-                    key={a.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/team-assessments/${a.id}`)}
-                  >
+                  <TableRow key={a.id} className="cursor-pointer" onClick={() => navigate(`/team-assessments/${a.id}`)}>
                     <TableCell className="align-top">
                       <div className="flex items-center gap-2.5">
                         <Avatar className="h-9 w-9">
@@ -468,9 +526,7 @@ export default function TeamAssessmentsPage() {
                           <div className="text-sm font-semibold text-card-foreground truncate">
                             {getName(a.employee_id)}
                           </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {designation || '—'}
-                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{designation || "—"}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -489,14 +545,13 @@ export default function TeamAssessmentsPage() {
                             Reassessment
                           </Badge>
                         )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
+
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <HelpCircle size={12} />
-                          <span className="text-foreground">{questionCount > 0 ? questionCount : '—'}</span>
+                          <span className="text-foreground">{questionCount > 0 ? questionCount : "—"}</span>
                           <span>({formatLabel})</span>
                         </span>
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock size={12} />
                           {a.duration_minutes} mins
                         </span>
@@ -505,9 +560,7 @@ export default function TeamAssessmentsPage() {
 
                     <TableCell className="align-top">
                       <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
-                      {dateLine && (
-                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
-                      )}
+                      {dateLine && <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>}
                     </TableCell>
 
                     <TableCell className="align-top">
@@ -535,9 +588,7 @@ export default function TeamAssessmentsPage() {
                       })()}
                     </TableCell>
 
-                    <TableCell className="align-top text-right">
-                      {actionEl}
-                    </TableCell>
+                    <TableCell className="align-top text-right">{actionEl}</TableCell>
                   </TableRow>
                 );
               })
@@ -549,9 +600,9 @@ export default function TeamAssessmentsPage() {
       {!showLoadingRows && total > 0 && (
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{' '}
-            <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> assessments
+            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{" "}
+            <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{" "}
+            <span className="font-medium text-foreground">{total}</span> assessments
           </p>
           {pageCount > 1 && (
             <Pagination className="mx-0 w-auto justify-end">
@@ -559,8 +610,11 @@ export default function TeamAssessmentsPage() {
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
-                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
-                    className={safePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={safePage === 1 ? "pointer-events-none opacity-50" : ""}
                   />
                 </PaginationItem>
                 {Array.from({ length: pageCount }).map((_, i) => {
@@ -570,7 +624,10 @@ export default function TeamAssessmentsPage() {
                       <PaginationLink
                         href="#"
                         isActive={n === safePage}
-                        onClick={(e) => { e.preventDefault(); setPage(n); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(n);
+                        }}
                       >
                         {n}
                       </PaginationLink>
@@ -580,8 +637,11 @@ export default function TeamAssessmentsPage() {
                 <PaginationItem>
                   <PaginationNext
                     href="#"
-                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(pageCount, p + 1)); }}
-                    className={safePage === pageCount ? 'pointer-events-none opacity-50' : ''}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(pageCount, p + 1));
+                    }}
+                    className={safePage === pageCount ? "pointer-events-none opacity-50" : ""}
                   />
                 </PaginationItem>
               </PaginationContent>
@@ -590,12 +650,7 @@ export default function TeamAssessmentsPage() {
         </div>
       )}
 
-      <AssignTemplateDialog
-        open={assignOpen}
-        onOpenChange={setAssignOpen}
-        template={null}
-        showTemplatePicker
-      />
+      <AssignTemplateDialog open={assignOpen} onOpenChange={setAssignOpen} template={null} showTemplatePicker />
     </div>
   );
 }
