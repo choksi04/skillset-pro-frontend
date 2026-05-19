@@ -377,12 +377,16 @@ export default function UserGuidePage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Help & Tutorial</h2>
-          <p className="text-sm text-muted-foreground mt-1">Comprehensive guide for every role — learn how to use the platform effectively.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Comprehensive guide for every role — learn how to use the platform effectively.
+            The in-app tour is now a brief dashboard intro; this User Guide is the source of truth for step-by-step instructions. Press <kbd className="px-1.5 py-0.5 rounded border bg-muted text-[10px]">Esc</kbd> at any time to exit the tour.
+          </p>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={restartTour}>
           <Play size={12} /> Restart Tour
         </Button>
       </div>
+
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
