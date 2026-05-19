@@ -1,36 +1,53 @@
-# Fix Guided Tour Lockout & Simplify Onboarding
+## Goal
+Replace the single dashboard-intro tour with a **role-aware sidebar walkthrough**. The tour stays on the current page, highlights each visible sidebar menu item one by one, and explains what that section is for. No route navigation during the tour.
 
-## Problem
-After the dashboard redesign, the guided tour gets stuck on `/` and the user can't exit:
-- Many tour steps point at sidebar items (`[data-tour="skills|domains|questions|..."]`) that no longer exist in `AppSidebar.tsx` — so `targetRect` is null and the tooltip falls back to center, but for the dashboard step itself the rect is the full main-content area, pushing the tooltip (position: `bottom`) below the viewport. Skip/Later buttons become unreachable.
-- There is no global Escape affordance (no ESC key handler, no floating close button), so once the tooltip is offscreen the user is trapped.
+## Behavior
+
+- Tour starts wherever the user is (typically `/`). It does **not** navigate.
+- Step 1 is a centered "Welcome / this is your Dashboard" intro.
+- Each subsequent step highlights one sidebar nav item (My Registry, Team Registry, My Assessments, etc.) with a short description of its purpose, tooltip positioned to the `right` of the sidebar item.
+- Steps are filtered by role so the user only sees steps for menu items they can actually see:
+  - **Admin**: Dashboard, All Registries, My Registry, Team Registry, My Assessments, Team Assessments, Skill Library, Domains, Question Bank, Assessment Config, Assessment Templates, Users, Help & Tutorial
+  - **Manager**: Dashboard, My Registry, Team Registry, My Assessments, Team Assessments, Skill Library, Domains, Question Bank, Assessment Templates, Help & Tutorial
+  - **Employee**: Dashboard, My Registry, My Assessments, Help & Tutorial
+- Existing safety nets stay: floating top-right X, ESC key, Skip / Later, viewport clamping.
 
 ## Changes
 
-### 1. `src/components/onboarding/GuidedTour.tsx`
-- Add a **fixed top-right floating Close (X) button** rendered above the overlay (always visible regardless of tooltip position). Clicking calls `completeTour()`.
-- Add an **ESC key listener** while `tourActive` — calls `completeTour()`.
-- Clamp tooltip position into the viewport (fallback to centered when computed `top`/`left` would fall outside the visible area) so it can never be pushed offscreen again.
-- Keep the existing Skip / Later / Back / Next buttons.
+### 1. `src/components/layout/AppSidebar.tsx`
+Add a `data-tour="nav-<key>"` attribute to each `NavLink` so the tour can target them. Key derived from href (e.g. `/` → `dashboard`, `/skill-registry` → `my-registry`, `/team-registry` → `team-registry`, etc.). Purely additive, no visual change.
 
-### 2. `src/stores/onboardingStore.ts` — simplify the tour
-Replace the multi-step `coreTourSteps` + role-specific extras with a **single generic step** for all roles:
-- id: `dashboard-intro`, title: "Welcome to your Dashboard", description: short message that this is the dashboard, summarizes what they'll find here, and points them to the User Guide for deeper walkthroughs.
-- position: `center`, no `targetSelector`.
+### 2. `src/stores/onboardingStore.ts`
+Replace `dashboardIntroStep` with an array of steps — one centered intro + one step per sidebar item. Each sidebar step:
+- `targetSelector: '[data-tour="nav-<key>"]'`
+- `position: 'right'`
+- `roles: [...]` matching the sidebar item's `roles`
+- **No `targetRoute`** (so the tour never navigates away from the current page).
 
-`getTourStepsForRole` returns just this one step for every role. Role-specific arrays (`adminExtraSteps`, `managerExtraSteps`, `employeeExtraSteps`) are removed.
+`getTourStepsForRole(role)` filters the array by `roles.includes(role)` and returns the result.
 
-The checklist (`checklistItems`) and store actions remain unchanged.
+### 3. `src/components/onboarding/GuidedTour.tsx`
+Minor: when a step has no `targetRoute`, skip the `navigate()` call (already conditional, just confirming). No other logic changes — clamping, ESC, X button, Skip/Later/Back/Next stay.
 
-### 3. `src/pages/UserGuidePage.tsx`
-- Add a small note near the top explaining the in-app guided tour is now a brief dashboard intro, and that the User Guide is the source of truth for step-by-step instructions.
-- No structural rewrite of the existing role/feature sections.
+### 4. `src/pages/UserGuidePage.tsx`
+Update the small intro note: the in-app tour is now a quick role-aware walkthrough of the sidebar menu; the User Guide remains the detailed reference.
 
 ## Out of scope
-- Re-wiring `data-tour` anchors on the new sidebar (the tour no longer relies on them).
-- Welcome modal copy, checklist behavior, profile sheet.
+- No route changes, no welcome-modal/checklist changes, no new pages.
+- No business-logic changes.
 
-## Technical notes
-- Floating close button: `fixed top-4 right-4 z-[10000]`, semantic tokens only.
-- ESC handler attached in the same `useEffect` that already runs while `tourActive`.
-- Viewport clamping: after computing `pos`, if numeric `top`/`left` exceeds `window.innerHeight`/`innerWidth` minus a margin, fall back to centered transform.
+## Step copy (concise, one sentence each)
+
+- **Dashboard** — Your home view with role-specific KPIs and quick actions.
+- **All Registries** (admin) — Organization-wide directory of every employee's skill registry.
+- **My Registry** — Your personal skill self-assessment and approved levels.
+- **Team Registry** (admin/manager) — Registries of employees in domains you lead.
+- **My Assessments** — Assessments assigned to you, in progress or completed.
+- **Team Assessments** (admin/manager) — Assessments of employees in your domains, for review.
+- **Skill Library** (admin/manager) — Catalog of skill categories, skills and topics.
+- **Domains** (admin/manager) — Practice areas grouping people and skills.
+- **Question Bank** (admin/manager) — MCQ, coding and scenario questions powering assessments.
+- **Assessment Config** (admin) — Global rules: question counts, passing thresholds, scoring.
+- **Assessment Templates** (admin/manager) — Reusable assessment definitions to assign to employees.
+- **Users** (admin) — Manage accounts, roles and domain assignments.
+- **Help & Tutorial** — Full user guide and option to replay this tour.
