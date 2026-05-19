@@ -386,12 +386,22 @@ export default function TeamAssessmentsPage() {
               </TableRow>
             ) : (
               paged.map((a) => {
-                const { attempt, status, verified, levelLabel, hasLevel } = computeRow(a);
+                const { attempt, status, assessmentReviews } = computeRow(a);
                 const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
                 const designation = getDesignation(a.employee_id);
                 const domainName = getDomainName(a);
                 const formatLabel = a.is_adaptive ? 'Adaptive' : 'Fixed';
                 const questionCount = a.assessment_questions.length;
+                const isCompleted = COMPLETE_STATUSES.has(status);
+
+                let dateLine: string | null = null;
+                if (status === 'approved' || status === 'evaluated') {
+                  dateLine = `Completed: ${formatDate(a.updated_at)}`;
+                } else if (status === 'submitted' || status === 'under_review') {
+                  dateLine = `Submitted: ${formatDate(a.updated_at)}`;
+                } else {
+                  dateLine = `Created: ${formatDate(a.created_at)}`;
+                }
 
                 let actionEl: JSX.Element;
                 if (status === 'pending') {
