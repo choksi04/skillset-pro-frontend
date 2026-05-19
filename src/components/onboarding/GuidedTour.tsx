@@ -67,18 +67,24 @@ export default function GuidedTour() {
     return () => clearTimeout(timer);
   }, [tourActive, tourStep, currentStepData, navigate, updateTargetRect]);
 
-  // Observe DOM changes to keep rect updated
+  // Observe DOM changes to keep rect updated + ESC to close
   useEffect(() => {
     if (!tourActive) return;
     const obs = new MutationObserver(() => updateTargetRect());
     obs.observe(document.body, { childList: true, subtree: true });
     observerRef.current = obs;
     window.addEventListener('resize', updateTargetRect);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') completeTour();
+    };
+    window.addEventListener('keydown', onKey);
     return () => {
       obs.disconnect();
       window.removeEventListener('resize', updateTargetRect);
+      window.removeEventListener('keydown', onKey);
     };
-  }, [tourActive, updateTargetRect]);
+  }, [tourActive, updateTargetRect, completeTour]);
+
 
   if (!tourActive || !currentStepData) return null;
 
