@@ -334,10 +334,10 @@ export default function TeamAssessmentsPage() {
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Employee</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assessment Info</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Format Details</TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Skill Level</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assessment Details</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Achieved Level</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Verified Level</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
