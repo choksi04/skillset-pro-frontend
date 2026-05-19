@@ -1,85 +1,45 @@
-## Notification panel — better organization + mark-all-read
+# Plan: Show L1–L5 competency levels clearly in the User Guide
 
-Improve `src/components/layout/NotificationDropdown.tsx` so all three roles can scan notifications fast and act on what needs attention.
+## Goal
+Make the 5-level competency framework (L1 → L5) easy to find and understand inside the Help & Tutorial page, for all roles. Data is read dynamically from the `competency_levels` table (never hardcoded), matching project standard.
 
-### Common changes (apply regardless of option chosen)
+## Where it appears
+On `src/pages/UserGuidePage.tsx`, insert a new prominent section titled **"Competency Levels (L1 – L5)"** directly under the existing "How the Platform Works" banner and above the role tabs. Visible to Admin, Manager, and Employee.
 
-1. **"Mark all as read" button** in the header — only shown when `unread > 0`. Updates all unread rows for the current user/role in one query (`supabase.from('notifications').update({ read: true }).in('id', unreadIds)`), then updates local state.
-2. **Type badge** per notification — small colored pill with a human label + icon. Mapping (derived from the 6 existing types in DB):
-
-  | type                   | Label      | Icon           | Tone    |
-  | ---------------------- | ---------- | -------------- | ------- |
-  | `assessment_assigned`  | Assessment | ClipboardCheck | indigo  |
-  | `assessment_reminder`  | Reminder   | BellRing       | amber   |
-  | `assessment_completed` | Assessment | CheckCircle2   | emerald |
-  | `review_completed`     | Review     | UserCheck      | blue    |
-  | `registry_submitted`   | Registry   | FileCheck      | violet  |
-  | &nbsp;                 | &nbsp;     | &nbsp;         | &nbsp;  |
-
-3. **Relative timestamps** — "2h ago", "Yesterday", "3 Apr". Hover shows full datetime.
-4. **Widen panel** to `w-96` and raise max height to `max-h-[28rem]` to fit the richer rows.
-5. **Unread dot** instead of just a background tint — clearer affordance.
-
-### Three organization options to choose from
+## What it shows
+A compact 5-row card (or table) — one row per level — pulled live from `useCompetencyLevelStore`:
 
 ```text
-OPTION A — Grouped by date (recommended default)
-┌──────────────────────────────────────────────┐
-│ Notifications        Mark all as read  •  3  │
-├──────────────────────────────────────────────┤
-│ TODAY                                        │
-│ • [Assessment] React Basics assigned   2h ago│
-│ • [Reminder]   Submit registry by Fri  5h ago│
-│ YESTERDAY                                    │
-│ • [Review]     Lead approved your reg.       │
-│ EARLIER                                      │
-│ • [Cycle]      Q2 cycle activated      3 Apr │
-└──────────────────────────────────────────────┘
+┌────┬──────────────────────┬──────────────┬──────────────────────────────────────────────┐
+│ L# │ Label                │ Score Range  │ What it means                                │
+├────┼──────────────────────┼──────────────┼──────────────────────────────────────────────┤
+│ L1 │ None / Low           │ 0 – 39       │ Unable to perform basic tasks. No exp.       │
+│ L2 │ Basic                │ 40 – 56      │ Limited / basic level. No critical tasks.    │
+│ L3 │ Demonstrating        │ 60 – 74      │ Basic→advanced w/ some SME direction.        │
+│ L4 │ Proficient           │ 75 – 89      │ Independent, can train & lead others.        │
+│ L5 │ Expert               │ 90 – 100     │ SME, cross-dept consultation, train & lead.  │
+└────┴──────────────────────┴──────────────┴──────────────────────────────────────────────┘
 ```
 
-Buckets: Today / Yesterday / This Week / Earlier. Familiar (Gmail/Linear pattern). Best when chronology matters most — most users skim newest first.
+Each row uses the existing `getLevelColorClass(level)` semantic token so colors align with badges used elsewhere (red→green progression).
 
-```text
-OPTION B — Grouped by "Needs action" vs "Updates"
-┌──────────────────────────────────────────────┐
-│ Notifications        Mark all as read  •  3  │
-├──────────────────────────────────────────────┤
-│ NEEDS YOUR ACTION (2)                        │
-│ • [Assessment] React Basics — Start    2h ago│
-│ • [Reminder]   Submit registry by Fri  5h ago│
-│ UPDATES (4)                                  │
-│ • [Review]     Lead approved your reg.   1d  │
-│ • [Cycle]      Q2 cycle activated      3 Apr │
-└──────────────────────────────────────────────┘
-```
+A short helper line above the table:
+> "Every skill in the platform is rated on this 5-level scale. Self-ratings, assessment achieved levels, and manager-verified levels all use the same vocabulary."
 
-Action-required types: `assessment_assigned`, `assessment_reminder`, `registry_submitted` (manager view), `cycle_activated` (admin/employee to act). Informational: `assessment_completed`, `review_completed`. Drives behavior, surfaces what to do next. Best for employees with task overload.
+A small note below for transparency:
+> "Levels and score ranges are configured by admins under Settings → Assessment Config and are read live from the database."
 
-```text
-OPTION C — Tabbed by Category with date subgroups inside
-┌──────────────────────────────────────────────┐
-│ Notifications        Mark all as read  •  3  │
-│ [ All ] [ Assessments ] [ Reviews ] [ Cycles]│
-├──────────────────────────────────────────────┤
-│ TODAY                                        │
-│ • [Assessment] React Basics assigned   2h ago│
-│ YESTERDAY                                    │
-│ • [Assessment] Reminder: Python quiz         │
-└──────────────────────────────────────────────┘
-```
+## Implementation details (technical)
+- File: `src/pages/UserGuidePage.tsx`
+- Add a new component `CompetencyLevelsCard` in the same file (or co-located) that:
+  - Calls `useCompetencyLevelStore()` and, if `!initialized`, triggers `fetchLevels()` on mount.
+  - Filters `levels` to `status === 'active'`, sorted by `level` ASC.
+  - Renders rows with `getLevelColorClass(level)` for the L# pill, `label`, `score_range_min–score_range_max`, and `description`.
+  - Graceful empty state if no levels loaded yet (skeleton or "Loading competency levels…").
+- Place the card between the "How the Platform Works" banner and the `platformOverview` accordion list.
+- No DB changes, no store changes, no routing changes. Purely additive UI.
 
-Tabs filter by category (Assessments / Reviews / Registry / Cycle). Inside each tab, items group by date. Best for admins/managers with high volume across many workflows.
-
-### Recommendation
-
-Default to **Option A** as the base layout, with **Option B's "Needs action" pinned section on top** as a lightweight hybrid — so a typical employee sees a clear "do this" stack at the top, followed by chronological history. Option C tabs can be a follow-up if volume grows.
-
-### Out of scope
-
-- No DB schema changes (existing `notifications` table already has `type`, `read`, `created_at`, `action_link`).
-- No new notification types — only relabeling existing ones for display.
-- No realtime subscription work; current fetch-on-mount stays.
-
-Pick A, B, C, or the hybrid (A + pinned action section) and I'll implement.
-
-Implement option A only. We will think about implementing option B in future.
+## Out of scope
+- No edits to other guide sections (Admin/Manager/Employee accordions stay as-is).
+- No changes to the in-app guided tour.
+- No new translations or copy elsewhere.

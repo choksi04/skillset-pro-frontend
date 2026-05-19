@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +9,7 @@ import {
   ChevronDown, ChevronRight, Play, Shield, Users, User,
   Brain, Network, HelpCircle, ClipboardCheck, BarChart3, CheckCircle, Sparkles,
   SlidersHorizontal, RefreshCw, Database, FileText, Bell, Layers, Award,
-  LayoutDashboard, Crown,
+  LayoutDashboard, Crown, Gauge,
 } from 'lucide-react';
 
 interface GuideStep {
