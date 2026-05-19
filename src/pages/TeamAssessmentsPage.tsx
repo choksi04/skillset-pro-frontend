@@ -490,53 +490,47 @@ export default function TeamAssessmentsPage() {
                           </Badge>
                         )}
                       </div>
-                    </TableCell>
-
-                    <TableCell className="align-top">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <HelpCircle size={13} />
-                        <span className="text-foreground">{questionCount > 0 ? `${questionCount} Qs` : '—'}</span>
-                        <span className="text-muted-foreground">({formatLabel})</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock size={13} />
-                        <span>{a.duration_minutes} mins</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="align-top">
-                      <div className={`text-sm font-medium ${hasLevel ? 'text-card-foreground' : 'text-muted-foreground'}`}>
-                        {levelLabel}
-                      </div>
-                      <div className="mt-1">
-                        {verified ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-success">
-                            <CheckCircle2 size={11} /> Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <AlertCircle size={11} /> Unverified
-                          </span>
-                        )}
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <HelpCircle size={12} />
+                          <span className="text-foreground">{questionCount > 0 ? questionCount : '—'}</span>
+                          <span>({formatLabel})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={12} />
+                          {a.duration_minutes} mins
+                        </span>
                       </div>
                     </TableCell>
 
                     <TableCell className="align-top">
                       <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
+                      {dateLine && (
+                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="align-top">
                       {(() => {
-                        const { level, correct, total } = getAchievedLevelFromAttempt(attempt);
-                        if (level == null) return null;
+                        if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
+                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
-                          <div className="mt-1.5 space-y-0.5">
-                            <Badge className="text-[10px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-                              {getFormattedLevelLabel(levels, level)}
-                            </Badge>
-                            {total > 0 && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {correct} / {total} correct
-                              </div>
-                            )}
-                          </div>
+                          <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                            {getFormattedLevelLabel(levels, level)}
+                          </Badge>
+                        );
+                      })()}
+                    </TableCell>
+
+                    <TableCell className="align-top">
+                      {(() => {
+                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id);
+                        if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
+                        return (
+                          <Badge className="text-[11px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">
+                            {getFormattedLevelLabel(levels, level)}
+                          </Badge>
                         );
                       })()}
                     </TableCell>
