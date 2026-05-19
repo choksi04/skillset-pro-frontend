@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +9,7 @@ import {
   ChevronDown, ChevronRight, Play, Shield, Users, User,
   Brain, Network, HelpCircle, ClipboardCheck, BarChart3, CheckCircle, Sparkles,
   SlidersHorizontal, RefreshCw, Database, FileText, Bell, Layers, Award,
-  LayoutDashboard, Crown,
+  LayoutDashboard, Crown, Gauge,
 } from 'lucide-react';
 
 interface GuideStep {
@@ -368,6 +369,70 @@ function GuideSectionCard({ step, defaultOpen = false }: { step: GuideStep; defa
   );
 }
 
+function CompetencyLevelsCard() {
+  const { levels, initialized, loading, fetchLevels } = useCompetencyLevelStore();
+  useEffect(() => {
+    if (!initialized && !loading) fetchLevels();
+  }, [initialized, loading, fetchLevels]);
+
+  const active = levels.filter(l => l.status === 'active').sort((a, b) => a.level - b.level);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Gauge size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-card-foreground">Competency Levels (L1 – L5)</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Every skill — self-rating, assessment achieved level, and manager-verified level — uses this 5-level scale.
+          </p>
+        </div>
+      </div>
+      <div className="p-4">
+        {active.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">Loading competency levels…</p>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium w-16">Level</th>
+                  <th className="text-left px-3 py-2 font-medium">Label</th>
+                  <th className="text-left px-3 py-2 font-medium w-28">Score Range</th>
+                  <th className="text-left px-3 py-2 font-medium">What it means</th>
+                </tr>
+              </thead>
+              <tbody>
+                {active.map((l) => (
+                  <tr key={l.id} className="border-t border-border align-top">
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center justify-center h-6 min-w-[2rem] px-2 rounded-md text-[11px] font-semibold ${getLevelColorClass(l.level)}`}>
+                        L{l.level}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-foreground font-medium">{l.label}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground tabular-nums">
+                      {l.score_range_min} – {l.score_range_max}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground leading-relaxed">
+                      {l.description || <span className="italic">No description</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground mt-3 italic">
+          Levels and score ranges are configured by admins under Settings → Assessment Config and read live from the database.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function UserGuidePage() {
   const { currentRole } = useAuth();
   const { restartTour } = useOnboardingStore();
@@ -401,6 +466,8 @@ export default function UserGuidePage() {
           ))}
         </div>
       </div>
+
+      <CompetencyLevelsCard />
 
       <div className="space-y-3">
         {platformOverview.map((s) => <GuideSectionCard key={s.title} step={s} defaultOpen />)}
