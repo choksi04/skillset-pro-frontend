@@ -59,6 +59,14 @@ function getInitials(name: string) {
     .join('') || '?';
 }
 
+function formatDate(d: string | Date) {
+  return new Date(d).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+const COMPLETE_STATUSES = new Set(['submitted', 'evaluated', 'under_review', 'approved']);
+
 export default function TeamAssessmentsPage() {
   const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
   const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
