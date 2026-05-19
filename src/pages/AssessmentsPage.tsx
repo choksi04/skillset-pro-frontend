@@ -14,22 +14,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import {
-  Pagination, PaginationContent, PaginationItem, PaginationLink,
-  PaginationNext, PaginationPrevious,
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  ClipboardCheck, Search, ArrowRight, HelpCircle, Clock, Layers,
-  Filter as FilterIcon, Bot,
-} from "lucide-react";
+import { ClipboardCheck, Search, ArrowRight, HelpCircle, Clock, Layers, Filter as FilterIcon, Bot } from "lucide-react";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
 
@@ -48,17 +47,21 @@ const ACTIVE_STATUSES = new Set(["pending", "in_progress"]);
 const COMPLETE_STATUSES = new Set(["submitted", "evaluated", "under_review", "approved"]);
 
 function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("") || "?";
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
 }
 
 function formatDate(d: string | Date) {
   return new Date(d).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -95,10 +98,7 @@ export default function AssessmentsPage() {
     fetchLevels();
   }, []);
 
-  const myAssessments = useMemo(
-    () => assessments.filter((a) => a.employee_id === user?.id),
-    [assessments, user],
-  );
+  const myAssessments = useMemo(() => assessments.filter((a) => a.employee_id === user?.id), [assessments, user]);
 
   // Resolve assigner full names
   useEffect(() => {
@@ -109,15 +109,21 @@ export default function AssessmentsPage() {
     });
     const missing = [...ids].filter((id) => !(id in assignerNames));
     if (missing.length === 0) return;
-    supabase.from("users").select("id, full_name").in("id", missing).then(({ data }) => {
-      if (data) {
-        setAssignerNames((prev) => {
-          const next = { ...prev };
-          data.forEach((u: any) => { next[u.id] = u.full_name; });
-          return next;
-        });
-      }
-    });
+    supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", missing)
+      .then(({ data }) => {
+        if (data) {
+          setAssignerNames((prev) => {
+            const next = { ...prev };
+            data.forEach((u: any) => {
+              next[u.id] = u.full_name;
+            });
+            return next;
+          });
+        }
+      });
   }, [myAssessments]);
 
   const getAssessmentName = (a: Assessment) => {
@@ -137,9 +143,8 @@ export default function AssessmentsPage() {
     let list = myAssessments;
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((a) =>
-        getAssessmentName(a).toLowerCase().includes(q) ||
-        (getDomainName(a) ?? "").toLowerCase().includes(q),
+      list = list.filter(
+        (a) => getAssessmentName(a).toLowerCase().includes(q) || (getDomainName(a) ?? "").toLowerCase().includes(q),
       );
     }
     if (formatFilter !== "all") {
@@ -156,7 +161,9 @@ export default function AssessmentsPage() {
   }, [myAssessments, search, formatFilter, statusFilter, templates, domains, reviews]);
 
   // Reset page on filter changes
-  useEffect(() => { setPage(1); }, [search, formatFilter, statusFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, formatFilter, statusFilter]);
 
   const total = filteredMy.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -167,9 +174,7 @@ export default function AssessmentsPage() {
   const showLoadingRows = loading && !initialized;
 
   const toggleStatus = (key: string) => {
-    setStatusFilter((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
+    setStatusFilter((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
   const clearFilters = () => {
     setStatusFilter([]);
@@ -182,9 +187,7 @@ export default function AssessmentsPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">My Assessments</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            View and take your assigned skill assessments.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">View and take your assigned skill assessments.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -215,10 +218,7 @@ export default function AssessmentsPage() {
                   <div className="space-y-1.5">
                     {STATUS_FILTERS.map((s) => (
                       <label key={s.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox
-                          checked={statusFilter.includes(s.key)}
-                          onCheckedChange={() => toggleStatus(s.key)}
-                        />
+                        <Checkbox checked={statusFilter.includes(s.key)} onCheckedChange={() => toggleStatus(s.key)} />
                         <span className="text-foreground">{s.label}</span>
                       </label>
                     ))}
@@ -234,7 +234,9 @@ export default function AssessmentsPage() {
                     ].map((o) => (
                       <div key={o.v} className="flex items-center gap-2">
                         <RadioGroupItem value={o.v} id={`fmt-${o.v}`} />
-                        <Label htmlFor={`fmt-${o.v}`} className="text-sm cursor-pointer">{o.l}</Label>
+                        <Label htmlFor={`fmt-${o.v}`} className="text-sm cursor-pointer">
+                          {o.l}
+                        </Label>
                       </div>
                     ))}
                   </RadioGroup>
@@ -295,8 +297,12 @@ export default function AssessmentsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
                   <TableCell className="text-right">
                     <Skeleton className="h-8 w-24 ml-auto" />
                   </TableCell>
@@ -322,9 +328,7 @@ export default function AssessmentsPage() {
                 const status = getEffectiveStatus(a, attempt, assessmentReviews);
                 const config = assessmentStatusConfig[status] ?? assessmentStatusConfig.pending;
                 const assignment = getAssignmentByAssessmentId(a.id);
-                const assignerName = assignment?.assigned_by
-                  ? assignerNames[assignment.assigned_by] ?? null
-                  : null;
+                const assignerName = assignment?.assigned_by ? (assignerNames[assignment.assigned_by] ?? null) : null;
                 const isAuto = !assignment?.assigned_by;
 
                 const domainName = getDomainName(a);
@@ -346,15 +350,9 @@ export default function AssessmentsPage() {
                 }
 
                 return (
-                  <TableRow
-                    key={a.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/assessments/${a.id}`)}
-                  >
+                  <TableRow key={a.id} className="cursor-pointer" onClick={() => navigate(`/assessments/${a.id}`)}>
                     <TableCell className="align-top">
-                      <div className="font-medium text-sm text-card-foreground">
-                        {getAssessmentName(a)}
-                      </div>
+                      <div className="font-medium text-sm text-card-foreground">{getAssessmentName(a)}</div>
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                         {domainName && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-muted text-muted-foreground text-[11px] px-1.5 py-0.5">
@@ -367,8 +365,7 @@ export default function AssessmentsPage() {
                             Reassessment
                           </Badge>
                         )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+
                         <span className="inline-flex items-center gap-1">
                           <HelpCircle size={12} />
                           <span className="text-foreground">{questionCount > 0 ? questionCount : "—"}</span>
@@ -383,9 +380,7 @@ export default function AssessmentsPage() {
 
                     <TableCell className="align-top">
                       <Badge className={`text-xs border ${config.color}`}>{config.label}</Badge>
-                      {dateLine && (
-                        <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
-                      )}
+                      {dateLine && <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>}
                     </TableCell>
 
                     <TableCell className="align-top">
@@ -399,9 +394,7 @@ export default function AssessmentsPage() {
                           <div className="text-sm font-medium text-card-foreground truncate">
                             {isAuto ? "System Auto-Assign" : (assignerName ?? "—")}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {isAuto ? "Automated" : "Manager"}
-                          </div>
+                          <div className="text-xs text-muted-foreground">{isAuto ? "Automated" : "Manager"}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -470,10 +463,8 @@ export default function AssessmentsPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-muted-foreground">
             Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{" "}
-            <span className="font-medium text-foreground">
-              {Math.min(pageStart + PAGE_SIZE, total)}
-            </span>{" "}
-            of <span className="font-medium text-foreground">{total}</span> assessments
+            <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{" "}
+            <span className="font-medium text-foreground">{total}</span> assessments
           </p>
           {pageCount > 1 && (
             <Pagination className="mx-0 w-auto justify-end">
@@ -481,7 +472,10 @@ export default function AssessmentsPage() {
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
-                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
                     className={safePage === 1 ? "pointer-events-none opacity-50" : ""}
                   />
                 </PaginationItem>
@@ -492,7 +486,10 @@ export default function AssessmentsPage() {
                       <PaginationLink
                         href="#"
                         isActive={n === safePage}
-                        onClick={(e) => { e.preventDefault(); setPage(n); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(n);
+                        }}
                       >
                         {n}
                       </PaginationLink>
@@ -502,7 +499,10 @@ export default function AssessmentsPage() {
                 <PaginationItem>
                   <PaginationNext
                     href="#"
-                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(pageCount, p + 1)); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(pageCount, p + 1));
+                    }}
                     className={safePage === pageCount ? "pointer-events-none opacity-50" : ""}
                   />
                 </PaginationItem>
