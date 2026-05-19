@@ -28,6 +28,7 @@ interface SidebarItem {
   href: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  tourKey: string;
 }
 
 interface SidebarGroup {
