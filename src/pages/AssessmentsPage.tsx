@@ -71,6 +71,7 @@ export default function AssessmentsPage() {
   const { fetchReviews, reviews } = useReviewStore();
   const { templates, fetchTemplates } = useTemplateStore();
   const { fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
+  const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
