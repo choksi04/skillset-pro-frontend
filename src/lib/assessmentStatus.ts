@@ -1,4 +1,5 @@
 import type { Assessment } from "@/stores/assessmentStore";
+import type { AssessmentAttempt } from "@/stores/attemptStore";
 
 /**
  * Canonical, attempt-aware status derivation for an assessment.
@@ -41,4 +42,72 @@ export function getEffectiveStatus(
   if (attempt.status === "reviewed") return "approved";
 
   return assessment.status;
+}
+
+/**
+ * Shared "Achieved Level" derivation used by Assessment list, Team list, and
+ * the detail Result Summary. Mirrors ResultSummaryCard exactly so the same
+ * value is shown everywhere.
+ *
+ * Rule:
+ *   - Prefer adaptive_state.skills[].history (max level among correct answers
+ *     per skill, average across skills with ≥1 correct answer).
+ *   - Fallback to attempt.skill_scores[].calculated_level (non-adaptive flow).
+ *   - Returns null if no level can be derived.
+ *
+ * Also returns the underlying correct/total counts so the UI can show a
+ * secondary "X / Y correct" label.
+ */
+export function getAchievedLevelFromAttempt(
+  attempt: Pick<AssessmentAttempt, "skill_scores"> & { adaptive_state?: any } | null | undefined,
+): { level: number | null; correct: number; total: number } {
+  if (!attempt) return { level: null, correct: 0, total: 0 };
+
+  const adaptive: any = (attempt as any).adaptive_state ?? {};
+  const adaptiveSkills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
+
+  if (adaptiveSkills.length > 0) {
+    const perSkill = adaptiveSkills
+      .filter((s) => Array.isArray(s.history) && s.history.length > 0)
+      .map((s) => {
+        const total = s.history.length;
+        const correct = s.history.filter((h: any) => h.correct).length;
+        const correctLevels = s.history
+          .filter((h: any) => h.correct)
+          .map((h: any) => h.level as number);
+        const achieved = correctLevels.length ? Math.max(...correctLevels) : null;
+        return { total, correct, achieved };
+      });
+
+    const totals = perSkill.reduce(
+      (acc, b) => ({ correct: acc.correct + b.correct, total: acc.total + b.total }),
+      { correct: 0, total: 0 },
+    );
+    const achievedLevels = perSkill
+      .map((b) => b.achieved)
+      .filter((l): l is number => typeof l === "number");
+    const level = achievedLevels.length
+      ? Math.round(achievedLevels.reduce((a, b) => a + b, 0) / achievedLevels.length)
+      : null;
+
+    return { level, correct: totals.correct, total: totals.total };
+  }
+
+  // Non-adaptive fallback (fixed runner) — use per-skill calculated_level.
+  const ss = attempt.skill_scores ?? [];
+  if (ss.length === 0) return { level: null, correct: 0, total: 0 };
+
+  const totals = ss.reduce(
+    (acc, s) => {
+      const correct = Math.round((s.avg_score / 100) * s.question_count);
+      return { correct: acc.correct + correct, total: acc.total + s.question_count };
+    },
+    { correct: 0, total: 0 },
+  );
+  const levels = ss.map((s) => s.calculated_level).filter((l): l is number => typeof l === "number");
+  const level = levels.length
+    ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length)
+    : null;
+
+  return { level, correct: totals.correct, total: totals.total };
 }
