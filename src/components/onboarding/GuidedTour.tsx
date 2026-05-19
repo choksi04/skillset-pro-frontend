@@ -88,8 +88,24 @@ export default function GuidedTour() {
 
   if (!tourActive || !currentStepData) return null;
 
-  const pos = getTooltipPosition(targetRect, currentStepData.position);
-  const isCentered = !targetRect;
+  let pos = getTooltipPosition(targetRect, currentStepData.position);
+  let isCentered = !targetRect;
+
+  // Clamp into viewport — if the computed position would push the tooltip
+  // off-screen, fall back to centered so Close/Skip stay reachable.
+  if (targetRect && typeof window !== 'undefined') {
+    const margin = 24;
+    const topNum = parseFloat(pos.top as string);
+    const leftNum = parseFloat(pos.left as string);
+    if (
+      !Number.isFinite(topNum) || !Number.isFinite(leftNum) ||
+      topNum < margin || topNum > window.innerHeight - margin ||
+      leftNum < margin || leftNum > window.innerWidth - margin
+    ) {
+      pos = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+      isCentered = true;
+    }
+  }
 
   const handleNext = () => {
     if (isLast) {
@@ -101,6 +117,17 @@ export default function GuidedTour() {
 
   return (
     <div className="fixed inset-0 z-[9999]">
+      {/* Always-visible escape button */}
+      <Button
+        variant="secondary"
+        size="icon"
+        onClick={completeTour}
+        aria-label="Close tour"
+        className="fixed top-4 right-4 z-[10000] h-9 w-9 rounded-full shadow-lg"
+      >
+        <X size={16} />
+      </Button>
+
       {/* Overlay */}
       <div className="absolute inset-0">
         {targetRect ? (
