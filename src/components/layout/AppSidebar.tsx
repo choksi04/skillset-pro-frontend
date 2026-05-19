@@ -190,11 +190,10 @@ export default function AppSidebar() {
       {/* Footer */}
       <div className="border-t border-sidebar-border">
         <div className="px-4 py-3">
-          <div className="flex items-center gap-2.5">
+          <ProfilePopover>
             <button
               type="button"
-              onClick={() => setProfileOpen(true)}
-              className="flex items-center gap-2.5 min-w-0 flex-1 rounded-md p-1 -m-1 hover:bg-sidebar-accent/50 transition-colors text-left"
+              className="flex items-center gap-2.5 min-w-0 w-full rounded-md p-1 -m-1 hover:bg-sidebar-accent/50 transition-colors text-left"
               title="View profile"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground shrink-0">
@@ -208,18 +207,9 @@ export default function AppSidebar() {
                 <p className="truncate text-[10px] text-sidebar-muted">{user?.email}</p>
               </div>
             </button>
-            <button
-              onClick={logout}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
-              title="Sign out"
-            >
-              <LogOut size={14} />
-            </button>
-          </div>
+          </ProfilePopover>
         </div>
       </div>
-
-      <ProfileSheet open={profileOpen} onOpenChange={setProfileOpen} />
     </aside>
   );
 }
