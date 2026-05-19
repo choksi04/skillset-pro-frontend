@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AssignTemplateDialog from '@/components/templates/AssignTemplateDialog';
-import { getEffectiveStatus, getAchievedLevelFromAttempt } from '@/lib/assessmentStatus';
+import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from '@/lib/assessmentStatus';
 
 const PAGE_SIZE = 10;
 
