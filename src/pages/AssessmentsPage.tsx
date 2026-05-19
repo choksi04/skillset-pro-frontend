@@ -92,6 +92,7 @@ export default function AssessmentsPage() {
     fetchReviews();
     fetchTemplates();
     fetchAssignments();
+    fetchLevels();
   }, []);
 
   const myAssessments = useMemo(
@@ -405,19 +406,22 @@ export default function AssessmentsPage() {
                       {dateLine && (
                         <div className="text-xs text-muted-foreground mt-1.5">{dateLine}</div>
                       )}
-                      {attempt?.total_ai_score != null && isCompleted && (
-                        <div
-                          className={`text-xs font-semibold mt-1 ${
-                            attempt.total_ai_score >= 75
-                              ? "text-success"
-                              : attempt.total_ai_score >= 50
-                                ? "text-warning"
-                                : "text-destructive"
-                          }`}
-                        >
-                          Score: {attempt.total_ai_score}%
-                        </div>
-                      )}
+                      {isCompleted && (() => {
+                        const { level, correct, total } = getAchievedLevelFromAttempt(attempt);
+                        if (level == null) return null;
+                        return (
+                          <div className="mt-1.5 space-y-0.5">
+                            <Badge className="text-[10px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+                              {getFormattedLevelLabel(competencyLevels, level)}
+                            </Badge>
+                            {total > 0 && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {correct} / {total} correct
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
 
                     <TableCell className="align-top text-right">
