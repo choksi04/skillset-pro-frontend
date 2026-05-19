@@ -12,18 +12,123 @@ export interface TourStep {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
 }
 
-const dashboardIntroStep: TourStep = {
-  id: 'dashboard-intro',
-  title: 'Welcome to your Dashboard',
-  description:
-    'This is your dashboard — a snapshot of skills, assessments, and progress relevant to your role. Use the sidebar to navigate, and visit the User Guide for a full walkthrough of every feature.',
-  roles: ['admin', 'manager', 'employee'],
-  position: 'center',
-  targetRoute: '/',
-};
+const tourSteps: TourStep[] = [
+  {
+    id: 'welcome',
+    title: 'Welcome to SIAP',
+    description:
+      "Let's take a quick tour of the sidebar so you know where everything lives. You can press Esc or click the X at any time to exit.",
+    roles: ['admin', 'manager', 'employee'],
+    position: 'center',
+  },
+  {
+    id: 'nav-dashboard',
+    title: 'Dashboard',
+    description: 'Your home view with role-specific KPIs, quick actions, and recent activity.',
+    targetSelector: '[data-tour="nav-dashboard"]',
+    position: 'right',
+    roles: ['admin', 'manager', 'employee'],
+  },
+  {
+    id: 'nav-all-registries',
+    title: 'All Registries',
+    description: "Organization-wide directory of every employee's approved skill registry.",
+    targetSelector: '[data-tour="nav-all-registries"]',
+    position: 'right',
+    roles: ['admin'],
+  },
+  {
+    id: 'nav-my-registry',
+    title: 'My Registry',
+    description: 'Your personal skill self-assessment and the levels approved by your manager.',
+    targetSelector: '[data-tour="nav-my-registry"]',
+    position: 'right',
+    roles: ['admin', 'manager', 'employee'],
+  },
+  {
+    id: 'nav-team-registry',
+    title: 'Team Registry',
+    description: 'Registries of employees in the domains you lead — review and approve them here.',
+    targetSelector: '[data-tour="nav-team-registry"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-my-assessments',
+    title: 'My Assessments',
+    description: 'Assessments assigned to you — in progress, pending, or completed.',
+    targetSelector: '[data-tour="nav-my-assessments"]',
+    position: 'right',
+    roles: ['admin', 'manager', 'employee'],
+  },
+  {
+    id: 'nav-team-assessments',
+    title: 'Team Assessments',
+    description: "Assessments completed by employees in your domains, ready for your review.",
+    targetSelector: '[data-tour="nav-team-assessments"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-skill-library',
+    title: 'Skill Library',
+    description: 'Catalog of skill categories, skills, and topics that power the platform.',
+    targetSelector: '[data-tour="nav-skill-library"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-domains',
+    title: 'Domains',
+    description: 'Practice areas that group people and skills, and define oversight boundaries.',
+    targetSelector: '[data-tour="nav-domains"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-questions',
+    title: 'Question Bank',
+    description: 'MCQ, coding, and scenario questions used to generate assessments.',
+    targetSelector: '[data-tour="nav-questions"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-assessment-config',
+    title: 'Assessment Config',
+    description: 'Global assessment rules: question counts, passing thresholds, and scoring.',
+    targetSelector: '[data-tour="nav-assessment-config"]',
+    position: 'right',
+    roles: ['admin'],
+  },
+  {
+    id: 'nav-assessment-templates',
+    title: 'Assessment Templates',
+    description: 'Reusable assessment definitions you can assign to employees.',
+    targetSelector: '[data-tour="nav-assessment-templates"]',
+    position: 'right',
+    roles: ['admin', 'manager'],
+  },
+  {
+    id: 'nav-users',
+    title: 'Users',
+    description: 'Manage user accounts, roles, and domain assignments.',
+    targetSelector: '[data-tour="nav-users"]',
+    position: 'right',
+    roles: ['admin'],
+  },
+  {
+    id: 'nav-help',
+    title: 'Help & Tutorial',
+    description: 'The full user guide, with the option to replay this tour anytime.',
+    targetSelector: '[data-tour="nav-help"]',
+    position: 'right',
+    roles: ['admin', 'manager', 'employee'],
+  },
+];
 
-export function getTourStepsForRole(_role: UserRole): TourStep[] {
-  return [dashboardIntroStep];
+export function getTourStepsForRole(role: UserRole): TourStep[] {
+  return tourSteps.filter((s) => s.roles.includes(role));
 }
 
 
