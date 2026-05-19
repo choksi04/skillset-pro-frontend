@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types/models";
 
 import SetupProgress from "./SetupProgress";
-import ProfileSheet from "./ProfileSheet";
+import ProfilePopover from "./ProfilePopover";
 import {
   Brain,
   Network,
