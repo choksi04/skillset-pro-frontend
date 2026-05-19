@@ -28,6 +28,7 @@ interface SidebarItem {
   href: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  tourKey: string;
 }
 
 interface SidebarGroup {
@@ -39,8 +40,8 @@ const sidebarGroups: SidebarGroup[] = [
   {
     label: "Insights",
     items: [
-      { title: "Dashboard", href: "/", icon: <LayoutDashboard size={18} />, roles: ["admin", "manager", "employee"] },
-      { title: "All Registries", href: "/all-registries", icon: <Database size={18} />, roles: ["admin"] },
+      { title: "Dashboard", href: "/", icon: <LayoutDashboard size={18} />, roles: ["admin", "manager", "employee"], tourKey: "dashboard" },
+      { title: "All Registries", href: "/all-registries", icon: <Database size={18} />, roles: ["admin"], tourKey: "all-registries" },
     ],
   },
   {
@@ -51,41 +52,46 @@ const sidebarGroups: SidebarGroup[] = [
         href: "/skill-registry",
         icon: <BarChart3 size={18} />,
         roles: ["admin", "manager", "employee"],
+        tourKey: "my-registry",
       },
-      { title: "Team Registry", href: "/team-registry", icon: <Users size={18} />, roles: ["admin", "manager"] },
+      { title: "Team Registry", href: "/team-registry", icon: <Users size={18} />, roles: ["admin", "manager"], tourKey: "team-registry" },
       {
         title: "My Assessments",
         href: "/assessments",
         icon: <ClipboardCheck size={18} />,
         roles: ["admin", "manager", "employee"],
+        tourKey: "my-assessments",
       },
       {
         title: "Team Assessments",
         href: "/team-assessments",
         icon: <FileText size={18} />,
         roles: ["admin", "manager"],
+        tourKey: "team-assessments",
       },
     ],
   },
   {
     label: "Settings",
     items: [
-      { title: "Skill Library", href: "/skill-library", icon: <Brain size={18} />, roles: ["admin", "manager"] },
-      { title: "Domains", href: "/domains", icon: <Network size={18} />, roles: ["admin", "manager"] },
-      { title: "Question Bank", href: "/questions", icon: <HelpCircle size={18} />, roles: ["admin", "manager"] },
+      { title: "Skill Library", href: "/skill-library", icon: <Brain size={18} />, roles: ["admin", "manager"], tourKey: "skill-library" },
+      { title: "Domains", href: "/domains", icon: <Network size={18} />, roles: ["admin", "manager"], tourKey: "domains" },
+      { title: "Question Bank", href: "/questions", icon: <HelpCircle size={18} />, roles: ["admin", "manager"], tourKey: "questions" },
       {
         title: "Assessment Config",
         href: "/assessment-config",
         icon: <SlidersHorizontal size={18} />,
         roles: ["admin"],
+        tourKey: "assessment-config",
       },
       {
         title: "Assessment Templates",
         href: "/assessment-templates",
         icon: <LayoutTemplate size={18} />,
         roles: ["admin", "manager"],
+        tourKey: "assessment-templates",
       },
-      { title: "Users", href: "/users", icon: <Users size={18} />, roles: ["admin"] },
+      { title: "Users", href: "/users", icon: <Users size={18} />, roles: ["admin"], tourKey: "users" },
     ],
   },
   {
@@ -96,6 +102,7 @@ const sidebarGroups: SidebarGroup[] = [
         href: "/help",
         icon: <BookOpen size={18} />,
         roles: ["admin", "manager", "employee"],
+        tourKey: "help",
       },
     ],
   },
@@ -159,6 +166,7 @@ export default function AppSidebar() {
                 <NavLink
                   key={item.href}
                   to={item.href}
+                  data-tour={`nav-${item.tourKey}`}
                   end={item.href === "/"}
                   className={({ isActive }) =>
                     `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
