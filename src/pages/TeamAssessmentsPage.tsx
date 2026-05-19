@@ -526,7 +526,7 @@ export default function TeamAssessmentsPage() {
                           <div className="text-sm font-semibold text-card-foreground truncate">
                             {getName(a.employee_id)}
                           </div>
-                          <div className="text-xs text-muted-foreground truncate">{designation || "—"}</div>
+                          {/* <div className="text-xs text-muted-foreground truncate">{email || "—"}</div> */}
                         </div>
                       </div>
                     </TableCell>
