@@ -1,46 +1,56 @@
-## Goal
+# Cleanup Transactional Data for Release
 
-Restructure the list tables in **My Assessments** and **Team Assessments** to clearly separate Achieved Level (AI-derived) and Verified Level (manager-approved), since managers can adjust levels during review.
+Wipe all transactional/operational records so the app launches with a clean slate, while preserving master/configuration data and the three demo accounts.
 
-## New helper
+## Preserved (Master Data)
 
-Add `getVerifiedLevelFromReviews(reviews, attemptId)` to `src/lib/assessmentStatus.ts`:
-- Find the completed review for the given attempt (`review.attempt_id === attemptId && review.status === 'completed'`).
-- Return the rounded average of `skill_reviews[].verified_level` across skills.
-- Returns `{ level: number | null }`. `null` means not verified yet → render as "—".
+- `skill_categories`, `skills`, `skill_topics`, `skills.tags`
+- `domains`, `domain_skill_mappings`
+- `competency_levels`
+- `assessment_config`
+- `assessment_templates`, `assessment_template_questions`, `assessment_template_skills`
+- `questions`
+- `users` (all kept — incl. Admin, John Emp, John Manager demo accounts)
+- `employee_domain_assignments` (master mapping; user↔domain)
 
-## My Assessments page (`src/pages/AssessmentsPage.tsx`)
+## Cleared (Transactional Data)
 
-Replace the current 5 columns with:
+Assessments & attempts:
+- `assessments`
+- `assessment_questions`
+- `assessment_assignments`
+- `assessment_attempts`
+- `attempt_answers`
+- `ai_evaluations`
+- `attempt_skill_scores`
 
-| Column | Content |
-|---|---|
-| **Assessment Details** | Name (bold). Sub-line(s): domain badge, "{N} Questions · {Adaptive/Fixed}", "{duration} mins". |
-| **Status** | Status badge + date line below (same logic as today: Completed/Submitted/Assigned/Created). |
-| **Assigned By** | Unchanged (avatar + name + role/Automated). |
-| **Achieved Level** | If attempt submitted/evaluated/approved → level badge via `getAchievedLevelFromAttempt` + `getFormattedLevelLabel`. Else `—`. |
-| **Verified Level** | If manager review completed → level badge via new `getVerifiedLevelFromReviews`. Else `—`. |
-| **Action** | Unchanged (Start/Resume/View Results). |
+Reviews:
+- `manager_reviews`
+- `review_skill_entries`
+- `reassessment_requests`
 
-Remove the "X / Y correct" sub-label and the inline achieved-level badge currently nested inside the Status cell.
+Skill registries:
+- `skill_registries`
+- `skill_registry_items`
+- `skill_registry_submissions`
+- `skill_self_ratings`
+- `registry_reviews`
+- `registry_review_items`
+- `official_skill_entries`
 
-## Team Assessments page (`src/pages/TeamAssessmentsPage.tsx`)
+Notifications:
+- `notifications`
 
-Replace the current 6 columns with:
+## Technical Notes
 
-| Column | Content |
-|---|---|
-| **Employee** | Unchanged (avatar + name + designation). |
-| **Assessment Details** | Same structure as My Assessments (name + domain + questions/format + duration). |
-| **Status** | Status badge + date below. |
-| **Achieved Level** | Same as My Assessments. |
-| **Verified Level** | Same as My Assessments. |
-| **Action** | Unchanged (Send Reminder / Review / View). |
+- Executed as a single `TRUNCATE ... RESTART IDENTITY CASCADE` via the insert/data tool — schema, RLS, GRANTs, triggers, functions, and config remain untouched (per the database reset policy memory).
+- No migration is needed; this is data-only.
+- After cleanup, the demo users can immediately start a fresh end-to-end cycle (registry → assessment → review).
 
-The existing "Skill Level" column (which mixed AI-derived level + verification badge) is removed; its data is now split across Achieved + Verified columns. Verification filter continues to work (uses `review.status === 'completed'`).
+## Out of Scope
 
-## Out of scope
+- No changes to table structures, policies, edge functions, or app code.
+- Storage buckets unaffected (none exist).
+- Auth users (Supabase `auth.users`) are not touched.
 
-- Manager review logic, DB schema, edge functions.
-- Detail pages (`AssessmentDetailPage`, `ResultSummaryCard`).
-- Filter popover contents (only the table changes).
+Confirm and I'll run the cleanup.
