@@ -314,6 +314,7 @@ export default function CategoryDetailPage() {
         open={skillDialogOpen}
         onOpenChange={setSkillDialogOpen}
         editSkill={editingSkill}
+        categoryId={category?.id}
         categoryName={category?.name}
         onCreated={handleSkillCreated}
       />
