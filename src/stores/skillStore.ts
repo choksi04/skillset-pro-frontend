@@ -17,6 +17,9 @@ export interface Skill {
   tenant_id: string;
   skill_name: string;
   skill_description: string;
+  /** ID of the category this skill belongs to. This is the source of truth. */
+  category_id: string;
+  /** Denormalised category name kept in sync for display. Do NOT use for joins/filters. */
   skill_category: string;
   tags: string[];
   status: 'active' | 'disabled';
@@ -78,6 +81,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
         tenant_id: s.tenant_id,
         skill_name: s.skill_name,
         skill_description: s.skill_description || '',
+        category_id: s.category_id || '',
         skill_category: s.skill_category || '',
         tags: s.tags || [],
         status: s.status as 'active' | 'disabled',
@@ -143,9 +147,21 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       ...updates, modified_at: new Date().toISOString(), modified_by: userId,
     }).eq('id', id);
     if (error) { console.error('Failed to update category:', error); return; }
-    set((state) => ({
-      categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
-    }));
+
+    // If the display name changed, keep the denormalised skills.skill_category label in sync.
+    // (Joins always use category_id; this only refreshes the cached label used in UI lists.)
+    if (typeof updates.name === 'string') {
+      const newName = updates.name;
+      await supabase.from('skills').update({ skill_category: newName }).eq('category_id', id);
+      set((state) => ({
+        categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
+        skills: state.skills.map((s) => s.category_id === id ? { ...s, skill_category: newName } : s),
+      }));
+    } else {
+      set((state) => ({
+        categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
+      }));
+    }
   },
 
   toggleCategoryStatus: async (id) => {
@@ -154,9 +170,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     const newStatus = cat.status === 'active' ? 'disabled' : 'active';
     await get().updateCategory(id, { status: newStatus });
 
-    // When disabling a category, also disable all child skills
+    // When disabling a category, also disable all child skills (resolved by category_id).
     if (newStatus === 'disabled') {
-      const childSkills = get().skills.filter((s) => s.skill_category === cat.name && s.status === 'active');
+      const childSkills = get().skills.filter((s) => s.category_id === cat.id && s.status === 'active');
       for (const skill of childSkills) {
         await get().updateSkill(skill.id, { status: 'disabled' });
       }
@@ -166,15 +182,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   addSkill: async (skill) => {
     const id = `skill-${Date.now()}`;
     const userId = getCurrentUserId();
+    // Keep skill_category (name) in sync with category_id for display purposes.
+    const cat = get().categories.find((c) => c.id === skill.category_id);
+    const categoryName = cat?.name || skill.skill_category || '';
     const { data, error } = await supabase.from('skills').insert({
       id, skill_name: skill.skill_name, skill_description: skill.skill_description,
-      skill_category: skill.skill_category, tags: skill.tags || [], status: skill.status,
+      category_id: skill.category_id, skill_category: categoryName,
+      tags: skill.tags || [], status: skill.status,
       tenant_id: skill.tenant_id, created_by: userId,
-    }).select().single();
+    } as any).select().single();
     if (error) { console.error('Failed to add skill:', error); return undefined; }
     set((state) => ({
       skills: [...state.skills, {
-        ...skill, id, tags: skill.tags || [],
+        ...skill, id, skill_category: categoryName, tags: skill.tags || [],
         created_at: (data as any).created_at, updated_at: (data as any).updated_at,
       }],
     }));
@@ -183,13 +203,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   updateSkill: async (id, updates) => {
     const userId = getCurrentUserId();
+    // If category_id is being changed, keep skill_category (name) in sync.
+    const payload: any = { ...updates };
+    if (updates.category_id) {
+      const cat = get().categories.find((c) => c.id === updates.category_id);
+      if (cat) payload.skill_category = cat.name;
+    }
     const { error } = await supabase.from('skills').update({
-      ...updates, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
+      ...payload, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) { console.error('Failed to update skill:', error); return; }
     set((state) => ({
       skills: state.skills.map((s) =>
-        s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s
+        s.id === id ? { ...s, ...payload, updated_at: new Date().toISOString() } : s
       ),
     }));
   },
@@ -250,7 +276,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   deleteCategory: async (id) => {
     const cat = get().categories.find((c) => c.id === id);
     if (cat) {
-      const skillsInCat = get().skills.filter((s) => s.skill_category === cat.name);
+      const skillsInCat = get().skills.filter((s) => s.category_id === cat.id);
       if (skillsInCat.length > 0) {
         toast.error(`Cannot delete category with ${skillsInCat.length} skill(s). Remove or reassign them first.`);
         return;

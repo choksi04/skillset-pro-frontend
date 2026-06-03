@@ -50,29 +50,35 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
 
   const grouped = useMemo(() => {
     const q = search.toLowerCase();
+    const catNameById = new Map(categories.map((c) => [c.id, c.name]));
     const filtered = q
-      ? activeSkills.filter((s) => s.skill_name.toLowerCase().includes(q) || s.skill_category.toLowerCase().includes(q))
+      ? activeSkills.filter((s) => {
+          const catName = catNameById.get(s.category_id) || '';
+          return s.skill_name.toLowerCase().includes(q) || catName.toLowerCase().includes(q);
+        })
       : activeSkills;
 
-    const map = new Map<string, typeof activeSkills>();
+    // Group by category ID (source of truth), with display name resolved from categories.
+    const map = new Map<string, { name: string; skills: typeof activeSkills }>();
     filtered.forEach((s) => {
-      const cat = s.skill_category || 'Uncategorized';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(s);
+      const catId = s.category_id || '__uncategorised__';
+      const catName = catNameById.get(s.category_id) || 'Uncategorized';
+      if (!map.has(catId)) map.set(catId, { name: catName, skills: [] });
+      map.get(catId)!.skills.push(s);
     });
     return map;
-  }, [activeSkills, search]);
+  }, [activeSkills, search, categories]);
 
-  const toggleExpand = (cat: string) => {
+  const toggleExpand = (catId: string) => {
     setExpandedCats((prev) => {
       const next = new Set(prev);
-      next.has(cat) ? next.delete(cat) : next.add(cat);
+      next.has(catId) ? next.delete(catId) : next.add(catId);
       return next;
     });
   };
 
-  const getCategoryState = (catName: string): 'none' | 'partial' | 'all' => {
-    const catSkills = activeSkills.filter((s) => s.skill_category === catName);
+  const getCategoryState = (catId: string): 'none' | 'partial' | 'all' => {
+    const catSkills = activeSkills.filter((s) => s.category_id === catId);
     if (catSkills.length === 0) return 'none';
     const mapped = catSkills.filter((s) => pendingSkillIds.has(s.id)).length;
     if (mapped === 0) return 'none';
@@ -80,8 +86,8 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
     return 'partial';
   };
 
-  const handleToggleCategory = (catName: string) => {
-    const catSkills = activeSkills.filter((s) => s.skill_category === catName);
+  const handleToggleCategory = (catId: string) => {
+    const catSkills = activeSkills.filter((s) => s.category_id === catId);
     const allMapped = catSkills.every((s) => pendingSkillIds.has(s.id));
 
     setPendingSkillIds((prev) => {
@@ -179,20 +185,20 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
           {grouped.size === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No skills found.</p>
           ) : (
-            Array.from(grouped.entries()).map(([catName, catSkills]) => {
-              const catState = getCategoryState(catName);
-              const isExpanded = expandedCats.has(catName);
+            Array.from(grouped.entries()).map(([catId, { name: catName, skills: catSkills }]) => {
+              const catState = getCategoryState(catId);
+              const isExpanded = expandedCats.has(catId);
               const mappedCount = catSkills.filter((s) => pendingSkillIds.has(s.id)).length;
 
               return (
-                <div key={catName} className="border border-border rounded-lg overflow-hidden">
+                <div key={catId} className="border border-border rounded-lg overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
                     <Checkbox
                       checked={catState === 'all' ? true : catState === 'partial' ? 'indeterminate' : false}
-                      onCheckedChange={() => handleToggleCategory(catName)}
+                      onCheckedChange={() => handleToggleCategory(catId)}
                     />
                     <button
-                      onClick={() => toggleExpand(catName)}
+                      onClick={() => toggleExpand(catId)}
                       className="flex items-center gap-2 flex-1 min-w-0 text-left"
                     >
                       {isExpanded ? <ChevronDown size={14} className="text-muted-foreground shrink-0" /> : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}

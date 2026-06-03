@@ -24,7 +24,7 @@ interface Props {
   mappings: DomainSkillMap[];
   /** Filter: if set, only consider employees in this domain. */
   domainFilter?: string;
-  /** Filter: if set, only consider this skill category (skill_category name). */
+  /** Filter: if set, only consider this skill category (skill_categories.id). */
   categoryFilter?: string;
   /** Threshold level used to define "covered". Default 4. */
   targetLevel?: number;
@@ -80,7 +80,7 @@ export function TopSkillsPanel({
         if (i.self_score === null || i.self_score === undefined) return;
         const sk = skillById.get(i.skill_id);
         if (!sk || sk.status !== 'active') return;
-        if (categoryFilter && sk.skill_category !== categoryFilter) return;
+        if (categoryFilter && sk.category_id !== categoryFilter) return;
         const cur = acc.get(i.skill_id) ?? { sum: 0, n: 0, meets: 0 };
         cur.sum += i.self_score;
         cur.n += 1;

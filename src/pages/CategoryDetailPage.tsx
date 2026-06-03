@@ -65,7 +65,7 @@ export default function CategoryDetailPage() {
 
   const categorySkills = useMemo(() => {
     if (!category) return [];
-    return skills.filter((s) => s.skill_category === category.name);
+    return skills.filter((s) => s.category_id === category.id);
   }, [skills, category]);
 
   const allTags = useMemo(() => {
@@ -314,6 +314,7 @@ export default function CategoryDetailPage() {
         open={skillDialogOpen}
         onOpenChange={setSkillDialogOpen}
         editSkill={editingSkill}
+        categoryId={category?.id}
         categoryName={category?.name}
         onCreated={handleSkillCreated}
       />

@@ -22,11 +22,12 @@ interface SkillFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editSkill?: Skill | null;
+  categoryId?: string;
   categoryName?: string;
   onCreated?: (skillId: string) => void;
 }
 
-export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryName, onCreated }: SkillFormDialogProps) {
+export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryId, categoryName, onCreated }: SkillFormDialogProps) {
   const { addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
 
@@ -74,19 +75,20 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
       return;
     }
 
+    const resolvedCategoryId = categoryId || editSkill?.category_id || '';
     const resolvedCategory = categoryName || editSkill?.skill_category || '';
     setSubmitting(true);
     try {
       if (editSkill) {
         await updateSkill(editSkill.id, {
           skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-          skill_category: resolvedCategory, tags, status,
+          category_id: resolvedCategoryId, skill_category: resolvedCategory, tags, status,
         });
       } else {
         const newId = await addSkill({
           tenant_id: user?.tenant_id ?? 'tenant-001',
           skill_name: result.data.skill_name, skill_description: result.data.skill_description,
-          skill_category: resolvedCategory, tags, status,
+          category_id: resolvedCategoryId, skill_category: resolvedCategory, tags, status,
         });
         if (newId && onCreated) onCreated(newId);
       }

@@ -1416,6 +1416,7 @@ export type Database = {
       }
       skills: {
         Row: {
+          category_id: string | null
           created_at: string
           created_by: string | null
           deleted_by: string | null
@@ -1432,6 +1433,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_by?: string | null
@@ -1448,6 +1450,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_by?: string | null
