@@ -189,7 +189,7 @@ export function EmployeeDashboard() {
     sourceItems.forEach(({ skillId, level }) => {
       const skill = skillById.get(skillId);
       if (!skill) return;
-      const cat = catById.get(skill.skill_category);
+      const cat = catById.get(skill.category_id);
       const key = cat?.id ?? 'uncategorised';
       const name = cat?.name ?? 'Uncategorised';
       const cur = byCat.get(key) ?? { sum: 0, count: 0, name };
