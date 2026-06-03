@@ -40,9 +40,12 @@ export default function DomainSkillMapDialog({ open, onOpenChange, domainId, dom
     }
   };
 
-  // Group skills by category
+  // Group skills by category ID (source of truth), resolving display name from categories.
+  const { categories } = useSkillStore();
+  const catNameById = new Map(categories.map((c) => [c.id, c.name]));
   const grouped = activeSkills.reduce<Record<string, typeof activeSkills>>((acc, skill) => {
-    (acc[skill.skill_category] ??= []).push(skill);
+    const key = catNameById.get(skill.category_id) || 'Uncategorized';
+    (acc[key] ??= []).push(skill);
     return acc;
   }, {});
 
