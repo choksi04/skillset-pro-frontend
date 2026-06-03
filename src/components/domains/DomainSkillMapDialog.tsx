@@ -19,7 +19,7 @@ interface DomainSkillMapDialogProps {
 
 export default function DomainSkillMapDialog({ open, onOpenChange, domainId, domainName }: DomainSkillMapDialogProps) {
   const { mappings, addMapping, removeMapping } = useDomainStore();
-  const { skills } = useSkillStore();
+  const { skills, categories } = useSkillStore();
   const { user } = useAuth();
 
   const activeSkills = skills.filter((s) => s.status === 'active');
