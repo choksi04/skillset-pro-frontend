@@ -481,7 +481,7 @@ function FilteredInsightsRow2({
         skills={skills}
         mappings={mappings}
         domainFilter={filters.domainId || undefined}
-        categoryFilter={filters.categoryName || undefined}
+        categoryFilter={filters.categoryId || undefined}
       />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <DomainReadiness
