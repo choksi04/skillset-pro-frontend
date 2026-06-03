@@ -158,9 +158,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     const newStatus = cat.status === 'active' ? 'disabled' : 'active';
     await get().updateCategory(id, { status: newStatus });
 
-    // When disabling a category, also disable all child skills
+    // When disabling a category, also disable all child skills (resolved by category_id).
     if (newStatus === 'disabled') {
-      const childSkills = get().skills.filter((s) => s.skill_category === cat.name && s.status === 'active');
+      const childSkills = get().skills.filter((s) => s.category_id === cat.id && s.status === 'active');
       for (const skill of childSkills) {
         await get().updateSkill(skill.id, { status: 'disabled' });
       }
@@ -170,15 +170,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   addSkill: async (skill) => {
     const id = `skill-${Date.now()}`;
     const userId = getCurrentUserId();
+    // Keep skill_category (name) in sync with category_id for display purposes.
+    const cat = get().categories.find((c) => c.id === skill.category_id);
+    const categoryName = cat?.name || skill.skill_category || '';
     const { data, error } = await supabase.from('skills').insert({
       id, skill_name: skill.skill_name, skill_description: skill.skill_description,
-      skill_category: skill.skill_category, tags: skill.tags || [], status: skill.status,
+      category_id: skill.category_id, skill_category: categoryName,
+      tags: skill.tags || [], status: skill.status,
       tenant_id: skill.tenant_id, created_by: userId,
-    }).select().single();
+    } as any).select().single();
     if (error) { console.error('Failed to add skill:', error); return undefined; }
     set((state) => ({
       skills: [...state.skills, {
-        ...skill, id, tags: skill.tags || [],
+        ...skill, id, skill_category: categoryName, tags: skill.tags || [],
         created_at: (data as any).created_at, updated_at: (data as any).updated_at,
       }],
     }));
