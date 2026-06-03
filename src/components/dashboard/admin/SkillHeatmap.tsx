@@ -97,16 +97,11 @@ export function SkillHeatmap({
     return out;
   }, [registries, reviewStatuses, mode]);
 
-  // Build category resolver: skills.skill_category stores the category NAME,
-  // but we render columns keyed by category ID. Map both ways to the canonical ID.
-  const categoryIdByKey = useMemo(() => {
-    const m = new Map<string, string>();
-    categories.forEach((c) => {
-      if (c.status !== 'active') return;
-      m.set(c.id, c.id);
-      if (c.name) m.set(c.name.toLowerCase(), c.id);
-    });
-    return m;
+  // Skills are now keyed to categories by category_id (the source of truth).
+  const activeCategoryIds = useMemo(() => {
+    const set = new Set<string>();
+    categories.forEach((c) => { if (c.status === 'active') set.add(c.id); });
+    return set;
   }, [categories]);
 
   const skillById = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
@@ -124,10 +119,10 @@ export function SkillHeatmap({
       const its = items.get(reg.id) ?? [];
       its.forEach((i) => {
         const skill = skillById.get(i.skill_id);
-        if (!skill?.skill_category) return;
+        if (!skill?.category_id) return;
         if (i.self_score === null || i.self_score === undefined) return;
-        const catId = categoryIdByKey.get(skill.skill_category) ?? categoryIdByKey.get(skill.skill_category.toLowerCase());
-        if (!catId) return; // category inactive or missing — skip
+        const catId = skill.category_id;
+        if (!activeCategoryIds.has(catId)) return; // category inactive or missing — skip
         const k = `${empDomain}|${catId}`;
         const cur =
           acc.get(k) ??
