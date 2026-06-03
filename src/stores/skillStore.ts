@@ -191,13 +191,19 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   updateSkill: async (id, updates) => {
     const userId = getCurrentUserId();
+    // If category_id is being changed, keep skill_category (name) in sync.
+    const payload: any = { ...updates };
+    if (updates.category_id) {
+      const cat = get().categories.find((c) => c.id === updates.category_id);
+      if (cat) payload.skill_category = cat.name;
+    }
     const { error } = await supabase.from('skills').update({
-      ...updates, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
+      ...payload, updated_at: new Date().toISOString(), modified_by: userId, modified_at: new Date().toISOString(),
     }).eq('id', id);
     if (error) { console.error('Failed to update skill:', error); return; }
     set((state) => ({
       skills: state.skills.map((s) =>
-        s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s
+        s.id === id ? { ...s, ...payload, updated_at: new Date().toISOString() } : s
       ),
     }));
   },
