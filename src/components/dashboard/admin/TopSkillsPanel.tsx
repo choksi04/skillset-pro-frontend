@@ -24,7 +24,7 @@ interface Props {
   mappings: DomainSkillMap[];
   /** Filter: if set, only consider employees in this domain. */
   domainFilter?: string;
-  /** Filter: if set, only consider this skill category (skill_category name). */
+  /** Filter: if set, only consider this skill category (skill_categories.id). */
   categoryFilter?: string;
   /** Threshold level used to define "covered". Default 4. */
   targetLevel?: number;
