@@ -185,20 +185,20 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
           {grouped.size === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No skills found.</p>
           ) : (
-            Array.from(grouped.entries()).map(([catName, catSkills]) => {
-              const catState = getCategoryState(catName);
-              const isExpanded = expandedCats.has(catName);
+            Array.from(grouped.entries()).map(([catId, { name: catName, skills: catSkills }]) => {
+              const catState = getCategoryState(catId);
+              const isExpanded = expandedCats.has(catId);
               const mappedCount = catSkills.filter((s) => pendingSkillIds.has(s.id)).length;
 
               return (
-                <div key={catName} className="border border-border rounded-lg overflow-hidden">
+                <div key={catId} className="border border-border rounded-lg overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
                     <Checkbox
                       checked={catState === 'all' ? true : catState === 'partial' ? 'indeterminate' : false}
-                      onCheckedChange={() => handleToggleCategory(catName)}
+                      onCheckedChange={() => handleToggleCategory(catId)}
                     />
                     <button
-                      onClick={() => toggleExpand(catName)}
+                      onClick={() => toggleExpand(catId)}
                       className="flex items-center gap-2 flex-1 min-w-0 text-left"
                     >
                       {isExpanded ? <ChevronDown size={14} className="text-muted-foreground shrink-0" /> : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}
