@@ -264,7 +264,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   deleteCategory: async (id) => {
     const cat = get().categories.find((c) => c.id === id);
     if (cat) {
-      const skillsInCat = get().skills.filter((s) => s.skill_category === cat.name);
+      const skillsInCat = get().skills.filter((s) => s.category_id === cat.id);
       if (skillsInCat.length > 0) {
         toast.error(`Cannot delete category with ${skillsInCat.length} skill(s). Remove or reassign them first.`);
         return;
