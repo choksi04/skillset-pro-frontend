@@ -17,6 +17,9 @@ export interface Skill {
   tenant_id: string;
   skill_name: string;
   skill_description: string;
+  /** ID of the category this skill belongs to. This is the source of truth. */
+  category_id: string;
+  /** Denormalised category name kept in sync for display. Do NOT use for joins/filters. */
   skill_category: string;
   tags: string[];
   status: 'active' | 'disabled';
