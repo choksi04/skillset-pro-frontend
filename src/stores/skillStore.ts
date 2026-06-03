@@ -81,6 +81,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
         tenant_id: s.tenant_id,
         skill_name: s.skill_name,
         skill_description: s.skill_description || '',
+        category_id: s.category_id || '',
         skill_category: s.skill_category || '',
         tags: s.tags || [],
         status: s.status as 'active' | 'disabled',
