@@ -22,11 +22,12 @@ interface SkillFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editSkill?: Skill | null;
+  categoryId?: string;
   categoryName?: string;
   onCreated?: (skillId: string) => void;
 }
 
-export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryName, onCreated }: SkillFormDialogProps) {
+export default function SkillFormDialog({ open, onOpenChange, editSkill, categoryId, categoryName, onCreated }: SkillFormDialogProps) {
   const { addSkill, updateSkill } = useSkillStore();
   const { user } = useAuth();
 
