@@ -147,9 +147,21 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       ...updates, modified_at: new Date().toISOString(), modified_by: userId,
     }).eq('id', id);
     if (error) { console.error('Failed to update category:', error); return; }
-    set((state) => ({
-      categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
-    }));
+
+    // If the display name changed, keep the denormalised skills.skill_category label in sync.
+    // (Joins always use category_id; this only refreshes the cached label used in UI lists.)
+    if (typeof updates.name === 'string') {
+      const newName = updates.name;
+      await supabase.from('skills').update({ skill_category: newName }).eq('category_id', id);
+      set((state) => ({
+        categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
+        skills: state.skills.map((s) => s.category_id === id ? { ...s, skill_category: newName } : s),
+      }));
+    } else {
+      set((state) => ({
+        categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
+      }));
+    }
   },
 
   toggleCategoryStatus: async (id) => {
