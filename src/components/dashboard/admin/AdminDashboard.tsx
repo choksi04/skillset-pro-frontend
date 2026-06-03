@@ -419,11 +419,11 @@ function AdminFilterControls({
         .map((u) => ({ value: u.id, label: u.full_name })),
     },
     {
-      key: 'categoryName',
+      key: 'categoryId',
       label: 'Category',
       options: categories
         .filter((c) => c.status === 'active')
-        .map((c) => ({ value: c.name, label: c.name })),
+        .map((c) => ({ value: c.id, label: c.name })),
     },
   ];
   return (
