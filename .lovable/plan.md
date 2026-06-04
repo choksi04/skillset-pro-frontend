@@ -1,30 +1,30 @@
-Hard-delete all data tied to skill category `cat-1777007273580`.
+Hard-delete category **cat-1779952831692** (.NET-Tech) and all related data.
 
 ## Scope
 
-6 skills and all their dependent rows. The category row itself is already gone.
+**Category:** cat-1779952831692 — .NET-Tech (active)
 
-Skills:
-- skill-1777613434497 (.NET MVC)
-- skill-1777613318517 (.NET Core Framework)
-- skill-1777007434211 (Web-API)
-- skill-1777007401235 (C# Fundamental)
-- skill-1777007370794 (ADO.NET)
-- skill-1777007327705 (Ef-Core)
+**Skill (1):** skill-1779952903262 — Design Patterns
 
-## Deletion order (child → parent)
+**Related rows:**
+| Table | Rows |
+|---|---|
+| skill_topics | 3 |
+| questions | 15 |
+| domain_skill_mappings | 1 |
+| assessment_template_skills | 1 |
+| assessment_template_questions | 0 |
+| ai_evaluations / attempt_answers / registry / review / scores | 0 |
 
-1. `ai_evaluations` where `question_id` in target questions
-2. `attempt_answers` where `question_id` in target questions
-3. `assessment_template_questions` where `question_id` in target questions
-4. `questions` (53 rows)
-5. `assessment_template_skills` (12 rows)
-6. `domain_skill_mappings` (9 rows)
-7. `skill_topics` (7 rows)
-8. `skills` (6 rows)
+No transactional data references this skill — safe to hard delete.
 
-All executed in a single SQL transaction via the insert tool so it's atomic.
+## Deletion order
+1. `assessment_template_questions` (via question_id)
+2. `questions`
+3. `assessment_template_skills`
+4. `domain_skill_mappings`
+5. `skill_topics`
+6. `skills`
+7. `skill_categories` (the category row itself)
 
-## Notes
-- Hard delete (not soft) as requested for cleanup.
-- No assessments/attempts/registry items reference these skills, so no transactional data lost.
+Executed atomically via a single CTE statement.
