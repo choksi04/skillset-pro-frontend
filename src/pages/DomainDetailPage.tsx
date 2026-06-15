@@ -64,6 +64,8 @@ export default function DomainDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteCheck, setDeleteCheck] = useState<{ deletable: boolean; reason?: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [leadChangeOpen, setLeadChangeOpen] = useState(false);
+  const [pendingLeadChange, setPendingLeadChange] = useState<string | null>(null);
 
   useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
