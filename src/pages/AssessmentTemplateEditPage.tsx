@@ -412,11 +412,17 @@ export default function AssessmentTemplateEditPage() {
                     <Input
                       type="number"
                       min={1}
-                      max={20}
+                      max={availableSkillPool > 0 ? Math.min(20, availableSkillPool) : 20}
                       value={skillsPerAssessment}
                       onChange={(e) => setSkillsPerAssessment(Number(e.target.value) || 1)}
                     />
+                    {availableSkillPool > 0 && skillsPerAssessment > availableSkillPool && (
+                      <p className="text-[11px] text-destructive">
+                        Only {availableSkillPool} skill{availableSkillPool === 1 ? "" : "s"} available — reduce this value or {skillMode === "custom" ? "pick more skills" : "add more skills to this domain"}.
+                      </p>
+                    )}
                   </div>
+
                   <div className="space-y-1.5">
                     <Label className="text-xs">Questions per Skill</Label>
                     <Input
