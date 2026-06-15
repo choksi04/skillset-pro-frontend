@@ -138,6 +138,12 @@ export default function AssessmentTemplateEditPage() {
   if (!name.trim()) errors.push("Name is required");
   if (duration < 5 || duration > 240) errors.push("Duration must be between 5 and 240 minutes");
   if (maxAttempts < 1) errors.push("Max attempts must be at least 1");
+  const availableSkillPool =
+    type === "adaptive"
+      ? skillMode === "custom"
+        ? pickedSkills.length
+        : skillsForDomain.length
+      : 0;
   if (type === "adaptive") {
     if (!domainId) errors.push("Domain is required for adaptive templates");
     if (questionTypes.length === 0) errors.push("Select at least one question type");
@@ -145,6 +151,12 @@ export default function AssessmentTemplateEditPage() {
       errors.push("Adaptive templates currently support MCQ questions only");
     if (skillMode === "custom" && pickedSkills.length === 0) errors.push("Pick at least one skill (custom mode)");
     if (skillsPerAssessment < 1) errors.push("Skills per assessment must be ≥ 1");
+    if (domainId && availableSkillPool > 0 && skillsPerAssessment > availableSkillPool)
+      errors.push(
+        `Skills per Assessment (${skillsPerAssessment}) exceeds available skills (${availableSkillPool}) in this ${
+          skillMode === "custom" ? "selection" : "domain"
+        }`,
+      );
     if (questionsPerSkill < ADAPTIVE_QPS_MIN || questionsPerSkill > ADAPTIVE_QPS_MAX)
       errors.push(`Questions per skill must be between ${ADAPTIVE_QPS_MIN} and ${ADAPTIVE_QPS_MAX}`);
   } else {
