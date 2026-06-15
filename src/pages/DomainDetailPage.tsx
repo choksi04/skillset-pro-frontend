@@ -293,7 +293,16 @@ export default function DomainDetailPage() {
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
         {canManage && (
-          <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
+          <Select
+            value={domain.domain_lead_id ?? 'none'}
+            onValueChange={(val) => {
+              const current = domain.domain_lead_id ?? 'none';
+              if (val !== current) {
+                setPendingLeadChange(val);
+                setLeadChangeOpen(true);
+              }
+            }}
+          >
             <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
               <SelectValue placeholder="Assign lead…" />
             </SelectTrigger>
