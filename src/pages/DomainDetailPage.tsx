@@ -139,6 +139,13 @@ export default function DomainDetailPage() {
     toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
   };
 
+  const handleConfirmLeadChange = async () => {
+    if (!pendingLeadChange) return;
+    await handleSetLead(pendingLeadChange);
+    setPendingLeadChange(null);
+    setLeadChangeOpen(false);
+  };
+
   const handleRemoveUser = async () => {
     if (!removeTarget) return;
     const userId = getCurrentUserId();
