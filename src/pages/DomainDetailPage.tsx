@@ -584,7 +584,7 @@ export default function DomainDetailPage() {
       <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!open) setDeleteOpen(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Domain</AlertDialogDialogTitle>
+            <AlertDialogTitle>Delete Domain</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteCheck?.deletable
                 ? <>Are you sure you want to delete <strong>{domain?.name}</strong>? This action cannot be undone.</>
