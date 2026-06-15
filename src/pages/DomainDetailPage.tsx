@@ -64,6 +64,8 @@ export default function DomainDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteCheck, setDeleteCheck] = useState<{ deletable: boolean; reason?: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [leadChangeOpen, setLeadChangeOpen] = useState(false);
+  const [pendingLeadChange, setPendingLeadChange] = useState<string | null>(null);
 
   useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
 
@@ -135,6 +137,13 @@ export default function DomainDetailPage() {
       }
     }
     toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
+  };
+
+  const handleConfirmLeadChange = async () => {
+    if (!pendingLeadChange) return;
+    await handleSetLead(pendingLeadChange);
+    setPendingLeadChange(null);
+    setLeadChangeOpen(false);
   };
 
   const handleRemoveUser = async () => {
@@ -291,7 +300,16 @@ export default function DomainDetailPage() {
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
         {canManage && (
-          <Select value={domain.domain_lead_id ?? 'none'} onValueChange={handleSetLead}>
+          <Select
+            value={domain.domain_lead_id ?? 'none'}
+            onValueChange={(val) => {
+              const current = domain.domain_lead_id ?? 'none';
+              if (val !== current) {
+                setPendingLeadChange(val);
+                setLeadChangeOpen(true);
+              }
+            }}
+          >
             <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
               <SelectValue placeholder="Assign lead…" />
             </SelectTrigger>
@@ -584,6 +602,36 @@ export default function DomainDetailPage() {
                 {deleting ? 'Deleting...' : 'Delete'}
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Change Domain Lead Confirm */}
+      <AlertDialog open={leadChangeOpen} onOpenChange={(open) => { if (!open) { setLeadChangeOpen(false); setPendingLeadChange(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingLeadChange === 'none' ? 'Remove Domain Lead?' : 'Change Domain Lead?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingLeadChange === 'none'
+                ? 'Are you sure you want to remove the current domain lead?'
+                : (
+                    <>
+                      Are you sure you want to assign{' '}
+                      <strong>
+                        {eligibleLeads.find((u) => u.id === pendingLeadChange)?.full_name || 'this user'}
+                      </strong>{' '}
+                      as the domain lead?
+                    </>
+                  )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPendingLeadChange(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmLeadChange}>
+              {pendingLeadChange === 'none' ? 'Remove Lead' : 'Assign Lead'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
