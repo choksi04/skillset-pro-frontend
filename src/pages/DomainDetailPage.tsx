@@ -584,7 +584,7 @@ export default function DomainDetailPage() {
       <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!open) setDeleteOpen(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Domain</AlertDialogTitle>
+            <AlertDialogTitle>Delete Domain</AlertDialogDialogTitle>
             <AlertDialogDescription>
               {deleteCheck?.deletable
                 ? <>Are you sure you want to delete <strong>{domain?.name}</strong>? This action cannot be undone.</>
@@ -602,6 +602,36 @@ export default function DomainDetailPage() {
                 {deleting ? 'Deleting...' : 'Delete'}
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Change Domain Lead Confirm */}
+      <AlertDialog open={leadChangeOpen} onOpenChange={(open) => { if (!open) { setLeadChangeOpen(false); setPendingLeadChange(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingLeadChange === 'none' ? 'Remove Domain Lead?' : 'Change Domain Lead?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingLeadChange === 'none'
+                ? 'Are you sure you want to remove the current domain lead?'
+                : (
+                    <>
+                      Are you sure you want to assign{' '}
+                      <strong>
+                        {eligibleLeads.find((u) => u.id === pendingLeadChange)?.full_name || 'this user'}
+                      </strong>{' '}
+                      as the domain lead?
+                    </>
+                  )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPendingLeadChange(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmLeadChange}>
+              {pendingLeadChange === 'none' ? 'Remove Lead' : 'Assign Lead'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
