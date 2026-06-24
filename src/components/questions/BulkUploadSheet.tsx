@@ -224,8 +224,8 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
             <FileSpreadsheet size={18} /> Bulk Upload MCQ Questions
           </SheetTitle>
           <SheetDescription>
-            Configure a scoped template, fill it in offline, then upload to review and import. Only
-            multiple-choice questions with a single correct answer are supported.
+            Upload an existing file or download a fresh template scoped to selected skills and levels.
+            Only multiple-choice questions with a single correct answer are supported.
           </SheetDescription>
         </SheetHeader>
 
