@@ -210,9 +210,6 @@ export async function parseMcqWorkbook(
     }
 
     // (skill scope no longer enforced)
-    void 0;
-      }
-    }
 
     // Topic
     let topic_id: string | null = null;
