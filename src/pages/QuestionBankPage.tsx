@@ -161,6 +161,8 @@ export default function QuestionBankPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   // --- AI generation state ---
   const [aiOpen, setAiOpen] = useState(false);
@@ -619,6 +621,13 @@ export default function QuestionBankPage() {
           >
             <CheckCircle size={14} className="mr-1.5" /> Publish Selected
           </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 size={14} className="mr-1.5" /> Delete Selected
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             Clear
           </Button>
@@ -992,6 +1001,44 @@ export default function QuestionBankPage() {
               }}
             >
               {deleteLoading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={(open) => { if (!open && !bulkDeleteLoading) setBulkDeleteOpen(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} question{selectedIds.size === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the selected questions. Questions linked to existing assessments will be skipped and reported.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={bulkDeleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                setBulkDeleteLoading(true);
+                const ids = Array.from(selectedIds);
+                let success = 0;
+                const skipped: string[] = [];
+                for (const id of ids) {
+                  const result = await deleteQuestion(id);
+                  if (result.success) success++;
+                  else skipped.push(id);
+                }
+                setBulkDeleteLoading(false);
+                setBulkDeleteOpen(false);
+                setSelectedIds(new Set());
+                if (success > 0) toast.success(`Deleted ${success} question(s).`);
+                if (skipped.length > 0) toast.error(`${skipped.length} question(s) could not be deleted (in use by assessments).`);
+              }}
+            >
+              {bulkDeleteLoading ? 'Deleting...' : `Delete ${selectedIds.size}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
