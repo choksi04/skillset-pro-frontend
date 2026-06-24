@@ -161,6 +161,8 @@ export default function QuestionBankPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   // --- AI generation state ---
   const [aiOpen, setAiOpen] = useState(false);
