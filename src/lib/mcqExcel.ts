@@ -143,7 +143,7 @@ export async function parseMcqWorkbook(
   skills: Skill[],
   topicsBySkill: Record<string, SkillTopic[]>,
   levels: CompetencyLevel[],
-  scope?: TemplateScope,
+  _scope?: TemplateScope, // accepted for compatibility; no longer used to block imports
 ): Promise<ParseResult> {
   const buf = await file.arrayBuffer();
   let wb: XLSX.WorkBook;
