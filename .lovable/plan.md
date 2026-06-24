@@ -1,60 +1,49 @@
-# Plan: Excel MCQ Upload + Demo Login
+## Pre-Configured Excel Template for MCQ Upload
 
-## 1. Excel MCQ Bulk Upload
+Enhance the bulk upload flow so users pick skills and competency levels **before** downloading the template. The generated `.xlsx` is pre-scoped to their selection — eliminating typos in `skill_name` and `competency_level`.
 
-A new "Upload from Excel" entry in the Question Bank toolbar. MCQs only.
+### UX Flow (new Step 0 in BulkUploadSheet)
 
-### Standard Excel template
+Add a "Configure Template" step before "Upload File":
 
-Downloadable `.xlsx` template with one sheet `Questions`:
+1. **Select Skills** — Multi-select combobox listing active skills (grouped by category, searchable). At least 1 required.
+2. **Select Competency Levels** — Multi-select chips (Level 1–5, labels pulled dynamically from `competency_levels` table). At least 1 required.
+3. **Download Template** button — generates a tailored `.xlsx` and advances to Step 1 (Upload).
 
-| Column | Required | Notes |
-|---|---|---|
-| skill_name | yes | Must match an existing active skill (case-insensitive) |
-| topic_name | no | Optional; must belong to the resolved skill if provided |
-| competency_level | yes | Level name (e.g. "Beginner") or numeric order |
-| question_text | yes | The MCQ stem |
-| option_1 … option_6 | ≥2 required | Empty options ignored |
-| correct_options | yes | Comma-separated indices (`1` or `1,3`) — single = single-answer, multiple = multi-answer |
-| evaluation_guidelines | no | Free text (typically blank for MCQs per project memory) |
+Existing steps (Upload → Review → Import) remain unchanged.
 
-A second `Instructions` sheet documents each column.
+### Template Structure (revised)
 
-### Upload + Review UX (right-side Sheet)
+The downloaded `.xlsx` will contain **3 sheets**:
 
-1. **File** — drop/select `.xlsx`; "Download template" button. Parsed client-side via SheetJS (`xlsx`).
-2. **Review** — table of parsed rows with badges:
-   - `Valid` (green) — ready to import
-   - `Error` (red) — row-level message (unknown skill, bad level, <2 options, no correct option, etc.)
-   - Inline edit for `competency_level`, `skill`, `correct_options` to fix without re-uploading.
-   - Header summary: `X valid · Y errors`. Only valid rows are importable.
-3. **Approve & Import** — pick default status (Draft recommended, or Published) → inserts via existing `addQuestions` store method with `question_text` serialized in the same JSON shape the MCQ form uses (`{ questionText, options:[{text,correct}], multipleAnswer }`). Toast `Imported N questions`, list refreshes.
+1. **`Questions`** (data entry sheet)
+   - Same columns as today: `skill_name`, `topic_name`, `competency_level`, `question_text`, `option_1..option_4`, `correct_option`, `evaluation_guidelines`.
+   - `skill_name` column → Excel data validation dropdown sourced from selected skills.
+   - `competency_level` column → dropdown sourced from selected levels (e.g. "Level 2 - Beginner").
+   - Pre-seed ~3 empty rows with dropdowns applied for the first 200 rows.
 
-### Validation & safety
-- Hard cap 500 rows per upload.
-- Skill / level resolution against in-memory stores already loaded on the page.
-- Duplicate detection within the file (same skill + question_text) → warning, non-blocking.
-- No backend schema changes — existing `questions` table + `addQuestions` insert path.
+2. **`Selected Scope`** (new reference sheet)
+   - Two tables:
+     - **Selected Skills**: `skill_name`, `category`, `domain` (if any).
+     - **Selected Competency Levels**: `level_number`, `label`, `description`.
+   - Read-only reference for the author; also used as the source range for the dropdowns in `Questions`.
 
-### Files
-- `src/lib/excelTemplate.ts` (new) — build/download template, parse uploads, row validators.
-- `src/components/questions/BulkUploadSheet.tsx` (new) — the 3-step sheet.
-- `src/pages/QuestionBankPage.tsx` — toolbar button + sheet wiring.
-- `package.json` — add `xlsx`.
+3. **`Instructions`** (existing) — updated text noting the dropdowns and that values outside the selected scope will be rejected on import.
 
-## 2. Demo Login (testing only)
+### Validation on Import (Review step)
 
-`LoginPage.tsx` currently shows only the Microsoft SSO button. Restore the email-based demo login that already exists in `AuthContext.login()` so the preview can be tested without publishing.
-
-- Collapsible "Sign in with demo account" section under the SSO button.
-- Quick-pick buttons for the persistent demo accounts (Admin, John Emp, John Manager) + free-form email fallback.
-- Calls `useAuth().login(email)` — no backend changes.
-- Matches existing memory (`auth/login-methods`): SSO primary, demo login as collapsible fallback.
+- Reject rows whose `skill_name` is not in the selected skills list (error: "Skill not in template scope").
+- Reject rows whose `competency_level` is not in the selected levels (error: "Level not in template scope").
+- All other current validations (required fields, exactly 4 options, single correct index 1–4, duplicate detection as warning) remain.
 
 ### Files
-- `src/pages/LoginPage.tsx` only.
 
-## Out of scope
-- CSV upload (Excel only, as confirmed).
-- Coding / Scenario question import.
-- Server-side parsing — all parsing client-side, no edge function.
+- **`src/lib/mcqExcel.ts`** — extend `buildTemplate()` to accept `{ skills, levels }`, add the `Selected Scope` sheet, attach `dataValidation` ranges on `skill_name` and `competency_level` columns (SheetJS `!dataValidation` / formula references to `Selected Scope` ranges).
+- **`src/components/questions/BulkUploadSheet.tsx`** — add Step 0 UI (skill multi-select + level multi-select + Download button), wire selection state, gate the existing upload step behind a successful template download (or allow skip with confirm), and enforce scope validation in the review step.
+- No backend, schema, or store changes.
+
+### Out of Scope
+
+- Pre-seeding question rows with skill/level combinations.
+- Locking the `Questions` sheet against manual typing — Excel dropdowns guide but don't prevent paste-overrides; import-side validation is the safety net.
+- Persisting the user's last selection across sessions.
