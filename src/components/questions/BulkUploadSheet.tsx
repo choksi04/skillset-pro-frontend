@@ -93,7 +93,8 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const warningRows = useMemo(() => rows.filter((r) => r.errors.length === 0 && r.warnings.length > 0), [rows]);
 
   const reset = () => {
-    setStep('configure');
+    setStep('mode');
+    setMode(null);
     setSelectedSkillIds(new Set());
     setSelectedLevelIds(new Set());
     setSkillFilter('');
