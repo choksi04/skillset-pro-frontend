@@ -36,54 +36,75 @@ export const TEMPLATE_HEADERS = [
   'evaluation_guidelines',
 ];
 
-const SAMPLE_ROWS: Record<string, any>[] = [
-  {
-    skill_name: 'React',
-    topic_name: 'Hooks',
-    competency_level: 'Beginner',
-    question_text: 'Which hook is used to manage local component state?',
-    option_1: 'useState',
-    option_2: 'useEffect',
-    option_3: 'useMemo',
-    option_4: 'useRef',
-    correct_option: 1,
-    evaluation_guidelines: '',
-  },
-  {
-    skill_name: 'TypeScript',
-    topic_name: '',
-    competency_level: 'Intermediate',
-    question_text: 'Which keyword defines a non-reassignable variable?',
-    option_1: 'let',
-    option_2: 'var',
-    option_3: 'const',
-    option_4: 'static',
-    correct_option: 3,
-    evaluation_guidelines: '',
-  },
-];
+export interface TemplateScope {
+  skills: Skill[];
+  levels: CompetencyLevel[];
+}
 
-export function downloadMcqTemplate() {
+export function downloadMcqTemplate(scope: TemplateScope) {
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: Questions with sample rows
-  const wsQuestions = XLSX.utils.json_to_sheet(SAMPLE_ROWS, { header: TEMPLATE_HEADERS });
-  // Column widths
+  const skillNames = scope.skills.map((s) => s.skill_name);
+  const levelLabels = scope.levels
+    .slice()
+    .sort((a, b) => a.level - b.level)
+    .map((l) => l.label);
+
+  // Sheet 1: Questions — empty rows pre-seeded with the first selected skill/level as a hint
+  const firstSkill = skillNames[0] ?? '';
+  const firstLevel = levelLabels[0] ?? '';
+  const seedRow = {
+    skill_name: firstSkill,
+    topic_name: '',
+    competency_level: firstLevel,
+    question_text: '',
+    option_1: '',
+    option_2: '',
+    option_3: '',
+    option_4: '',
+    correct_option: '',
+    evaluation_guidelines: '',
+  };
+  const seedRows = Array.from({ length: 3 }, () => ({ ...seedRow }));
+  const wsQuestions = XLSX.utils.json_to_sheet(seedRows, { header: TEMPLATE_HEADERS });
   (wsQuestions as any)['!cols'] = [
-    { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 50 },
+    { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 50 },
     { wch: 24 }, { wch: 24 }, { wch: 24 }, { wch: 24 },
     { wch: 14 }, { wch: 30 },
   ];
   XLSX.utils.book_append_sheet(wb, wsQuestions, 'Questions');
 
-  // Sheet 2: Instructions
+  // Sheet 2: Selected Scope — the source of truth for valid values in this template
+  const scopeAoa: any[][] = [
+    ['Selected Scope — use ONLY these values in the Questions sheet'],
+    [],
+    ['Selected Skills'],
+    ['skill_name', 'category'],
+    ...scope.skills.map((s) => [s.skill_name, s.skill_category || '']),
+    [],
+    ['Selected Competency Levels'],
+    ['level', 'label', 'description'],
+    ...scope.levels
+      .slice()
+      .sort((a, b) => a.level - b.level)
+      .map((l) => [l.level, l.label, l.description || '']),
+  ];
+  const wsScope = XLSX.utils.aoa_to_sheet(scopeAoa);
+  (wsScope as any)['!cols'] = [{ wch: 28 }, { wch: 28 }, { wch: 60 }];
+  XLSX.utils.book_append_sheet(wb, wsScope, 'Selected Scope');
+
+  // Sheet 3: Instructions
   const instructions = [
     ['MCQ Bulk Upload — Template Instructions'],
     [],
+    ['This template is pre-scoped to the skills and competency levels you selected.'],
+    ['Open the "Selected Scope" sheet to see the allowed values.'],
+    ['Rows that reference a skill or level outside that scope will be rejected on import.'],
+    [],
     ['Column', 'Required', 'Description'],
-    ['skill_name', 'Yes', 'Must match an existing active skill name (case-insensitive).'],
+    ['skill_name', 'Yes', 'Must match a name in Selected Scope → Selected Skills (case-insensitive).'],
     ['topic_name', 'No', 'Optional. Must belong to the resolved skill if provided.'],
-    ['competency_level', 'Yes', 'Level name (e.g. Beginner) OR numeric level (1-5).'],
+    ['competency_level', 'Yes', 'Must match a label in Selected Scope (e.g. "Beginner") OR the level number (1-5).'],
     ['question_text', 'Yes', 'The MCQ question stem.'],
     ['option_1', 'Yes', 'Answer option 1.'],
     ['option_2', 'Yes', 'Answer option 2.'],
@@ -94,8 +115,9 @@ export function downloadMcqTemplate() {
     [],
     ['Notes:'],
     ['• Only MCQ (single correct answer) is supported by this template.'],
-    ['• Maximum 500 rows per upload.'],
-    ['• Replace the sample rows in the Questions sheet with your own data.'],
+    [`• Maximum ${MAX_ROWS} rows per upload.`],
+    ['• Replace the seeded rows in the Questions sheet with your own data.'],
+    ['• Tip: copy/paste skill_name and competency_level values directly from the Selected Scope sheet to avoid typos.'],
   ];
   const wsInstr = XLSX.utils.aoa_to_sheet(instructions);
   (wsInstr as any)['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 70 }];
@@ -106,9 +128,6 @@ export function downloadMcqTemplate() {
 
 function norm(s: any): string {
   return String(s ?? '').trim();
-}
-function normLower(s: any): string {
-  return norm(s).toLowerCase();
 }
 
 export const MAX_ROWS = 500;
@@ -124,6 +143,7 @@ export async function parseMcqWorkbook(
   skills: Skill[],
   topicsBySkill: Record<string, SkillTopic[]>,
   levels: CompetencyLevel[],
+  scope?: TemplateScope,
 ): Promise<ParseResult> {
   const buf = await file.arrayBuffer();
   let wb: XLSX.WorkBook;
@@ -144,6 +164,10 @@ export async function parseMcqWorkbook(
 
   const tooManyRows = json.length > MAX_ROWS;
   const limited = json.slice(0, MAX_ROWS);
+
+  // Scope restrictions (if provided)
+  const scopedSkillIds = scope ? new Set(scope.skills.map((s) => s.id)) : null;
+  const scopedLevelIds = scope ? new Set(scope.levels.map((l) => l.id)) : null;
 
   // Lookups
   const skillByName = new Map<string, Skill>();
@@ -181,7 +205,12 @@ export async function parseMcqWorkbook(
     else {
       const sk = skillByName.get(skill_name.toLowerCase());
       if (!sk) errors.push(`Unknown skill "${skill_name}"`);
-      else skill_id = sk.id;
+      else {
+        skill_id = sk.id;
+        if (scopedSkillIds && !scopedSkillIds.has(sk.id)) {
+          errors.push(`Skill "${skill_name}" is not in this template's scope`);
+        }
+      }
     }
 
     // Topic
@@ -203,6 +232,9 @@ export async function parseMcqWorkbook(
       else {
         competency_level_id = lv.id;
         competency_level_label = lv.label;
+        if (scopedLevelIds && !scopedLevelIds.has(lv.id)) {
+          errors.push(`Competency level "${competency_level_input}" is not in this template's scope`);
+        }
       }
     }
 
