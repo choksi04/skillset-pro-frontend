@@ -155,6 +155,7 @@ export default function QuestionBankPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | 'ai' | 'manual'>('all');
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent');
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
