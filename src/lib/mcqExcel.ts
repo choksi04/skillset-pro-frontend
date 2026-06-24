@@ -230,7 +230,6 @@ export async function parseMcqWorkbook(
       else {
         competency_level_id = lv.id;
         competency_level_label = lv.label;
-        if (scopedLevelIds && !scopedLevelIds.has(lv.id)) {
           errors.push(`Competency level "${competency_level_input}" is not in this template's scope`);
         }
       }
