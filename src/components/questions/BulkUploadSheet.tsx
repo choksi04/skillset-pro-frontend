@@ -4,18 +4,21 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, Settings2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
 import { useQuestionStore } from '@/stores/questionStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  ParsedMcqRow, downloadMcqTemplate, parseMcqWorkbook, buildMcqQuestionTextJson, MAX_ROWS,
+  ParsedMcqRow, TemplateScope, downloadMcqTemplate, parseMcqWorkbook, buildMcqQuestionTextJson, MAX_ROWS,
 } from '@/lib/mcqExcel';
 
 interface Props {
@@ -23,7 +26,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'file' | 'review';
+type Step = 'configure' | 'file' | 'review';
 
 export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
@@ -31,7 +34,12 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { addQuestions } = useQuestionStore();
   const { user } = useAuth();
 
-  const [step, setStep] = useState<Step>('file');
+  const [step, setStep] = useState<Step>('configure');
+  const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
+  const [selectedLevelIds, setSelectedLevelIds] = useState<Set<string>>(new Set());
+  const [skillFilter, setSkillFilter] = useState('');
+  const [scope, setScope] = useState<TemplateScope | null>(null);
+
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<ParsedMcqRow[]>([]);
   const [parsing, setParsing] = useState(false);
@@ -46,8 +54,6 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
     }
   }, [open, skills.length, levels.length, fetchSkills, fetchLevels]);
 
-  // When user opens, ensure topics for skills referenced in the file are loaded.
-  // We lazy-load topics for all skills mentioned in parsed rows.
   useEffect(() => {
     if (rows.length === 0) return;
     const skillIds = new Set(rows.map((r) => r.skill_id).filter(Boolean) as string[]);
@@ -56,12 +62,40 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
     });
   }, [rows, topics, fetchTopicsForSkill]);
 
+  const activeSkills = useMemo(() => skills.filter((s) => s.status === 'active'), [skills]);
+  const activeLevels = useMemo(
+    () => levels.filter((l) => l.status === 'active').slice().sort((a, b) => a.level - b.level),
+    [levels],
+  );
+
+  const skillsByCategory = useMemo(() => {
+    const q = skillFilter.trim().toLowerCase();
+    const filtered = q
+      ? activeSkills.filter(
+          (s) =>
+            s.skill_name.toLowerCase().includes(q) ||
+            (s.skill_category || '').toLowerCase().includes(q),
+        )
+      : activeSkills;
+    const map = new Map<string, typeof filtered>();
+    for (const s of filtered) {
+      const cat = s.skill_category || 'Uncategorized';
+      if (!map.has(cat)) map.set(cat, [] as any);
+      (map.get(cat) as any).push(s);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [activeSkills, skillFilter]);
+
   const validRows = useMemo(() => rows.filter((r) => r.errors.length === 0), [rows]);
   const errorRows = useMemo(() => rows.filter((r) => r.errors.length > 0), [rows]);
   const warningRows = useMemo(() => rows.filter((r) => r.errors.length === 0 && r.warnings.length > 0), [rows]);
 
   const reset = () => {
-    setStep('file');
+    setStep('configure');
+    setSelectedSkillIds(new Set());
+    setSelectedLevelIds(new Set());
+    setSkillFilter('');
+    setScope(null);
     setFile(null);
     setRows([]);
     setImporting(false);
@@ -74,11 +108,57 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
     onOpenChange(next);
   };
 
+  const toggleSkill = (id: string) => {
+    setSelectedSkillIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleLevel = (id: string) => {
+    setSelectedLevelIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const selectAllVisibleSkills = () => {
+    setSelectedSkillIds((prev) => {
+      const next = new Set(prev);
+      skillsByCategory.forEach(([, list]) => list.forEach((s: any) => next.add(s.id)));
+      return next;
+    });
+  };
+  const clearSkills = () => setSelectedSkillIds(new Set());
+
+  const buildScope = (): TemplateScope | null => {
+    const chosenSkills = activeSkills.filter((s) => selectedSkillIds.has(s.id));
+    const chosenLevels = activeLevels.filter((l) => selectedLevelIds.has(l.id));
+    if (chosenSkills.length === 0) {
+      toast.error('Select at least one skill.');
+      return null;
+    }
+    if (chosenLevels.length === 0) {
+      toast.error('Select at least one competency level.');
+      return null;
+    }
+    return { skills: chosenSkills, levels: chosenLevels };
+  };
+
+  const handleDownloadTemplate = () => {
+    const s = buildScope();
+    if (!s) return;
+    setScope(s);
+    downloadMcqTemplate(s);
+    toast.success('Template downloaded. Fill it in, then upload below.');
+    setStep('file');
+  };
+
   const handleFile = async (f: File) => {
     setFile(f);
     setParsing(true);
     try {
-      const result = await parseMcqWorkbook(f, skills, topics, levels);
+      const result = await parseMcqWorkbook(f, skills, topics, levels, scope ?? undefined);
       if (result.fileError) {
         toast.error(result.fileError);
         setFile(null);
@@ -141,17 +221,154 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
             <FileSpreadsheet size={18} /> Bulk Upload MCQ Questions
           </SheetTitle>
           <SheetDescription>
-            Upload MCQs from an Excel file using the standard template. Only multiple-choice questions
-            with a single correct answer are supported.
+            Configure a scoped template, fill it in offline, then upload to review and import. Only
+            multiple-choice questions with a single correct answer are supported.
           </SheetDescription>
         </SheetHeader>
 
+        {/* Step indicator */}
+        <div className="mt-4 flex items-center gap-2 text-xs">
+          {(['configure', 'file', 'review'] as Step[]).map((s, i) => {
+            const isActive = step === s;
+            const isDone =
+              (s === 'configure' && step !== 'configure') ||
+              (s === 'file' && step === 'review');
+            const label = s === 'configure' ? '1. Configure' : s === 'file' ? '2. Upload' : '3. Review & Import';
+            return (
+              <div key={s} className="flex items-center gap-2">
+                <span
+                  className={
+                    'px-2 py-0.5 rounded-md border ' +
+                    (isActive
+                      ? 'border-primary text-primary bg-primary/5'
+                      : isDone
+                      ? 'border-success/40 text-success'
+                      : 'border-border text-muted-foreground')
+                  }
+                >
+                  {label}
+                </span>
+                {i < 2 && <ArrowRight size={12} className="text-muted-foreground" />}
+              </div>
+            );
+          })}
+        </div>
+
+        {step === 'configure' && (
+          <div className="mt-6 space-y-6">
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Settings2 size={14} /> Select skills
+                  <Badge variant="outline" className="text-[10px]">
+                    {selectedSkillIds.size} selected
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={selectAllVisibleSkills}>
+                    Select visible
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={clearSkills}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <Input
+                placeholder="Search skills or categories…"
+                value={skillFilter}
+                onChange={(e) => setSkillFilter(e.target.value)}
+                className="h-8"
+              />
+              <ScrollArea className="h-64 rounded-md border border-border">
+                <div className="p-2 space-y-3">
+                  {skillsByCategory.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-3">No skills match your search.</p>
+                  )}
+                  {skillsByCategory.map(([cat, list]) => (
+                    <div key={cat}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 mb-1">
+                        {cat}
+                      </p>
+                      <div className="space-y-1">
+                        {list.map((s: any) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedSkillIds.has(s.id)}
+                              onCheckedChange={() => toggleSkill(s.id)}
+                            />
+                            <span className="text-xs">{s.skill_name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+
+            <div className="rounded-lg border border-border p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Settings2 size={14} /> Select competency levels
+                <Badge variant="outline" className="text-[10px]">
+                  {selectedLevelIds.size} selected
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {activeLevels.map((l) => {
+                  const checked = selectedLevelIds.has(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => toggleLevel(l.id)}
+                      className={
+                        'text-xs px-3 py-1.5 rounded-md border transition ' +
+                        (checked
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:bg-accent')
+                      }
+                    >
+                      L{l.level} · {l.label}
+                    </button>
+                  );
+                })}
+                {activeLevels.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No competency levels configured.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1.5">
+              <p className="font-medium text-foreground">How it works</p>
+              <p>
+                The downloaded template includes a <strong>Selected Scope</strong> sheet listing the
+                exact skill names and level labels you can use. Rows referencing anything outside
+                that scope will be rejected on import.
+              </p>
+            </div>
+          </div>
+        )}
+
         {step === 'file' && (
           <div className="mt-6 space-y-6">
+            {scope && (
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">Template scoped to:</span>
+                <Badge variant="outline">{scope.skills.length} skill{scope.skills.length === 1 ? '' : 's'}</Badge>
+                <Badge variant="outline">{scope.levels.length} level{scope.levels.length === 1 ? '' : 's'}</Badge>
+                <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1" onClick={() => setStep('configure')}>
+                  <Settings2 size={12} /> Change
+                </Button>
+              </div>
+            )}
+
             <div className="rounded-lg border border-dashed border-border p-8 text-center space-y-4">
               <FileSpreadsheet className="mx-auto text-muted-foreground" size={36} />
               <div>
-                <p className="text-sm font-medium">Select an Excel file (.xlsx)</p>
+                <p className="text-sm font-medium">Upload your completed template (.xlsx)</p>
                 <p className="text-xs text-muted-foreground mt-1">Max {MAX_ROWS} rows per upload</p>
               </div>
               <input
@@ -170,21 +387,12 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
                   {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   {parsing ? 'Parsing…' : 'Choose File'}
                 </Button>
-                <Button variant="outline" onClick={downloadMcqTemplate} className="gap-1.5">
-                  <Download size={14} /> Download Template
-                </Button>
+                {scope && (
+                  <Button variant="outline" onClick={() => downloadMcqTemplate(scope)} className="gap-1.5">
+                    <Download size={14} /> Re-download Template
+                  </Button>
+                )}
               </div>
-            </div>
-
-            <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1.5">
-              <p className="font-medium text-foreground">Template columns</p>
-              <p>
-                <code className="text-foreground">skill_name</code>, <code className="text-foreground">topic_name</code>,
-                <code className="text-foreground"> competency_level</code>, <code className="text-foreground">question_text</code>,
-                <code className="text-foreground"> option_1…option_4</code>, <code className="text-foreground">correct_option</code> (1-4),
-                <code className="text-foreground"> evaluation_guidelines</code>.
-              </p>
-              <p>See the <strong>Instructions</strong> sheet inside the template for details.</p>
             </div>
           </div>
         )}
@@ -210,7 +418,7 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
                   {file?.name}
                 </span>
               </div>
-              <Button variant="ghost" size="sm" onClick={reset} className="gap-1">
+              <Button variant="ghost" size="sm" onClick={() => { setFile(null); setRows([]); setStep('file'); }} className="gap-1">
                 <X size={14} /> Choose different file
               </Button>
             </div>
@@ -292,6 +500,15 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
 
         <SheetFooter className="mt-6">
           <Button variant="outline" onClick={() => handleClose(false)}>Cancel</Button>
+          {step === 'configure' && (
+            <Button
+              onClick={handleDownloadTemplate}
+              disabled={selectedSkillIds.size === 0 || selectedLevelIds.size === 0}
+              className="gap-1.5"
+            >
+              <Download size={14} /> Download Template
+            </Button>
+          )}
           {step === 'review' && (
             <Button onClick={handleImport} disabled={importing || validRows.length === 0} className="gap-1.5">
               {importing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
