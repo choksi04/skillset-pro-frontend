@@ -550,7 +550,7 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
             <div className="flex items-center gap-3">
               <label className="text-xs text-muted-foreground">Import as:</label>
               <Select value={defaultStatus} onValueChange={(v) => setDefaultStatus(v as 'draft' | 'published')}>
-                <SelectTrigger className="h-8 w-40 text-xs">
+                <SelectTrigger className="h-8 w-auto min-w-[180px] text-xs [&>span]:truncate">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
