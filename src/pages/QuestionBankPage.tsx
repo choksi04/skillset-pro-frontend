@@ -621,6 +621,13 @@ export default function QuestionBankPage() {
           >
             <CheckCircle size={14} className="mr-1.5" /> Publish Selected
           </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 size={14} className="mr-1.5" /> Delete Selected
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             Clear
           </Button>
