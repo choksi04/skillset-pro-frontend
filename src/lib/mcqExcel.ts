@@ -165,9 +165,8 @@ export async function parseMcqWorkbook(
   const tooManyRows = json.length > MAX_ROWS;
   const limited = json.slice(0, MAX_ROWS);
 
-  // Scope restrictions (if provided)
-  const scopedSkillIds = scope ? new Set(scope.skills.map((s) => s.id)) : null;
-  const scopedLevelIds = scope ? new Set(scope.levels.map((l) => l.id)) : null;
+  // Scope is no longer enforced at import time — templates may be days old.
+  // A skill/level that resolves against the active lists is always accepted.
 
   // Lookups
   const skillByName = new Map<string, Skill>();
