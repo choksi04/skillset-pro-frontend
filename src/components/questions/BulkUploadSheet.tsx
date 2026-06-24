@@ -35,7 +35,8 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { addQuestions } = useQuestionStore();
   const { user } = useAuth();
 
-  const [step, setStep] = useState<Step>('configure');
+  const [step, setStep] = useState<Step>('mode');
+  const [mode, setMode] = useState<Mode | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
   const [selectedLevelIds, setSelectedLevelIds] = useState<Set<string>>(new Set());
   const [skillFilter, setSkillFilter] = useState('');
