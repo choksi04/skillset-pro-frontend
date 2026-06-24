@@ -143,7 +143,7 @@ export async function parseMcqWorkbook(
   skills: Skill[],
   topicsBySkill: Record<string, SkillTopic[]>,
   levels: CompetencyLevel[],
-  scope?: TemplateScope,
+  _scope?: TemplateScope, // accepted for compatibility; no longer used to block imports
 ): Promise<ParseResult> {
   const buf = await file.arrayBuffer();
   let wb: XLSX.WorkBook;
@@ -165,9 +165,8 @@ export async function parseMcqWorkbook(
   const tooManyRows = json.length > MAX_ROWS;
   const limited = json.slice(0, MAX_ROWS);
 
-  // Scope restrictions (if provided)
-  const scopedSkillIds = scope ? new Set(scope.skills.map((s) => s.id)) : null;
-  const scopedLevelIds = scope ? new Set(scope.levels.map((l) => l.id)) : null;
+  // Scope is no longer enforced at import time — templates may be days old.
+  // A skill/level that resolves against the active lists is always accepted.
 
   // Lookups
   const skillByName = new Map<string, Skill>();
@@ -207,11 +206,10 @@ export async function parseMcqWorkbook(
       if (!sk) errors.push(`Unknown skill "${skill_name}"`);
       else {
         skill_id = sk.id;
-        if (scopedSkillIds && !scopedSkillIds.has(sk.id)) {
-          errors.push(`Skill "${skill_name}" is not in this template's scope`);
-        }
       }
     }
+
+    // (skill scope no longer enforced)
 
     // Topic
     let topic_id: string | null = null;
@@ -232,9 +230,6 @@ export async function parseMcqWorkbook(
       else {
         competency_level_id = lv.id;
         competency_level_label = lv.label;
-        if (scopedLevelIds && !scopedLevelIds.has(lv.id)) {
-          errors.push(`Competency level "${competency_level_input}" is not in this template's scope`);
-        }
       }
     }
 

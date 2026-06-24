@@ -26,7 +26,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'configure' | 'file' | 'review';
+type Step = 'mode' | 'configure' | 'file' | 'review';
+type Mode = 'direct' | 'template';
 
 export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
@@ -34,7 +35,8 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { addQuestions } = useQuestionStore();
   const { user } = useAuth();
 
-  const [step, setStep] = useState<Step>('configure');
+  const [step, setStep] = useState<Step>('mode');
+  const [mode, setMode] = useState<Mode | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
   const [selectedLevelIds, setSelectedLevelIds] = useState<Set<string>>(new Set());
   const [skillFilter, setSkillFilter] = useState('');
@@ -91,7 +93,8 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const warningRows = useMemo(() => rows.filter((r) => r.errors.length === 0 && r.warnings.length > 0), [rows]);
 
   const reset = () => {
-    setStep('configure');
+    setStep('mode');
+    setMode(null);
     setSelectedSkillIds(new Set());
     setSelectedLevelIds(new Set());
     setSkillFilter('');
@@ -221,38 +224,98 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
             <FileSpreadsheet size={18} /> Bulk Upload MCQ Questions
           </SheetTitle>
           <SheetDescription>
-            Configure a scoped template, fill it in offline, then upload to review and import. Only
-            multiple-choice questions with a single correct answer are supported.
+            Upload an existing file or download a fresh template scoped to selected skills and levels.
+            Only multiple-choice questions with a single correct answer are supported.
           </SheetDescription>
         </SheetHeader>
 
         {/* Step indicator */}
-        <div className="mt-4 flex items-center gap-2 text-xs">
-          {(['configure', 'file', 'review'] as Step[]).map((s, i) => {
-            const isActive = step === s;
-            const isDone =
-              (s === 'configure' && step !== 'configure') ||
-              (s === 'file' && step === 'review');
-            const label = s === 'configure' ? '1. Configure' : s === 'file' ? '2. Upload' : '3. Review & Import';
-            return (
-              <div key={s} className="flex items-center gap-2">
-                <span
-                  className={
-                    'px-2 py-0.5 rounded-md border ' +
-                    (isActive
-                      ? 'border-primary text-primary bg-primary/5'
-                      : isDone
-                      ? 'border-success/40 text-success'
-                      : 'border-border text-muted-foreground')
-                  }
-                >
-                  {label}
-                </span>
-                {i < 2 && <ArrowRight size={12} className="text-muted-foreground" />}
-              </div>
-            );
-          })}
+        <div className="mt-4 flex items-center gap-2 text-xs flex-wrap">
+          {(() => {
+            const steps: { key: Step; label: string }[] =
+              mode === 'template'
+                ? [
+                    { key: 'configure', label: '1. Configure Template' },
+                    { key: 'file', label: '2. Upload' },
+                    { key: 'review', label: '3. Review & Import' },
+                  ]
+                : [
+                    { key: 'file', label: '1. Upload' },
+                    { key: 'review', label: '2. Review & Import' },
+                  ];
+            const order: Step[] = steps.map((s) => s.key);
+            const currentIdx = order.indexOf(step);
+            return steps.map((s, i) => {
+              const isActive = step === s.key;
+              const isDone = currentIdx > i;
+              return (
+                <div key={s.key} className="flex items-center gap-2">
+                  <span
+                    className={
+                      'px-2 py-0.5 rounded-md border ' +
+                      (isActive
+                        ? 'border-primary text-primary bg-primary/5'
+                        : isDone
+                        ? 'border-success/40 text-success'
+                        : 'border-border text-muted-foreground')
+                    }
+                  >
+                    {s.label}
+                  </span>
+                  {i < steps.length - 1 && <ArrowRight size={12} className="text-muted-foreground" />}
+                </div>
+              );
+            });
+          })()}
+          {mode && step !== 'mode' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 ml-auto text-[11px]"
+              onClick={() => {
+                setMode(null);
+                setScope(null);
+                setFile(null);
+                setRows([]);
+                setStep('mode');
+              }}
+            >
+              Change mode
+            </Button>
+          )}
         </div>
+
+        {step === 'mode' && (
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => { setMode('direct'); setScope(null); setStep('file'); }}
+              className="text-left rounded-lg border border-border p-4 hover:border-primary hover:bg-primary/5 transition"
+            >
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Upload size={16} /> Upload a file I already have
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Best if you've already prepared an .xlsx file. We'll validate it against the current
+                active skills and competency levels.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('template'); setStep('configure'); }}
+              className="text-left rounded-lg border border-border p-4 hover:border-primary hover:bg-primary/5 transition"
+            >
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Download size={16} /> Download a fresh template
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Pick the skills and competency levels you'll author for. We'll generate a template
+                with those values listed for reference.
+              </p>
+            </button>
+          </div>
+        )}
+
 
         {step === 'configure' && (
           <div className="mt-6 space-y-6">
@@ -345,8 +408,9 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
               <p className="font-medium text-foreground">How it works</p>
               <p>
                 The downloaded template includes a <strong>Selected Scope</strong> sheet listing the
-                exact skill names and level labels you can use. Rows referencing anything outside
-                that scope will be rejected on import.
+                skill names and level labels you picked, as a reference while you author. On import
+                we validate against the current active skills and levels — so you can come back days
+                later and still upload.
               </p>
             </div>
           </div>

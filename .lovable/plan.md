@@ -1,49 +1,57 @@
-## Pre-Configured Excel Template for MCQ Upload
+## Two Upload Modes + Fix False "Out of Scope" Errors
 
-Enhance the bulk upload flow so users pick skills and competency levels **before** downloading the template. The generated `.xlsx` is pre-scoped to their selection — eliminating typos in `skill_name` and `competency_level`.
+### Problem
+1. The current flow forces every user through Step 0 (select skills + levels) before they can upload. Real users download the template, fill it offline over days, then come back to upload — by then the original scope is irrelevant.
+2. Even when "JavaScript" is clearly in both the skill list and the file, the importer flags it as "not in this template's scope". Root cause: the upload step always reuses the in-memory `scope` state from Step 0 to validate, so any mismatch (different casing of selection, skill re-fetched with a new `id`, or skipping Step 0 entirely) triggers the scope error — even though the skill exists and is active.
 
-### UX Flow (new Step 0 in BulkUploadSheet)
+### Fix — Mode Picker on Step 0
 
-Add a "Configure Template" step before "Upload File":
+Replace the single "Configure Template" step with a two-choice entry screen:
 
-1. **Select Skills** — Multi-select combobox listing active skills (grouped by category, searchable). At least 1 required.
-2. **Select Competency Levels** — Multi-select chips (Level 1–5, labels pulled dynamically from `competency_levels` table). At least 1 required.
-3. **Download Template** button — generates a tailored `.xlsx` and advances to Step 1 (Upload).
+```text
+┌─ How do you want to upload? ─────────────────┐
+│  ○ Upload a file I already have              │
+│      → goes straight to Step 1 (Upload)      │
+│  ○ Download a fresh template                 │
+│      → opens skill + level selectors,        │
+│        Download button, then Step 1          │
+└──────────────────────────────────────────────┘
+```
 
-Existing steps (Upload → Review → Import) remain unchanged.
+- **Direct Upload mode**: no scope is captured. Validation uses the full active skill list and full active competency-level list. No "not in template's scope" errors are possible.
+- **Download Template mode**: same selectors as today; the generated `.xlsx` carries the chosen skills/levels on the `Selected Scope` sheet. On upload, validation again uses the full active skill/level lists — the scope sheet is purely a reference for the author, not an import-time restriction.
 
-### Template Structure (revised)
+The user can switch modes at any time via a small "Change mode" link on the upload step.
 
-The downloaded `.xlsx` will contain **3 sheets**:
+### Fix — Remove Hard Scope Enforcement on Import
 
-1. **`Questions`** (data entry sheet)
-   - Same columns as today: `skill_name`, `topic_name`, `competency_level`, `question_text`, `option_1..option_4`, `correct_option`, `evaluation_guidelines`.
-   - `skill_name` column → Excel data validation dropdown sourced from selected skills.
-   - `competency_level` column → dropdown sourced from selected levels (e.g. "Level 2 - Beginner").
-   - Pre-seed ~3 empty rows with dropdowns applied for the first 200 rows.
+In `parseMcqWorkbook`:
+- Drop the `scope?: TemplateScope` parameter usage that promotes "outside scope" to an **error**.
+- A skill or level that resolves successfully against the active lists is always accepted, regardless of what was on the template sheet.
+- If we still want gentle feedback, surface "Not in the template's selected scope" only as a **warning** (yellow), never as an error that blocks import. Default: skip the warning too, since templates may be days old.
 
-2. **`Selected Scope`** (new reference sheet)
-   - Two tables:
-     - **Selected Skills**: `skill_name`, `category`, `domain` (if any).
-     - **Selected Competency Levels**: `level_number`, `label`, `description`.
-   - Read-only reference for the author; also used as the source range for the dropdowns in `Questions`.
-
-3. **`Instructions`** (existing) — updated text noting the dropdowns and that values outside the selected scope will be rejected on import.
-
-### Validation on Import (Review step)
-
-- Reject rows whose `skill_name` is not in the selected skills list (error: "Skill not in template scope").
-- Reject rows whose `competency_level` is not in the selected levels (error: "Level not in template scope").
-- All other current validations (required fields, exactly 4 options, single correct index 1–4, duplicate detection as warning) remain.
+This eliminates the "JavaScript not in scope" false negative entirely.
 
 ### Files
 
-- **`src/lib/mcqExcel.ts`** — extend `buildTemplate()` to accept `{ skills, levels }`, add the `Selected Scope` sheet, attach `dataValidation` ranges on `skill_name` and `competency_level` columns (SheetJS `!dataValidation` / formula references to `Selected Scope` ranges).
-- **`src/components/questions/BulkUploadSheet.tsx`** — add Step 0 UI (skill multi-select + level multi-select + Download button), wire selection state, gate the existing upload step behind a successful template download (or allow skip with confirm), and enforce scope validation in the review step.
-- No backend, schema, or store changes.
+- **`src/components/questions/BulkUploadSheet.tsx`**
+  - Replace Step 0 content with a mode picker (`'direct' | 'template'`).
+  - Template mode reveals the existing skill/level selectors + Download button, then advances to Upload.
+  - Direct mode advances straight to Upload.
+  - Stop passing `scope` into `parseMcqWorkbook`.
+  - Add "Change mode" affordance on Upload step.
+
+- **`src/lib/mcqExcel.ts`**
+  - Remove `scope` parameter from `parseMcqWorkbook` (or keep it for an optional non-blocking warning only).
+  - Delete the `scopedSkillIds` / `scopedLevelIds` error branches.
+  - `downloadMcqTemplate(scope)` stays unchanged — it's only relevant in template mode.
 
 ### Out of Scope
+- Persisting last-used selections.
+- Locking the Questions sheet against typing.
+- Changing the template file structure.
 
-- Pre-seeding question rows with skill/level combinations.
-- Locking the `Questions` sheet against manual typing — Excel dropdowns guide but don't prevent paste-overrides; import-side validation is the safety net.
-- Persisting the user's last selection across sessions.
+### Result
+- Users with an old template just hit "Upload a file I already have" and import succeeds as long as skills/levels are still active in the system.
+- Users who want guardrails before authoring choose "Download a fresh template" and get the dropdown-loaded `.xlsx`.
+- "JavaScript not in scope" no longer appears when the skill genuinely exists.
