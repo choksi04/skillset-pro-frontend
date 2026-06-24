@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import QuestionFormSheet from '@/components/questions/QuestionFormSheet';
 import QuestionDetailSheet, { FormattedQuestionContent } from '@/components/questions/QuestionDetailSheet';
+import BulkUploadSheet from '@/components/questions/BulkUploadSheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,7 @@ import {
 import {
   Plus, Search, Pencil, ToggleLeft, ToggleRight, CheckCircle, HelpCircle,
   Sparkles, Trash2, MoreHorizontal, Loader2, ChevronDown, ChevronRight,
-  AlertTriangle, Copy, Eye, Bot, User, CheckSquare, ChevronLeft,
+  AlertTriangle, Copy, Eye, Bot, User, CheckSquare, ChevronLeft, FileSpreadsheet,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -154,6 +155,7 @@ export default function QuestionBankPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | 'ai' | 'manual'>('all');
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent');
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<Question | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -338,9 +340,14 @@ export default function QuestionBankPage() {
           </p>
         </div>
         {canEdit && (
-          <Button onClick={() => { setEditQuestion(null); setFormOpen(true); }} className="gap-1.5">
-            <Plus size={14} /> Add Question
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-1.5">
+              <FileSpreadsheet size={14} /> Upload from Excel
+            </Button>
+            <Button onClick={() => { setEditQuestion(null); setFormOpen(true); }} className="gap-1.5">
+              <Plus size={14} /> Add Question
+            </Button>
+          </div>
         )}
       </div>
 
@@ -952,6 +959,9 @@ export default function QuestionBankPage() {
 
       {/* Form Sheet */}
       <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
+
+      {/* Bulk Upload */}
+      <BulkUploadSheet open={bulkOpen} onOpenChange={setBulkOpen} />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
