@@ -340,9 +340,14 @@ export default function QuestionBankPage() {
           </p>
         </div>
         {canEdit && (
-          <Button onClick={() => { setEditQuestion(null); setFormOpen(true); }} className="gap-1.5">
-            <Plus size={14} /> Add Question
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-1.5">
+              <FileSpreadsheet size={14} /> Upload from Excel
+            </Button>
+            <Button onClick={() => { setEditQuestion(null); setFormOpen(true); }} className="gap-1.5">
+              <Plus size={14} /> Add Question
+            </Button>
+          </div>
         )}
       </div>
 
