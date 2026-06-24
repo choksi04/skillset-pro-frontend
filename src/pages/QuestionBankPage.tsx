@@ -960,6 +960,9 @@ export default function QuestionBankPage() {
       {/* Form Sheet */}
       <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
 
+      {/* Bulk Upload */}
+      <BulkUploadSheet open={bulkOpen} onOpenChange={setBulkOpen} />
+
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
