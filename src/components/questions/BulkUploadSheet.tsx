@@ -26,7 +26,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'configure' | 'file' | 'review';
+type Step = 'mode' | 'configure' | 'file' | 'review';
+type Mode = 'direct' | 'template';
 
 export default function BulkUploadSheet({ open, onOpenChange }: Props) {
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
