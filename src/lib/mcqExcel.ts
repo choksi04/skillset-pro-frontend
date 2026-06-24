@@ -206,9 +206,11 @@ export async function parseMcqWorkbook(
       if (!sk) errors.push(`Unknown skill "${skill_name}"`);
       else {
         skill_id = sk.id;
-        if (scopedSkillIds && !scopedSkillIds.has(sk.id)) {
-          errors.push(`Skill "${skill_name}" is not in this template's scope`);
-        }
+      }
+    }
+
+    // (skill scope no longer enforced)
+    void 0;
       }
     }
 
