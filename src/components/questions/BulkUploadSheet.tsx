@@ -408,8 +408,9 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
               <p className="font-medium text-foreground">How it works</p>
               <p>
                 The downloaded template includes a <strong>Selected Scope</strong> sheet listing the
-                exact skill names and level labels you can use. Rows referencing anything outside
-                that scope will be rejected on import.
+                skill names and level labels you picked, as a reference while you author. On import
+                we validate against the current active skills and levels — so you can come back days
+                later and still upload.
               </p>
             </div>
           </div>
