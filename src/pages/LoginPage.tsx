@@ -52,7 +52,7 @@ function FeatureRow({
 }
 
 export default function LoginPage() {
-  const { isAuthenticated, loginWithAzure, login } = useAuth();
+  const { isAuthenticated, loginWithAzure } = useAuth();
   const [error, setError] = useState("");
   const [azureLoading, setAzureLoading] = useState(false);
 
@@ -65,7 +65,6 @@ export default function LoginPage() {
     if (!result.success) setError(result.error ?? "Sign-in failed.");
     setAzureLoading(false);
   };
-
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
