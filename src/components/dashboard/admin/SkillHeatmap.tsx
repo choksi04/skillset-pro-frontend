@@ -5,13 +5,7 @@ import { CheckCircle2, Network, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import {
   Tooltip,
   TooltipContent,
@@ -466,15 +460,15 @@ export function SkillHeatmap({
         action={
           <div className="flex items-center gap-3">
             {!loading ? (
-              <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
-                <SelectTrigger className="h-8 w-[160px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="approved">Approved only</SelectItem>
-                  <SelectItem value="all_submitted">All submitted</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={mode}
+                onValueChange={(v) => setMode(v as Mode)}
+                className="h-8 w-[180px] text-xs"
+                options={[
+                  { value: 'approved', label: 'Approved only' },
+                  { value: 'all_submitted', label: 'All submitted' },
+                ]}
+              />
             ) : null}
             {lastUpdated ? (
               <span className="hidden text-[11px] text-muted-foreground sm:inline">

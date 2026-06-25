@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchableSelect from "@/components/ui/searchable-select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -386,35 +386,19 @@ export default function TeamRegistryDetailPage() {
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">Score:</span>
-                            <Select
+                            <SearchableSelect
                               value={mgrScore != null ? String(mgrScore) : ""}
-                              onValueChange={(v) => handleScoreChange(skill.id, v)}
-                              disabled={!isReviewable}
-                            >
-                              <SelectTrigger className="h-8 min-w-[14rem] text-xs">
-                                <SelectValue placeholder="Select level">
-                                  {mgrScore != null
-                                    ? (scoreOptions.find((l) => l.level === mgrScore)?.label ??
-                                      `L${mgrScore}`)
-                                    : null}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {scoreOptions.map((l) => {
-                                  const showName =
-                                    !!l.name &&
-                                    !l.label?.toLowerCase().includes(l.name.toLowerCase());
-                                  return (
-                                    <SelectItem key={l.id} value={String(l.level)}>
-                                      <span className="font-medium">{l.label}</span>
-                                      {showName ? (
-                                        <span className="text-muted-foreground"> ({l.name})</span>
-                                      ) : null}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
+                              onValueChange={(v) => isReviewable && handleScoreChange(skill.id, v)}
+                              placeholder="Select level"
+                              className="h-8 min-w-[14rem] text-xs"
+                              options={scoreOptions.map((l) => {
+                                const showName = !!l.name && !l.label?.toLowerCase().includes(l.name.toLowerCase());
+                                return {
+                                  value: String(l.level),
+                                  label: showName ? `${l.label} (${l.name})` : (l.label ?? `L${l.level}`),
+                                };
+                              })}
+                            />
                           </div>
                         )}
                       </div>

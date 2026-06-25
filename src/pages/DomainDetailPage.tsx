@@ -9,9 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -300,7 +298,7 @@ export default function DomainDetailPage() {
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
         {canManage && (
-          <Select
+          <SearchableSelect
             value={domain.domain_lead_id ?? 'none'}
             onValueChange={(val) => {
               const current = domain.domain_lead_id ?? 'none';
@@ -309,19 +307,13 @@ export default function DomainDetailPage() {
                 setLeadChangeOpen(true);
               }
             }}
-          >
-            <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
-              <SelectValue placeholder="Assign lead…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No lead</SelectItem>
-              {eligibleLeads.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.full_name} ({u.role})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Assign lead…"
+            className="h-7 text-xs w-[200px] ml-auto"
+            options={[
+              { value: 'none', label: 'No lead' },
+              ...eligibleLeads.map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` })),
+            ]}
+          />
         )}
       </div>
 

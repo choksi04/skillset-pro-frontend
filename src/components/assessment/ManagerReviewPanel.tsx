@@ -13,9 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -92,16 +89,12 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
               {isAdjusted && <span className="text-[10px] text-muted-foreground">adjusted</span>}
             </div>
           ) : (
-            <Select value={String(entry.verified_level)} onValueChange={handleLevelChange}>
-              <SelectTrigger className="h-8 w-[140px] mx-auto text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 5].map((l) => (
-                  <SelectItem key={l} value={String(l)} className="text-xs">{getFormattedLevelLabel(levels, l)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={String(entry.verified_level)}
+              onValueChange={handleLevelChange}
+              className="h-8 w-[160px] mx-auto text-xs"
+              options={[1, 2, 3, 4, 5].map((l) => ({ value: String(l), label: getFormattedLevelLabel(levels, l) }))}
+            />
           )}
         </td>
         <td className="py-3 px-4">

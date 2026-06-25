@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchableSelect from "@/components/ui/searchable-select";
 import { ArrowLeft, Layers, ListChecks, Loader2, Save, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useCompetencyLevelStore, getLevelLabelsByIdMap } from "@/stores/competencyLevelStore";
@@ -348,38 +348,25 @@ export default function AssessmentTemplateEditPage() {
                 <h3 className="text-sm font-semibold text-foreground">Adaptive Configuration</h3>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Domain *</Label>
-                  <Select value={domainId} onValueChange={setDomainId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a domain" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {domains.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={domainId}
+                    onValueChange={setDomainId}
+                    placeholder="Select a domain"
+                    className="w-full h-10"
+                    options={domains.map((d) => ({ value: d.id, label: d.name }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Skill Selection Mode</Label>
-                  <Select value={skillMode} onValueChange={(v) => setSkillMode(v as SkillSelectionMode)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="custom">Manual (pick specific skills)</SelectItem>
-                      <SelectItem value="top_n" disabled>
-                        <span className="flex items-center gap-2">
-                          Top N skills (auto-pick by self-rating)
-                          <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-                            Coming Soon
-                          </span>
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={skillMode}
+                    onValueChange={(v) => setSkillMode(v as SkillSelectionMode)}
+                    className="w-full h-10"
+                    options={[
+                      { value: "custom", label: "Manual (pick specific skills)" },
+                    ]}
+                  />
                 </div>
 
                 {skillMode === "custom" && domainId && (

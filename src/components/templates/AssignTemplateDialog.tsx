@@ -12,9 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertCircle, Loader2, Search, UserCheck, UsersRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -190,18 +188,16 @@ export default function AssignTemplateDialog({
           {showTemplatePicker && (
             <div className="space-y-1.5">
               <Label className="text-xs">Template *</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger><SelectValue placeholder="Select an active template" /></SelectTrigger>
-                <SelectContent>
-                  {activeTemplates.length === 0 ? (
-                    <div className="p-2 text-xs text-muted-foreground">No active templates available.</div>
-                  ) : (
-                    activeTemplates.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={templateId}
+                onValueChange={setTemplateId}
+                placeholder="Select an active template"
+                className="w-full h-10"
+                options={activeTemplates.map((t) => ({ value: t.id, label: t.name }))}
+              />
+              {activeTemplates.length === 0 && (
+                <p className="text-xs text-muted-foreground">No active templates available.</p>
+              )}
             </div>
           )}
 
@@ -242,12 +238,13 @@ export default function AssignTemplateDialog({
               <TabsContent value="domain" className="space-y-3 mt-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Domain</Label>
-                  <Select value={pickedDomain} onValueChange={setPickedDomain}>
-                    <SelectTrigger><SelectValue placeholder="Select a domain" /></SelectTrigger>
-                    <SelectContent>
-                      {domains.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={pickedDomain}
+                    onValueChange={setPickedDomain}
+                    placeholder="Select a domain"
+                    className="w-full h-10"
+                    options={domains.map((d) => ({ value: d.id, label: d.name }))}
+                  />
                 </div>
               </TabsContent>
 

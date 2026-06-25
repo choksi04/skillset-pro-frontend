@@ -26,7 +26,9 @@ export default function SearchableSelect({
   options, value, onValueChange, placeholder = 'Select...', className,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
-  const selectedLabel = options.find((o) => o.value === value)?.label || placeholder;
+  const selected = options.find((o) => o.value === value);
+  const selectedLabel = selected?.label || placeholder;
+  const showPlaceholder = !selected;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -35,16 +37,16 @@ export default function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('justify-between font-normal', value === '' || value === 'all' ? 'text-muted-foreground' : '', className)}
+          className={cn('justify-between font-normal', showPlaceholder ? 'text-muted-foreground' : '', className)}
         >
           <span className="truncate">{selectedLabel}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[220px] p-0" align="start">
         <Command>
           <CommandInput placeholder="Search..." className="h-8 text-sm" />
-          <CommandList>
+          <CommandList className="max-h-72">
             <CommandEmpty>No results.</CommandEmpty>
             {options.map((option) => (
               <CommandItem

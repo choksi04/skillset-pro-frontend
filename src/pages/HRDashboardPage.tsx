@@ -10,9 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -139,17 +137,16 @@ function RegistryTab({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Filter size={14} className="text-muted-foreground" />
-          <Select value={domainFilter} onValueChange={setDomainFilter}>
-            <SelectTrigger className="w-48 h-8 text-xs">
-              <SelectValue placeholder="Filter by domain" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Domains</SelectItem>
-              {domains.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={domainFilter}
+            onValueChange={setDomainFilter}
+            placeholder="Filter by domain"
+            className="w-52 h-8 text-xs"
+            options={[
+              { value: 'all', label: 'All Domains' },
+              ...domains.map((d) => ({ value: d.id, label: d.name })),
+            ]}
+          />
           <span className="text-xs text-muted-foreground">{filtered.length} entries</span>
         </div>
         <Button

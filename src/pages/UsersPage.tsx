@@ -13,9 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Pencil, Shield, Users, AlertTriangle, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -210,33 +208,40 @@ export default function UsersPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
         </div>
-        <Select value={domainFilter} onValueChange={setDomainFilter}>
-          <SelectTrigger className="w-[160px] h-9 text-sm"><SelectValue placeholder="Domain" /></SelectTrigger>
-          <SelectContent className="max-h-72">
-            <SelectItem value="all">All Domains</SelectItem>
-            <SelectItem value="none">No domain</SelectItem>
-            {domains.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Role" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="employee">Employee</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={domainFilter}
+          onValueChange={setDomainFilter}
+          placeholder="Domain"
+          className="w-[180px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Domains' },
+            { value: 'none', label: 'No domain' },
+            ...domains.map((d) => ({ value: d.id, label: d.name })),
+          ]}
+        />
+        <SearchableSelect
+          value={roleFilter}
+          onValueChange={setRoleFilter}
+          placeholder="Role"
+          className="w-[140px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Roles' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'manager', label: 'Manager' },
+            { value: 'employee', label: 'Employee' },
+          ]}
+        />
+        <SearchableSelect
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status"
+          className="w-[140px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Status' },
+            { value: 'active', label: 'Active' },
+            { value: 'disabled', label: 'Disabled' },
+          ]}
+        />
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" className="h-9 gap-1 text-xs" onClick={clearFilters}>
             <X size={12} /> Clear
@@ -328,15 +333,17 @@ export default function UsersPage() {
             <p className="text-sm text-muted-foreground">
               Showing {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} users
             </p>
-            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-              <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={String(pageSize)}
+              onValueChange={(v) => setPageSize(Number(v))}
+              className="h-8 w-[90px] text-xs"
+              options={[
+                { value: '10', label: '10' },
+                { value: '20', label: '20' },
+                { value: '50', label: '50' },
+                { value: '100', label: '100' },
+              ]}
+            />
           </div>
           {totalPages > 1 && (
             <div className="flex items-center gap-1">
@@ -410,41 +417,44 @@ export default function UsersPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Role</Label>
-                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={form.role}
+                  onValueChange={(v) => setForm({ ...form, role: v })}
+                  className="w-full h-10"
+                  options={[
+                    { value: 'admin', label: 'Admin' },
+                    { value: 'manager', label: 'Manager' },
+                    { value: 'employee', label: 'Employee' },
+                  ]}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={form.status}
+                  onValueChange={(v) => setForm({ ...form, status: v })}
+                  className="w-full h-10"
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'disabled', label: 'Disabled' },
+                  ]}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
                 Domain {isDomainRequired && <span className="text-destructive">*</span>}
               </Label>
-              <Select value={form.domain_id || 'none'} onValueChange={(v) => setForm({ ...form, domain_id: v === 'none' ? '' : v })}>
-                <SelectTrigger className={domainMissing ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="No domain" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!isDomainRequired && <SelectItem value="none">No domain</SelectItem>}
-                  {domains.filter((d) => d.status === 'active').map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={form.domain_id || 'none'}
+                onValueChange={(v) => setForm({ ...form, domain_id: v === 'none' ? '' : v })}
+                placeholder="No domain"
+                className={`w-full h-10 ${domainMissing ? 'border-destructive' : ''}`}
+                options={[
+                  ...(!isDomainRequired ? [{ value: 'none', label: 'No domain' }] : []),
+                  ...domains.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name })),
+                ]}
+              />
               {domainMissing && (
                 <p className="text-xs text-destructive flex items-center gap-1">
                   <AlertTriangle size={12} /> Domain is required for {form.role}s.
