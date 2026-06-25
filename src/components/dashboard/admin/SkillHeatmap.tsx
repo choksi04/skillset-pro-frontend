@@ -460,15 +460,15 @@ export function SkillHeatmap({
         action={
           <div className="flex items-center gap-3">
             {!loading ? (
-              <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
-                <SelectTrigger className="h-8 w-[160px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="approved">Approved only</SelectItem>
-                  <SelectItem value="all_submitted">All submitted</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={mode}
+                onValueChange={(v) => setMode(v as Mode)}
+                className="h-8 w-[180px] text-xs"
+                options={[
+                  { value: 'approved', label: 'Approved only' },
+                  { value: 'all_submitted', label: 'All submitted' },
+                ]}
+              />
             ) : null}
             {lastUpdated ? (
               <span className="hidden text-[11px] text-muted-foreground sm:inline">
