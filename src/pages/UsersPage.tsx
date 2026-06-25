@@ -417,41 +417,44 @@ export default function UsersPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Role</Label>
-                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={form.role}
+                  onValueChange={(v) => setForm({ ...form, role: v })}
+                  className="w-full h-10"
+                  options={[
+                    { value: 'admin', label: 'Admin' },
+                    { value: 'manager', label: 'Manager' },
+                    { value: 'employee', label: 'Employee' },
+                  ]}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={form.status}
+                  onValueChange={(v) => setForm({ ...form, status: v })}
+                  className="w-full h-10"
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'disabled', label: 'Disabled' },
+                  ]}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
                 Domain {isDomainRequired && <span className="text-destructive">*</span>}
               </Label>
-              <Select value={form.domain_id || 'none'} onValueChange={(v) => setForm({ ...form, domain_id: v === 'none' ? '' : v })}>
-                <SelectTrigger className={domainMissing ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="No domain" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!isDomainRequired && <SelectItem value="none">No domain</SelectItem>}
-                  {domains.filter((d) => d.status === 'active').map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={form.domain_id || 'none'}
+                onValueChange={(v) => setForm({ ...form, domain_id: v === 'none' ? '' : v })}
+                placeholder="No domain"
+                className={`w-full h-10 ${domainMissing ? 'border-destructive' : ''}`}
+                options={[
+                  ...(!isDomainRequired ? [{ value: 'none', label: 'No domain' }] : []),
+                  ...domains.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name })),
+                ]}
+              />
               {domainMissing && (
                 <p className="text-xs text-destructive flex items-center gap-1">
                   <AlertTriangle size={12} /> Domain is required for {form.role}s.
