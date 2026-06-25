@@ -208,33 +208,40 @@ export default function UsersPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
         </div>
-        <Select value={domainFilter} onValueChange={setDomainFilter}>
-          <SelectTrigger className="w-[160px] h-9 text-sm"><SelectValue placeholder="Domain" /></SelectTrigger>
-          <SelectContent className="max-h-72">
-            <SelectItem value="all">All Domains</SelectItem>
-            <SelectItem value="none">No domain</SelectItem>
-            {domains.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Role" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="employee">Employee</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={domainFilter}
+          onValueChange={setDomainFilter}
+          placeholder="Domain"
+          className="w-[180px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Domains' },
+            { value: 'none', label: 'No domain' },
+            ...domains.map((d) => ({ value: d.id, label: d.name })),
+          ]}
+        />
+        <SearchableSelect
+          value={roleFilter}
+          onValueChange={setRoleFilter}
+          placeholder="Role"
+          className="w-[140px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Roles' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'manager', label: 'Manager' },
+            { value: 'employee', label: 'Employee' },
+          ]}
+        />
+        <SearchableSelect
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status"
+          className="w-[140px] h-9 text-sm"
+          options={[
+            { value: 'all', label: 'All Status' },
+            { value: 'active', label: 'Active' },
+            { value: 'disabled', label: 'Disabled' },
+          ]}
+        />
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" className="h-9 gap-1 text-xs" onClick={clearFilters}>
             <X size={12} /> Clear
