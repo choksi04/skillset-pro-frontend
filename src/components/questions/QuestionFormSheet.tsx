@@ -232,47 +232,50 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
           {/* Skill */}
           <div className="space-y-1.5">
             <Label>Skill <span className="text-destructive">*</span></Label>
-            <Select value={skillId} onValueChange={(v) => { setSkillId(v); setTopicId(''); }}>
-              <SelectTrigger><SelectValue placeholder="Select skill" /></SelectTrigger>
-              <SelectContent>
-                {activeSkills.map((s) => <SelectItem key={s.id} value={s.id}>{s.skill_name} — {s.skill_category}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={skillId}
+              onValueChange={(v) => { setSkillId(v); setTopicId(''); }}
+              placeholder="Select skill"
+              className="w-full h-9"
+              options={activeSkills.map((s) => ({ value: s.id, label: `${s.skill_name} — ${s.skill_category}` }))}
+            />
             {errors.skill_id && <p className="text-xs text-destructive">{errors.skill_id}</p>}
           </div>
 
           {/* Topic */}
           <div className="space-y-1.5">
             <Label>Topic <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Select value={topicId} onValueChange={setTopicId} disabled={!skillId}>
-              <SelectTrigger><SelectValue placeholder="Select topic" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {skillTopics.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={topicId}
+              onValueChange={setTopicId}
+              placeholder={skillId ? 'Select topic' : 'Select a skill first'}
+              className="w-full h-9"
+              options={[{ value: 'none', label: 'None' }, ...skillTopics.map((t) => ({ value: t.id, label: t.name }))]}
+            />
           </div>
 
           {/* Level + Type */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Competency Level <span className="text-destructive">*</span></Label>
-              <Select value={level} onValueChange={setLevel}>
-                <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
-                <SelectContent>
-                  {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={level}
+                onValueChange={setLevel}
+                placeholder="Level"
+                className="w-full h-9"
+                options={dynamicLevels.map((l) => ({ value: l, label: dynamicLabels[l] || l }))}
+              />
               {errors.competency_level && <p className="text-xs text-destructive">{errors.competency_level}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Question Type <span className="text-destructive">*</span></Label>
-              <Select value={qType} onValueChange={setQType}>
-                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  {questionTypes.map((t) => <SelectItem key={t} value={t}>{questionTypeLabels[t]}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={qType}
+                onValueChange={setQType}
+                placeholder="Type"
+                className="w-full h-9"
+                options={questionTypes.map((t) => ({ value: t, label: questionTypeLabels[t] }))}
+              />
               {errors.question_type && <p className="text-xs text-destructive">{errors.question_type}</p>}
             </div>
           </div>
