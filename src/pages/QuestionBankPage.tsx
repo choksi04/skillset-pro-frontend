@@ -401,57 +401,60 @@ export default function QuestionBankPage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Skill <span className="text-destructive">*</span></Label>
-                    <Select value={aiSkillId} onValueChange={(v) => { setAiSkillId(v); setAiTopicId(''); }}>
-                      <SelectTrigger><SelectValue placeholder="Select skill" /></SelectTrigger>
-                      <SelectContent>
-                        {activeSkills.map((s) => <SelectItem key={s.id} value={s.id}>{s.skill_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiSkillId}
+                      onValueChange={(v) => { setAiSkillId(v); setAiTopicId(''); }}
+                      options={activeSkills.map((s) => ({ value: s.id, label: s.skill_name }))}
+                      placeholder="Select skill"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.skill_id && <p className="text-xs text-destructive">{aiErrors.skill_id}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Topic <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Select value={aiTopicId} onValueChange={setAiTopicId} disabled={!aiSkillId}>
-                      <SelectTrigger><SelectValue placeholder="Any topic" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Any topic</SelectItem>
-                        {(topics[aiSkillId] || []).filter((t) => t.status === 'active').map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiTopicId}
+                      onValueChange={setAiTopicId}
+                      options={[{ value: 'none', label: 'Any topic' }, ...((topics[aiSkillId] || []).filter((t) => t.status === 'active').map((t) => ({ value: t.id, label: t.name })))]}
+                      placeholder="Any topic"
+                      className="w-full h-9 text-sm"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Competency Level <span className="text-destructive">*</span></Label>
-                    <Select value={aiLevel} onValueChange={setAiLevel}>
-                      <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
-                      <SelectContent>
-                        {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiLevel}
+                      onValueChange={setAiLevel}
+                      options={dynamicLevels.map((l) => ({ value: l, label: dynamicLabels[l] || l }))}
+                      placeholder="Level"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.competency_level && <p className="text-xs text-destructive">{aiErrors.competency_level}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Question Type <span className="text-destructive">*</span></Label>
-                    <Select value={aiQType} onValueChange={setAiQType}>
-                      <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                      <SelectContent>
-                        {questionTypes.map((t) => <SelectItem key={t} value={t}>{questionTypeLabels[t]}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiQType}
+                      onValueChange={setAiQType}
+                      options={questionTypes.map((t) => ({ value: t, label: questionTypeLabels[t] }))}
+                      placeholder="Type"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.question_type && <p className="text-xs text-destructive">{aiErrors.question_type}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Count</Label>
-                    <Select value={String(aiCount)} onValueChange={(v) => setAiCount(Number(v))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 5, 10].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={String(aiCount)}
+                      onValueChange={(v) => setAiCount(Number(v))}
+                      options={[1, 2, 3, 5, 10].map((n) => ({ value: String(n), label: String(n) }))}
+                      placeholder="Count"
+                      className="w-full h-9 text-sm"
+                    />
                   </div>
+
                 </div>
                 <div className="space-y-1.5">
                   <Label>Organization Context <span className="text-destructive">*</span></Label>
