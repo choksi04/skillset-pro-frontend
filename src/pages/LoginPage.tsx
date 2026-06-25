@@ -55,9 +55,6 @@ export default function LoginPage() {
   const { isAuthenticated, loginWithAzure, login } = useAuth();
   const [error, setError] = useState("");
   const [azureLoading, setAzureLoading] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
-  const [demoEmail, setDemoEmail] = useState("");
-  const [demoLoading, setDemoLoading] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -69,13 +66,6 @@ export default function LoginPage() {
     setAzureLoading(false);
   };
 
-  const handleDemoLogin = async (email: string) => {
-    setError("");
-    setDemoLoading(true);
-    const result = await login(email);
-    if (!result.success) setError(result.error ?? "Sign-in failed.");
-    setDemoLoading(false);
-  };
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
@@ -176,59 +166,6 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Demo login (testing) */}
-          <div className="rounded-lg border border-dashed border-border bg-muted/30">
-            <button
-              type="button"
-              onClick={() => setDemoOpen((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <span>Demo sign-in (testing only)</span>
-              <span className="text-[10px]">{demoOpen ? "Hide" : "Show"}</span>
-            </button>
-            {demoOpen && (
-              <div className="space-y-2 border-t border-border/60 px-3 py-3">
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={demoEmail}
-                    onChange={(e) => setDemoEmail(e.target.value)}
-                    placeholder="your.email@1rivet.com"
-                    className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && demoEmail.trim()) handleDemoLogin(demoEmail.trim());
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => demoEmail.trim() && handleDemoLogin(demoEmail.trim())}
-                    disabled={demoLoading || !demoEmail.trim()}
-                  >
-                    {demoLoading ? "…" : "Sign in"}
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { label: "Admin", email: "rukshar.rangara@1rivet.com" },
-                    { label: "Manager", email: "kishan.mistry@1rivet.com" },
-                    { label: "Employee", email: "nidhi.shah@1rivet.com" },
-                  ].map((d) => (
-                    <button
-                      key={d.email}
-                      type="button"
-                      onClick={() => handleDemoLogin(d.email)}
-                      disabled={demoLoading}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-[11px] hover:bg-accent"
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Footer */}
           <p className="text-center text-xs text-muted-foreground">
