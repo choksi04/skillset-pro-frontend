@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { Download, Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, X, Settings2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSkillStore } from '@/stores/skillStore';
