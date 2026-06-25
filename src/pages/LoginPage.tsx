@@ -53,9 +53,12 @@ function FeatureRow({
 }
 
 export default function LoginPage() {
-  const { isAuthenticated, loginWithAzure } = useAuth();
+  const { isAuthenticated, loginWithAzure, login } = useAuth();
   const [error, setError] = useState("");
   const [azureLoading, setAzureLoading] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoEmail, setDemoEmail] = useState("");
+  const [demoLoading, setDemoLoading] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -66,6 +69,15 @@ export default function LoginPage() {
     if (!result.success) setError(result.error ?? "Sign-in failed.");
     setAzureLoading(false);
   };
+
+  const handleDemoLogin = async (email: string) => {
+    setError("");
+    setDemoLoading(true);
+    const result = await login(email);
+    if (!result.success) setError(result.error ?? "Sign-in failed.");
+    setDemoLoading(false);
+  };
+
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
