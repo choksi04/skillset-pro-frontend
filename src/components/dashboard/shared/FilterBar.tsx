@@ -1,11 +1,5 @@
 import { X } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { Button } from '@/components/ui/button';
 
 export interface FilterDef {
@@ -40,27 +34,21 @@ export function FilterBar({ filters, values, onChange, onReset, className }: Fil
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Filter
       </span>
-      {filters.map((f) => (
-        <div key={f.key} className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">{f.label}</span>
-          <Select
-            value={values[f.key] ?? ALL}
-            onValueChange={(v) => onChange(f.key, v === ALL ? '' : v)}
-          >
-            <SelectTrigger className="h-7 min-w-[140px] text-xs">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectItem value={ALL}>All</SelectItem>
-              {f.options.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ))}
+      {filters.map((f) => {
+        const opts = [{ value: ALL, label: 'All' }, ...f.options];
+        return (
+          <div key={f.key} className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">{f.label}</span>
+            <SearchableSelect
+              options={opts}
+              value={values[f.key] || ALL}
+              onValueChange={(v) => onChange(f.key, v === ALL ? '' : v)}
+              placeholder="All"
+              className="h-7 min-w-[140px] text-xs"
+            />
+          </div>
+        );
+      })}
       {activeCount > 0 && onReset ? (
         <Button
           type="button"
