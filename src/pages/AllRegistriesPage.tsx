@@ -353,19 +353,14 @@ export default function AllRegistriesPage() {
             className="pl-9 h-9 text-sm"
           />
         </div>
-        <Select value={domainFilter} onValueChange={setDomainFilter}>
-          <SelectTrigger className="w-48 h-9 text-sm">
-            <SelectValue placeholder="All Domains" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Domains</SelectItem>
-            {domains.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={domainFilter}
+          onValueChange={setDomainFilter}
+          options={[{ value: 'all', label: 'All Domains' }, ...domains.map((d) => ({ value: d.id, label: d.name }))]}
+          placeholder="All Domains"
+          className="w-48 h-9 text-sm"
+        />
+
       </div>
 
       {regsLoading && !regsInit ? (
