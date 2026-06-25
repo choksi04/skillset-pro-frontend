@@ -162,45 +162,40 @@ export default function QuestionPickerSheet({
             />
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <Select value={skillFilter} onValueChange={setSkillFilter}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Skill" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All skills</SelectItem>
-                {skillOptions.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.skill_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All levels</SelectItem>
-                {competencyLevels
+            <SearchableSelect
+              value={skillFilter}
+              onValueChange={setSkillFilter}
+              placeholder="Skill"
+              className="h-8 text-xs"
+              options={[
+                { value: "all", label: "All skills" },
+                ...skillOptions.map((s) => ({ value: s.id, label: s.skill_name })),
+              ]}
+            />
+            <SearchableSelect
+              value={levelFilter}
+              onValueChange={setLevelFilter}
+              placeholder="Level"
+              className="h-8 text-xs"
+              options={[
+                { value: "all", label: "All levels" },
+                ...competencyLevels
                   .filter((l) => l.status === "active")
-                  .map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.label}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="mcq">MCQ</SelectItem>
-                <SelectItem value="scenario">Scenario</SelectItem>
-                <SelectItem value="coding">Coding</SelectItem>
-              </SelectContent>
-            </Select>
+                  .map((l) => ({ value: l.id, label: l.label })),
+              ]}
+            />
+            <SearchableSelect
+              value={typeFilter}
+              onValueChange={setTypeFilter}
+              placeholder="Type"
+              className="h-8 text-xs"
+              options={[
+                { value: "all", label: "All types" },
+                { value: "mcq", label: "MCQ" },
+                { value: "scenario", label: "Scenario" },
+                { value: "coding", label: "Coding" },
+              ]}
+            />
           </div>
           {(search || skillFilter !== "all" || levelFilter !== "all" || typeFilter !== "all") && (
             <button
