@@ -15,9 +15,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { deriveRegistryStatus, registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
