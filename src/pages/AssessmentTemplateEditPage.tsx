@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchableSelect from "@/components/ui/searchable-select";
 import { ArrowLeft, Layers, ListChecks, Loader2, Save, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useCompetencyLevelStore, getLevelLabelsByIdMap } from "@/stores/competencyLevelStore";
