@@ -9,6 +9,7 @@ import {
   Target,
   BarChart3,
 } from "lucide-react";
+
 import rivetLogo from "@/assets/1rivet-logo.svg";
 
 function MicrosoftIcon({ className }: { className?: string }) {
