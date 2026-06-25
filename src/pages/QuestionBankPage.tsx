@@ -17,9 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/searchable-select';
+
+
+
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -400,57 +401,60 @@ export default function QuestionBankPage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Skill <span className="text-destructive">*</span></Label>
-                    <Select value={aiSkillId} onValueChange={(v) => { setAiSkillId(v); setAiTopicId(''); }}>
-                      <SelectTrigger><SelectValue placeholder="Select skill" /></SelectTrigger>
-                      <SelectContent>
-                        {activeSkills.map((s) => <SelectItem key={s.id} value={s.id}>{s.skill_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiSkillId}
+                      onValueChange={(v) => { setAiSkillId(v); setAiTopicId(''); }}
+                      options={activeSkills.map((s) => ({ value: s.id, label: s.skill_name }))}
+                      placeholder="Select skill"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.skill_id && <p className="text-xs text-destructive">{aiErrors.skill_id}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Topic <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Select value={aiTopicId} onValueChange={setAiTopicId} disabled={!aiSkillId}>
-                      <SelectTrigger><SelectValue placeholder="Any topic" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Any topic</SelectItem>
-                        {(topics[aiSkillId] || []).filter((t) => t.status === 'active').map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiTopicId}
+                      onValueChange={setAiTopicId}
+                      options={[{ value: 'none', label: 'Any topic' }, ...((topics[aiSkillId] || []).filter((t) => t.status === 'active').map((t) => ({ value: t.id, label: t.name })))]}
+                      placeholder="Any topic"
+                      className="w-full h-9 text-sm"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Competency Level <span className="text-destructive">*</span></Label>
-                    <Select value={aiLevel} onValueChange={setAiLevel}>
-                      <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
-                      <SelectContent>
-                        {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiLevel}
+                      onValueChange={setAiLevel}
+                      options={dynamicLevels.map((l) => ({ value: l, label: dynamicLabels[l] || l }))}
+                      placeholder="Level"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.competency_level && <p className="text-xs text-destructive">{aiErrors.competency_level}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Question Type <span className="text-destructive">*</span></Label>
-                    <Select value={aiQType} onValueChange={setAiQType}>
-                      <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                      <SelectContent>
-                        {questionTypes.map((t) => <SelectItem key={t} value={t}>{questionTypeLabels[t]}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={aiQType}
+                      onValueChange={setAiQType}
+                      options={questionTypes.map((t) => ({ value: t, label: questionTypeLabels[t] }))}
+                      placeholder="Type"
+                      className="w-full h-9 text-sm"
+                    />
                     {aiErrors.question_type && <p className="text-xs text-destructive">{aiErrors.question_type}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Count</Label>
-                    <Select value={String(aiCount)} onValueChange={(v) => setAiCount(Number(v))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 5, 10].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={String(aiCount)}
+                      onValueChange={(v) => setAiCount(Number(v))}
+                      options={[1, 2, 3, 5, 10].map((n) => ({ value: String(n), label: String(n) }))}
+                      placeholder="Count"
+                      className="w-full h-9 text-sm"
+                    />
                   </div>
+
                 </div>
                 <div className="space-y-1.5">
                   <Label>Organization Context <span className="text-destructive">*</span></Label>
@@ -513,55 +517,61 @@ export default function QuestionBankPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search questions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" maxLength={100} />
         </div>
-        <Select value={skillFilter} onValueChange={setSkillFilter}>
-          <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Skill" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Skills</SelectItem>
-            {activeSkills.map((s) => <SelectItem key={s.id} value={s.id}>{s.skill_name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={levelFilter} onValueChange={setLevelFilter}>
-          <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Level" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Levels</SelectItem>
-            {dynamicLevels.map((l) => <SelectItem key={l} value={l}>{dynamicLabels[l] || l}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {questionTypes.map((t) => <SelectItem key={t} value={t}>{questionTypeLabels[t]}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as 'all' | 'ai' | 'manual')}>
-          <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Source" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="ai">
-              <span className="flex items-center gap-1.5"><Bot size={12} /> AI Generated</span>
-            </SelectItem>
-            <SelectItem value="manual">
-              <span className="flex items-center gap-1.5"><User size={12} /> Manual</span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'recent' | 'oldest')}>
-          <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue placeholder="Sort" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="recent">Recent First</SelectItem>
-            <SelectItem value="oldest">Oldest First</SelectItem>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={skillFilter}
+          onValueChange={setSkillFilter}
+          options={[{ value: 'all', label: 'All Skills' }, ...activeSkills.map((s) => ({ value: s.id, label: s.skill_name }))]}
+          placeholder="Skill"
+          className="w-[170px] h-9 text-sm"
+        />
+        <SearchableSelect
+          value={levelFilter}
+          onValueChange={setLevelFilter}
+          options={[{ value: 'all', label: 'All Levels' }, ...dynamicLevels.map((l) => ({ value: l, label: dynamicLabels[l] || l }))]}
+          placeholder="Level"
+          className="w-[150px] h-9 text-sm"
+        />
+        <SearchableSelect
+          value={typeFilter}
+          onValueChange={setTypeFilter}
+          options={[{ value: 'all', label: 'All Types' }, ...questionTypes.map((t) => ({ value: t, label: questionTypeLabels[t] }))]}
+          placeholder="Type"
+          className="w-[140px] h-9 text-sm"
+        />
+        <SearchableSelect
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          options={[
+            { value: 'all', label: 'All Status' },
+            { value: 'published', label: 'Published' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'disabled', label: 'Disabled' },
+          ]}
+          placeholder="Status"
+          className="w-[140px] h-9 text-sm"
+        />
+        <SearchableSelect
+          value={sourceFilter}
+          onValueChange={(v) => setSourceFilter(v as 'all' | 'ai' | 'manual')}
+          options={[
+            { value: 'all', label: 'All Sources' },
+            { value: 'ai', label: 'AI Generated' },
+            { value: 'manual', label: 'Manual' },
+          ]}
+          placeholder="Source"
+          className="w-[150px] h-9 text-sm"
+        />
+        <SearchableSelect
+          value={sortOrder}
+          onValueChange={(v) => setSortOrder(v as 'recent' | 'oldest')}
+          options={[
+            { value: 'recent', label: 'Recent First' },
+            { value: 'oldest', label: 'Oldest First' },
+          ]}
+          placeholder="Sort"
+          className="w-[140px] h-9 text-sm"
+        />
+
       </div>
 
       {/* Coverage Gaps (below filters, respects active filters) */}

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchableSelect from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -353,19 +353,14 @@ export default function AllRegistriesPage() {
             className="pl-9 h-9 text-sm"
           />
         </div>
-        <Select value={domainFilter} onValueChange={setDomainFilter}>
-          <SelectTrigger className="w-48 h-9 text-sm">
-            <SelectValue placeholder="All Domains" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Domains</SelectItem>
-            {domains.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={domainFilter}
+          onValueChange={setDomainFilter}
+          options={[{ value: 'all', label: 'All Domains' }, ...domains.map((d) => ({ value: d.id, label: d.name }))]}
+          placeholder="All Domains"
+          className="w-48 h-9 text-sm"
+        />
+
       </div>
 
       {regsLoading && !regsInit ? (
