@@ -234,27 +234,27 @@ export default function TeamRegistryPage() {
             <PopoverContent align="end" className="w-64 p-3 space-y-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">Status</label>
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    {statusFilterOptions.map((s) => (
-                      <SelectItem key={s} value={s}>{registryStatusConfig[s].label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as any)}
+                  className="w-full h-8 text-sm"
+                  options={[
+                    { value: 'all', label: 'All statuses' },
+                    ...statusFilterOptions.map((s) => ({ value: s, label: registryStatusConfig[s].label })),
+                  ]}
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">Domain</label>
-                <Select value={domainFilter} onValueChange={setDomainFilter}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All domains</SelectItem>
-                    {filterDomains.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={domainFilter}
+                  onValueChange={setDomainFilter}
+                  className="w-full h-8 text-sm"
+                  options={[
+                    { value: 'all', label: 'All domains' },
+                    ...filterDomains.map((d) => ({ value: d.id, label: d.name })),
+                  ]}
+                />
               </div>
               {filtersActive && (
                 <Button
