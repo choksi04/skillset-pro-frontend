@@ -37,7 +37,7 @@ export default function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('justify-between font-normal', value === '' || value === 'all' ? 'text-muted-foreground' : '', className)}
+          className={cn('justify-between font-normal', showPlaceholder ? 'text-muted-foreground' : '', className)}
         >
           <span className="truncate">{selectedLabel}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
