@@ -298,7 +298,7 @@ export default function DomainDetailPage() {
           <span className="text-sm text-muted-foreground italic">No lead assigned</span>
         )}
         {canManage && (
-          <Select
+          <SearchableSelect
             value={domain.domain_lead_id ?? 'none'}
             onValueChange={(val) => {
               const current = domain.domain_lead_id ?? 'none';
@@ -307,19 +307,13 @@ export default function DomainDetailPage() {
                 setLeadChangeOpen(true);
               }
             }}
-          >
-            <SelectTrigger className="h-7 text-xs w-[180px] ml-auto">
-              <SelectValue placeholder="Assign lead…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No lead</SelectItem>
-              {eligibleLeads.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.full_name} ({u.role})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Assign lead…"
+            className="h-7 text-xs w-[200px] ml-auto"
+            options={[
+              { value: 'none', label: 'No lead' },
+              ...eligibleLeads.map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` })),
+            ]}
+          />
         )}
       </div>
 
