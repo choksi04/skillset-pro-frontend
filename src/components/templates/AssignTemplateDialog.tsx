@@ -238,12 +238,13 @@ export default function AssignTemplateDialog({
               <TabsContent value="domain" className="space-y-3 mt-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Domain</Label>
-                  <Select value={pickedDomain} onValueChange={setPickedDomain}>
-                    <SelectTrigger><SelectValue placeholder="Select a domain" /></SelectTrigger>
-                    <SelectContent>
-                      {domains.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={pickedDomain}
+                    onValueChange={setPickedDomain}
+                    placeholder="Select a domain"
+                    className="w-full h-10"
+                    options={domains.map((d) => ({ value: d.id, label: d.name }))}
+                  />
                 </div>
               </TabsContent>
 
