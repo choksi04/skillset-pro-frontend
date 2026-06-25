@@ -188,18 +188,16 @@ export default function AssignTemplateDialog({
           {showTemplatePicker && (
             <div className="space-y-1.5">
               <Label className="text-xs">Template *</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger><SelectValue placeholder="Select an active template" /></SelectTrigger>
-                <SelectContent>
-                  {activeTemplates.length === 0 ? (
-                    <div className="p-2 text-xs text-muted-foreground">No active templates available.</div>
-                  ) : (
-                    activeTemplates.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={templateId}
+                onValueChange={setTemplateId}
+                placeholder="Select an active template"
+                className="w-full h-10"
+                options={activeTemplates.map((t) => ({ value: t.id, label: t.name }))}
+              />
+              {activeTemplates.length === 0 && (
+                <p className="text-xs text-muted-foreground">No active templates available.</p>
+              )}
             </div>
           )}
 
