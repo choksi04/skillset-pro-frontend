@@ -26,7 +26,9 @@ export default function SearchableSelect({
   options, value, onValueChange, placeholder = 'Select...', className,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
-  const selectedLabel = options.find((o) => o.value === value)?.label || placeholder;
+  const selected = options.find((o) => o.value === value);
+  const selectedLabel = selected?.label || placeholder;
+  const showPlaceholder = !selected;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
