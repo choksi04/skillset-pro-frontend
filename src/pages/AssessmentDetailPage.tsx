@@ -74,7 +74,7 @@ export default function AssessmentDetailPage() {
     retryEvaluation,
     startAttempt,
   } = useAttemptStore();
-  const { questions, fetchQuestions } = useQuestionStore();
+  const { questions, fetchQuestionsByIds } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
   const { reviews, fetchReviews } = useReviewStore();
@@ -100,11 +100,16 @@ export default function AssessmentDetailPage() {
     // Avoids depending on the global preload (which can be truncated at the
     // PostgREST 1000-row default on child tables).
     if (assessmentId) {
-      fetchAssessmentById(assessmentId);
-      fetchAttemptsForAssessment(assessmentId);
+      (async () => {
+        await fetchAssessmentById(assessmentId);
+        await fetchAttemptsForAssessment(assessmentId);
+        // Now fetch ONLY the questions this assessment uses — not all ~7000.
+        const a = useAssessmentStore.getState().assessments.find((x) => x.id === assessmentId);
+        const qIds = a?.assessment_questions?.map((aq) => aq.question_id) ?? [];
+        if (qIds.length) await fetchQuestionsByIds(qIds);
+      })();
     }
     // Supporting reference data (small tables) — safe to preload.
-    fetchQuestions();
     fetchSkills();
     fetchDomains();
     fetchReviews();
@@ -113,6 +118,7 @@ export default function AssessmentDetailPage() {
     fetchTemplates();
     fetchAssignments();
   }, [assessmentId]);
+
 
 
   // Build a map from competency level UUID to level number

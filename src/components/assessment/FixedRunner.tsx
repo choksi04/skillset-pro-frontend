@@ -103,14 +103,19 @@ interface Props {
 export default function FixedRunner({ assessment, onComplete, onCancel }: Props) {
   const { saveAnswer, submitAttempt, getAttemptForAssessment, pauseAttempt, resumeAttempt } = useAttemptStore();
   const { updateAssessmentStatus, fetchAssessments } = useAssessmentStore();
-  const { questions, fetchQuestions } = useQuestionStore();
+  const { questions, fetchQuestionsByIds } = useQuestionStore();
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { skills, fetchSkills } = useSkillStore();
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchQuestions(); fetchSkills(); fetchLevels();
-  }, []);
+    // Only fetch the questions this assessment actually uses — not all ~7000.
+    const qIds = assessment.assessment_questions?.map((aq) => aq.question_id) ?? [];
+    if (qIds.length) fetchQuestionsByIds(qIds);
+    fetchSkills();
+    fetchLevels();
+  }, [assessment.id]);
+
 
   const dynamicLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
   const employeeId = user?.id ?? '';
