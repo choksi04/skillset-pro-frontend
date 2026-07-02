@@ -89,6 +89,7 @@ interface AttemptStore {
   loading: boolean;
   initialized: boolean;
   fetchAttempts: () => Promise<void>;
+  fetchAttemptsForAssessment: (assessmentId: string) => Promise<AssessmentAttempt[]>;
   startAttempt: (assessmentId: string, tenantId: string, employeeId: string, forceNew?: boolean) => Promise<string>;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => Promise<void>;
   submitAttempt: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
@@ -97,6 +98,55 @@ interface AttemptStore {
   resumeAttempt: (attemptId: string) => Promise<void>;
   retryEvaluation: (attemptId: string, questionMap: Map<string, Question>, assessmentQuestions: { question_id: string; skill_id: string; target_level: string }[]) => Promise<void>;
 }
+
+/**
+ * Paginated `.in()` fetch so we bypass the 1000-row PostgREST default and
+ * never silently drop child rows (answers / evaluations / skill scores).
+ */
+async function fetchAllIn<T = any>(table: string, column: string, values: string[]): Promise<T[]> {
+  if (values.length === 0) return [];
+  const PAGE = 1000;
+  const out: T[] = [];
+  let from = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await supabase
+      .from(table as any).select('*').in(column, values).range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data as any[]) ?? [];
+    out.push(...(rows as T[]));
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+function mapAttemptRow(a: any, answerRows: any[], evalRows: any[], scoreRows: any[]): AssessmentAttempt {
+  return {
+    id: a.id, assessment_id: a.assessment_id, tenant_id: a.tenant_id, employee_id: a.employee_id,
+    answers: answerRows
+      .filter((ans: any) => ans.attempt_id === a.id)
+      .map((ans: any) => ({ question_id: ans.question_id, answer_text: ans.answer_text, time_spent_seconds: ans.time_spent_seconds })),
+    ai_evaluations: evalRows
+      .filter((ev: any) => ev.attempt_id === a.id)
+      .map((ev: any) => ({
+        question_id: ev.question_id, score: ev.score, feedback: ev.feedback,
+        dimensions: ev.dimensions as DimensionScore[], confidence: Number(ev.confidence),
+      })),
+    skill_scores: scoreRows
+      .filter((ss: any) => ss.attempt_id === a.id)
+      .map((ss: any) => ({
+        skill_id: ss.skill_id, avg_score: ss.avg_score,
+        calculated_level: ss.calculated_level, target_level: ss.target_level ?? ss.calculated_level,
+        question_count: ss.question_count,
+      })),
+    total_ai_score: a.total_ai_score, status: a.status,
+    started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
+    paused_at: a.paused_at ?? null, remaining_seconds: a.remaining_seconds ?? null,
+    evaluation_error: a.evaluation_error ?? null,
+  };
+}
+
 
 export const useAttemptStore = create<AttemptStore>((set, get) => ({
   attempts: [],
