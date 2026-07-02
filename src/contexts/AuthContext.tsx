@@ -76,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Azure AD SSO login
   const loginWithAzure = async (): Promise<{ success: boolean; error?: string }> => {
-
     try {
+
       await msalReady;
       const result = await msalInstance.loginPopup(loginRequest);
       const idToken = result.idToken;
