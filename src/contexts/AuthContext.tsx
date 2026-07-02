@@ -22,11 +22,11 @@ interface AuthContextType {
   currentRole: UserRole;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string) => Promise<{ success: boolean; error?: string }>;
   loginWithAzure: () => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
