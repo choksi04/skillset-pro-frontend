@@ -68,7 +68,7 @@ function formatDate(d: string | Date) {
 export default function AssessmentsPage() {
   const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
   const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
-  const { fetchQuestions } = useQuestionStore();
+  const { fetchQuestionCounts } = useQuestionStore();
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
@@ -88,7 +88,9 @@ export default function AssessmentsPage() {
 
   useEffect(() => {
     fetchAssessments();
-    fetchQuestions();
+    // My-assessments list only needs question counts (assessment.assessment_questions.length),
+    // not the full ~7000-row question preload.
+    fetchQuestionCounts();
     fetchSkills();
     fetchDomains();
     fetchAttempts();
@@ -97,6 +99,7 @@ export default function AssessmentsPage() {
     fetchAssignments();
     fetchLevels();
   }, []);
+
 
   const myAssessments = useMemo(() => assessments.filter((a) => a.employee_id === user?.id), [assessments, user]);
 

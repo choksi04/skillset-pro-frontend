@@ -17,25 +17,27 @@ const setupSteps = [
 export default function SetupProgress() {
   const { skills, initialized: skillsInit, fetchSkills } = useSkillStore();
   const { domains, mappings, initialized: domainsInit, fetchDomains } = useDomainStore();
-  const { questions, initialized: questionsInit, fetchQuestions } = useQuestionStore();
+  const { counts: questionCounts, fetchQuestionCounts } = useQuestionStore();
   const { templates, initialized: templatesInit, fetchTemplates } = useTemplateStore();
 
   useEffect(() => {
     if (!skillsInit) fetchSkills();
     if (!domainsInit) fetchDomains();
-    if (!questionsInit) fetchQuestions();
+    // Only need the count, not the full 7000-row question preload.
+    fetchQuestionCounts();
     if (!templatesInit) fetchTemplates();
-  }, [skillsInit, domainsInit, questionsInit, templatesInit, fetchSkills, fetchDomains, fetchQuestions, fetchTemplates]);
+  }, [skillsInit, domainsInit, templatesInit, fetchSkills, fetchDomains, fetchQuestionCounts, fetchTemplates]);
 
-  const allLoaded = skillsInit && domainsInit && questionsInit && templatesInit;
+  const allLoaded = skillsInit && domainsInit && templatesInit;
 
   const completion = useMemo(() => ({
     skills: skills.length > 0,
     domains: domains.length > 0,
     mappings: mappings.length > 0,
-    questions: questions.length > 0,
+    questions: questionCounts.total > 0,
     template: templates.some((t) => t.status === 'active'),
-  }), [skills, domains, mappings, questions, templates]);
+  }), [skills, domains, mappings, questionCounts.total, templates]);
+
 
   const done = Object.values(completion).filter(Boolean).length;
   const total = setupSteps.length;
