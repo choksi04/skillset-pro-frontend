@@ -54,6 +54,19 @@ interface QuestionStore {
 
 const BATCH_SIZE = 1000;
 
+function mapQuestionRow(q: any): Question {
+  return {
+    id: q.id, tenant_id: q.tenant_id, skill_id: q.skill_id,
+    topic_id: q.topic_id || null,
+    competency_level: q.competency_level as CompetencyLevel,
+    question_type: q.question_type as QuestionType,
+    question_text: q.question_text, evaluation_guidelines: q.evaluation_guidelines || '',
+    status: q.status as QuestionStatus, ai_generated: q.ai_generated,
+    created_at: q.created_at, updated_at: q.updated_at,
+  };
+}
+
+
 export const useQuestionStore = create<QuestionStore>((set, get) => ({
   questions: [],
   counts: { total: 0, published: 0, draft: 0, disabled: 0, aiGenerated: 0 },
