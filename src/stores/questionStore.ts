@@ -34,7 +34,12 @@ interface QuestionStore {
   counts: QuestionCounts;
   loading: boolean;
   initialized: boolean;
+  /** Full preload (~all rows, paginated). Prefer scoped fetchers below. */
   fetchQuestions: () => Promise<void>;
+  /** Runs fetchQuestions() only if not yet initialized. Cheap on repeat. */
+  ensureQuestionsLoaded: () => Promise<void>;
+  /** Scoped fetch by question IDs — merges into store, returns rows. */
+  fetchQuestionsByIds: (ids: string[]) => Promise<Question[]>;
   fetchQuestionCounts: () => Promise<void>;
   addQuestion: (q: Omit<Question, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   addQuestions: (qs: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
@@ -45,6 +50,7 @@ interface QuestionStore {
   deleteQuestion: (id: string) => Promise<{ success: boolean; error?: string }>;
   checkQuestionUsage: (id: string) => Promise<boolean>;
 }
+
 
 const BATCH_SIZE = 1000;
 
