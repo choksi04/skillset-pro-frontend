@@ -1,60 +1,78 @@
-## What actually happened (no session hijack)
+# Fix missing questions on Assessment detail — scoped fetch
 
-You did **not** get auto-logged-in as someone else. The "Admin" demo quick-button on the login page is hardcoded to a **real employee's email address**, not a demo account.
+## What you're seeing
 
-`src/pages/LoginPage.tsx` lines 215–219:
+Assessment `8a6e7b8c-…`: DB has 4 `assessment_questions` and 4 `attempt_answers` (all correct), but the "Assessment Questions" list on the detail page shows only 2.
 
-```ts
-{ label: "Admin",    email: "rukshar.rangara@1rivet.com" },
-{ label: "Manager",  email: "kishan.mistry@1rivet.com" },
-{ label: "Employee", email: "nidhi.shah@1rivet.com" },
-```
+## Root cause
 
-Clicking **Admin** calls `login("rukshar.rangara@1rivet.com")`, which in `AuthContext.tsx` simply does:
+`assessmentStore.fetchAssessments()` loads **every** assessment on app boot, then batches child rows in a single call:
 
 ```ts
-const { data } = await supabase.from('users').select('*').eq('email', email).single();
-localStorage.setItem('siap_user_id', data.id);
+supabase.from('assessment_questions')
+  .select('*')
+  .in('assessment_id', assessmentIds)   // no limit, no range
 ```
 
-Rukshar happens to be the real Admin user in the DB, so her record is loaded. The label "Admin" on the button is just the role name — it never pointed to a separate demo "admin" account.
+Supabase's Data API caps every response at **1000 rows by default**. `assessment_questions` currently holds **1362 rows**, so ~362 are silently dropped. With no `ORDER BY`, which rows are dropped is nondeterministic — this assessment lost 2 of its 4 on the recent load.
 
-## The bigger picture (already a documented MVP trade-off)
+You're right that the real problem is the "fetch everything, filter in memory" pattern, not just the 1000-row cap. The list page needs a handful of rows for the current user; the detail page needs rows for a single assessment. There's no reason to pull the whole table.
 
-The current auth model is intentionally passwordless for MVP (see project memory: `auth/login-methods`, `architecture/security/rls-policy`):
+## Fix — scoped fetches, not global preloads
 
-- Demo login: email → look up user row → store `users.id` in `localStorage.siap_user_id`. No password, no token.
-- On reload, the app reads that ID and rehydrates the user.
-- This means **anyone who knows a user's email can sign in as them**, and anyone can edit `localStorage` to impersonate any user. RLS is "Allow all" because `auth.uid()` is always null.
+Two targeted changes, no new helpers, no pagination hacks.
 
-This is the documented Phase 1 posture, to be replaced when real Supabase Auth / Azure SSO is the only entry point.
+### 1. Detail page loads its own assessment
 
-## Fix in this change
-
-Re-point the demo quick-buttons to the **persistent demo accounts** that project memory marks as protected (`mem://development/demo-accounts`): Admin, John Emp, John Manager. Real employee emails should never appear as one-click sign-in buttons.
-
-### Edit: `src/pages/LoginPage.tsx`
-
-Replace the hardcoded list:
+Add `fetchAssessmentById(id)` to `src/stores/assessmentStore.ts`:
 
 ```ts
-{[
-  { label: "Admin",    email: "<admin demo email>" },
-  { label: "Manager",  email: "<john manager demo email>" },
-  { label: "Employee", email: "<john emp demo email>" },
-]}
+fetchAssessmentById: async (id) => {
+  const { data: a } = await supabase
+    .from('assessments').select('*')
+    .eq('id', id).is('deleted_on', null).maybeSingle();
+  if (!a) return null;
+
+  const { data: qs } = await supabase
+    .from('assessment_questions').select('*')
+    .eq('assessment_id', id)
+    .order('created_at', { ascending: true });
+
+  const assessment = mapAssessment(a, qs ?? []);
+  // upsert into the store so lists stay in sync
+  set((s) => ({ assessments: [assessment, ...s.assessments.filter(x => x.id !== id)] }));
+  return assessment;
+}
 ```
 
-I'll read the actual demo emails from the `users` table (filter by the three demo accounts named in the memory) and wire them in.
+Do the same on the attempt side — add `fetchAttemptsForAssessment(assessmentId)` to `src/stores/attemptStore.ts` that fetches `assessment_attempts`, `attempt_answers`, `ai_evaluations`, `attempt_skill_scores` filtered by that one assessment / its attempt IDs.
 
-### Optional, not done unless you confirm
+`AssessmentDetailPage.tsx` calls both on mount instead of relying on the preloaded lists.
 
-- Remove the quick-buttons entirely and require typing the email (slightly safer for shared previews).
-- Add a clearly visible "Testing mode — not for production" banner when the demo block is open.
-- Begin migrating to real Supabase Auth so `localStorage.siap_user_id` impersonation stops being possible. This is a larger effort and outside this fix.
+### 2. List pages fetch only what the current user can see
 
-## Confirm before I build
+Right now `fetchAssessments()` pulls every assessment for every role. Change it to accept a scope:
 
-1. OK to repoint the three demo buttons to the protected demo accounts (Admin / John Manager / John Emp)? - Yes
-2. Want me to also add the "Testing mode" warning banner in the demo block? - No
-3. Keep the typed-email demo input, or remove it and only keep the three quick-buttons? - Remove testing/demo block from auth page
+- **Employee** (`My Assessments`): `.eq('employee_id', currentUserId)`
+- **Manager** (`Team Assessments`): `.in('domain_id', managedDomainIds)` (already computed elsewhere)
+- **Admin**: current behavior, but with `.order('created_at', desc).limit(200)` for the initial page and lazy-load on demand.
+
+Then the child-row fetch (`assessment_questions`, attempts, etc.) uses the resulting — much smaller — `assessmentIds`, well under 1000 rows in every realistic case.
+
+### Files touched
+
+- `src/stores/assessmentStore.ts` — add `fetchAssessmentById`, scope `fetchAssessments` by role.
+- `src/stores/attemptStore.ts` — add `fetchAttemptsForAssessment`, scope `fetchAttempts` similarly.
+- `src/pages/AssessmentDetailPage.tsx` — call the by-id fetchers on mount.
+- `src/pages/AssessmentsPage.tsx` / `src/pages/TeamAssessmentsPage.tsx` — pass the current user / managed domains into `fetchAssessments`.
+
+## Verification
+
+1. Reload `/team-assessments/8a6e7b8c-…` — badge reads **4**, all four questions render (2× L3, 2× L4), stable order.
+2. `AssessmentsPage` and `TeamAssessmentsPage` still list the right assessments for each role.
+3. Network tab shows scoped queries (small `assessment_id` filters, no full-table pulls).
+
+## Non-goals
+
+- No schema, RLS, or adaptive-engine changes.
+- Not migrating to nested PostgREST selects in this pass.
