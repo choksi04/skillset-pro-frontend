@@ -75,22 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchUser]);
 
-  // Demo email login (fallback)
-  const login = async (email: string): Promise<{ success: boolean; error?: string }> => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email.toLowerCase().trim())
-      .single();
-    if (error || !data) return { success: false, error: 'No account found with this email.' };
-    if (data.status !== 'active') return { success: false, error: 'This account is disabled. Contact your admin.' };
-    localStorage.setItem('siap_user_id', data.id);
-    setUser(mapUser(data));
-    return { success: true };
-  };
-
   // Azure AD SSO login
   const loginWithAzure = async (): Promise<{ success: boolean; error?: string }> => {
+
     try {
       await msalReady;
       const result = await msalInstance.loginPopup(loginRequest);
