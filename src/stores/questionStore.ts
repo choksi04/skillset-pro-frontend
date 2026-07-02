@@ -105,21 +105,55 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
         }
       }
 
-      const questions: Question[] = allRows.map((q: any) => ({
-        id: q.id, tenant_id: q.tenant_id, skill_id: q.skill_id,
-        topic_id: q.topic_id || null,
-        competency_level: q.competency_level as CompetencyLevel,
-        question_type: q.question_type as QuestionType,
-        question_text: q.question_text, evaluation_guidelines: q.evaluation_guidelines || '',
-        status: q.status as QuestionStatus, ai_generated: q.ai_generated,
-        created_at: q.created_at, updated_at: q.updated_at,
-      }));
+      const questions: Question[] = allRows.map(mapQuestionRow);
       set({ questions, loading: false, initialized: true });
     } catch (err) {
       console.error('Failed to fetch questions:', err);
       set({ loading: false, initialized: true });
     }
   },
+
+  /** Only preload the full list if we haven't already. In-flight-safe. */
+  ensureQuestionsLoaded: async () => {
+    const state = get();
+    if (state.initialized || state.loading) return;
+    await state.fetchQuestions();
+  },
+
+  /**
+   * Scoped fetch by IDs — used by detail pages/runners that only care about
+   * the ~4–10 questions in one assessment. Chunked to stay under URL limits.
+   * Merges into state.questions (dedupe) so lookups keep working.
+   */
+  fetchQuestionsByIds: async (ids) => {
+    const uniqueIds = [...new Set(ids)].filter(Boolean);
+    if (uniqueIds.length === 0) return [];
+    const CHUNK = 200;
+    const collected: any[] = [];
+    try {
+      for (let i = 0; i < uniqueIds.length; i += CHUNK) {
+        const slice = uniqueIds.slice(i, i + CHUNK);
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .in('id', slice)
+          .is('deleted_on', null);
+        if (error) throw error;
+        collected.push(...(data || []));
+      }
+    } catch (err) {
+      console.error('Failed to fetch questions by ids:', err);
+      return [];
+    }
+    const rows: Question[] = collected.map(mapQuestionRow);
+    set((state) => {
+      const map = new Map(state.questions.map((q) => [q.id, q]));
+      for (const q of rows) map.set(q.id, q);
+      return { questions: Array.from(map.values()) };
+    });
+    return rows;
+  },
+
 
   addQuestion: async (q) => {
     const id = `q-${Date.now()}`;
