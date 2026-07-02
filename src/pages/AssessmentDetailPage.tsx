@@ -61,12 +61,19 @@ export default function AssessmentDetailPage() {
   const {
     assessments,
     fetchAssessments,
+    fetchAssessmentById,
     softDeleteAssessment,
     addAssessment,
     removeAssessmentQuestion,
     addAssessmentQuestion,
   } = useAssessmentStore();
-  const { getAttemptForAssessment, fetchAttempts, retryEvaluation, startAttempt } = useAttemptStore();
+  const {
+    getAttemptForAssessment,
+    fetchAttempts,
+    fetchAttemptsForAssessment,
+    retryEvaluation,
+    startAttempt,
+  } = useAttemptStore();
   const { questions, fetchQuestions } = useQuestionStore();
   const { skills, fetchSkills } = useSkillStore();
   const { domains, fetchDomains } = useDomainStore();
@@ -89,8 +96,14 @@ export default function AssessmentDetailPage() {
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
   useEffect(() => {
-    fetchAssessments();
-    fetchAttempts();
+    // Scoped fetches — only pull what this page needs, straight from DB.
+    // Avoids depending on the global preload (which can be truncated at the
+    // PostgREST 1000-row default on child tables).
+    if (assessmentId) {
+      fetchAssessmentById(assessmentId);
+      fetchAttemptsForAssessment(assessmentId);
+    }
+    // Supporting reference data (small tables) — safe to preload.
     fetchQuestions();
     fetchSkills();
     fetchDomains();
@@ -99,7 +112,8 @@ export default function AssessmentDetailPage() {
     fetchLevels();
     fetchTemplates();
     fetchAssignments();
-  }, []);
+  }, [assessmentId]);
+
 
   // Build a map from competency level UUID to level number
   const levelNumberMap = useMemo(() => {
