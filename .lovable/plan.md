@@ -1,78 +1,60 @@
-# Fix missing questions on Assessment detail — scoped fetch
+## Problem
 
-## What you're seeing
+`questionStore.fetchQuestions()` pages through the entire `questions` table (~7000 rows → 8 sequential 1000-row API calls) and dumps everything into memory. It runs from many screens that only need a tiny slice:
 
-Assessment `8a6e7b8c-…`: DB has 4 `assessment_questions` and 4 `attempt_answers` (all correct), but the "Assessment Questions" list on the detail page shows only 2.
+- `AssessmentDetailPage` / `FixedRunner` — only need the ~4–10 questions in the current assessment
+- `TeamAssessmentsPage` / `AssessmentsPage` — only need counts or referenced question IDs across visible rows
+- `EvalResults`, `AddQuestionDialog`, `QuestionFormSheet`, `BulkUploadSheet` — only need referenced or filtered slices
+- `SetupProgress`, `QuickStartChecklist` — only need the total count
+- `QuestionBankPage`, `QuestionPickerSheet`, `SelectedQuestionsSheet`, `AssessmentTemplateEditPage` — legitimately browse/search, but should paginate server-side with filters, not preload everything
 
-## Root cause
+Result on the current Team Assessments screen: 8+ `questions?...offset=N&limit=1000` calls just to render 1 assessment's 4 questions.
 
-`assessmentStore.fetchAssessments()` loads **every** assessment on app boot, then batches child rows in a single call:
+## Fix (scoped fetching, no more full preloads)
 
-```ts
-supabase.from('assessment_questions')
-  .select('*')
-  .in('assessment_id', assessmentIds)   // no limit, no range
+### 1. Add scoped fetchers to `questionStore`
+
+Extend the store with narrow, targeted methods. Keep `fetchQuestions()` only as an internal helper (not called from pages).
+
+```text
+fetchQuestionsByIds(ids: string[]): Promise<Question[]>
+   - chunked .in('id', ...) fetch, upserts into store, returns rows
+fetchQuestionsPage(filters, { limit, offset }): Promise<{ rows, total }>
+   - server-side filter + range() + head-count for QuestionBank/pickers
+fetchQuestionCounts()                    // already exists — keep
 ```
 
-Supabase's Data API caps every response at **1000 rows by default**. `assessment_questions` currently holds **1362 rows**, so ~362 are silently dropped. With no `ORDER BY`, which rows are dropped is nondeterministic — this assessment lost 2 of its 4 on the recent load.
+### 2. Replace `fetchQuestions()` calls per screen
 
-You're right that the real problem is the "fetch everything, filter in memory" pattern, not just the 1000-row cap. The list page needs a handful of rows for the current user; the detail page needs rows for a single assessment. There's no reason to pull the whole table.
+| File | Current | New |
+|---|---|---|
+| `AssessmentDetailPage.tsx` | `fetchQuestions()` | `fetchQuestionsByIds(assessment.assessment_questions.map(q=>q.question_id))` after `fetchAssessmentById` |
+| `FixedRunner.tsx` | `fetchQuestions()` | `fetchQuestionsByIds(assessmentQuestionIds)` |
+| `EvalResults.tsx` | uses `questions` array | receive/lookup via `fetchQuestionsByIds` (or props from parent) |
+| `TeamAssessmentsPage.tsx` / `AssessmentsPage.tsx` | `fetchQuestions()` | drop it — list only needs counts (`assessment.assessment_questions.length`) already on the assessment row |
+| `AssessmentTemplateEditPage.tsx` | `fetchQuestions()` | `fetchQuestionsPage({ skill_ids, level, status:'published' }, page)` for the picker |
+| `QuestionPickerSheet.tsx` / `SelectedQuestionsSheet.tsx` / `AddQuestionDialog.tsx` | `fetchQuestions()` | `fetchQuestionsPage(filters, page)` + `fetchQuestionsByIds(selectedIds)` for the "already selected" chip list |
+| `QuestionFormSheet.tsx` | `fetchQuestions()` (dup check) | direct scoped Supabase query on duplicate check only |
+| `BulkUploadSheet.tsx` | `fetchQuestions()` (dup check) | scoped `.in('question_text_hash', ...)` or per-row check |
+| `SetupProgress.tsx` / `QuickStartChecklist.tsx` | `fetchQuestions()` | `fetchQuestionCounts()` only |
+| `QuestionBankPage.tsx` | `fetchQuestions()` + client filter/sort/paginate | `fetchQuestionsPage(filters, {limit,offset})` — filter/sort/paginate on the server |
 
-## Fix — scoped fetches, not global preloads
+### 3. Question Bank server-side listing
 
-Two targeted changes, no new helpers, no pagination hacks.
+Rewrite the list to send `skill_id`, `competency_level`, `question_type`, `status`, search, and `range(offset, offset+limit-1)` to Supabase, plus a `select('*', { count: 'exact', head: true })` sibling query for total. This is the biggest UX win — the page currently freezes waiting for all 7000 rows.
 
-### 1. Detail page loads its own assessment
+### 4. Cleanup
 
-Add `fetchAssessmentById(id)` to `src/stores/assessmentStore.ts`:
+- Remove the `initialized` full-preload short-circuit from `questionStore` — no screen should depend on "all questions loaded".
+- Leave the store's local cache (rows fetched by ID / page) so repeated views on the same detail page are instant.
 
-```ts
-fetchAssessmentById: async (id) => {
-  const { data: a } = await supabase
-    .from('assessments').select('*')
-    .eq('id', id).is('deleted_on', null).maybeSingle();
-  if (!a) return null;
+## Expected result
 
-  const { data: qs } = await supabase
-    .from('assessment_questions').select('*')
-    .eq('assessment_id', id)
-    .order('created_at', { ascending: true });
+- Team Assessments detail page: **1** `questions?id=in.(...)` call for the 4 assessment questions instead of 8 full-table pages.
+- Question Bank: single paginated call (~50 rows) per page change, filter, or sort.
+- Dashboards/onboarding: 1 RPC (`get_question_counts`) instead of full preload.
 
-  const assessment = mapAssessment(a, qs ?? []);
-  // upsert into the store so lists stay in sync
-  set((s) => ({ assessments: [assessment, ...s.assessments.filter(x => x.id !== id)] }));
-  return assessment;
-}
-```
+## Out of scope (deliberately)
 
-Do the same on the attempt side — add `fetchAttemptsForAssessment(assessmentId)` to `src/stores/attemptStore.ts` that fetches `assessment_attempts`, `attempt_answers`, `ai_evaluations`, `attempt_skill_scores` filtered by that one assessment / its attempt IDs.
-
-`AssessmentDetailPage.tsx` calls both on mount instead of relying on the preloaded lists.
-
-### 2. List pages fetch only what the current user can see
-
-Right now `fetchAssessments()` pulls every assessment for every role. Change it to accept a scope:
-
-- **Employee** (`My Assessments`): `.eq('employee_id', currentUserId)`
-- **Manager** (`Team Assessments`): `.in('domain_id', managedDomainIds)` (already computed elsewhere)
-- **Admin**: current behavior, but with `.order('created_at', desc).limit(200)` for the initial page and lazy-load on demand.
-
-Then the child-row fetch (`assessment_questions`, attempts, etc.) uses the resulting — much smaller — `assessmentIds`, well under 1000 rows in every realistic case.
-
-### Files touched
-
-- `src/stores/assessmentStore.ts` — add `fetchAssessmentById`, scope `fetchAssessments` by role.
-- `src/stores/attemptStore.ts` — add `fetchAttemptsForAssessment`, scope `fetchAttempts` similarly.
-- `src/pages/AssessmentDetailPage.tsx` — call the by-id fetchers on mount.
-- `src/pages/AssessmentsPage.tsx` / `src/pages/TeamAssessmentsPage.tsx` — pass the current user / managed domains into `fetchAssessments`.
-
-## Verification
-
-1. Reload `/team-assessments/8a6e7b8c-…` — badge reads **4**, all four questions render (2× L3, 2× L4), stable order.
-2. `AssessmentsPage` and `TeamAssessmentsPage` still list the right assessments for each role.
-3. Network tab shows scoped queries (small `assessment_id` filters, no full-table pulls).
-
-## Non-goals
-
-- No schema, RLS, or adaptive-engine changes.
-- Not migrating to nested PostgREST selects in this pass.
+- Similar preload smell in other stores (skills, topics) — separate pass if you want.
+- Full-text search server-side (current substring filter can move to `ilike` in the same page query without adding infra).
