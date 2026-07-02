@@ -33,15 +33,20 @@ export default function SelectedQuestionsSheet({
   selectedIds,
   onRemove,
 }: Props) {
-  const { questions } = useQuestionStore();
+  const { questions, fetchQuestionsByIds } = useQuestionStore();
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
   const [search, setSearch] = useState("");
   const [detailQuestion, setDetailQuestion] = useState<Question | null>(null);
 
   useEffect(() => {
-    if (open) setSearch("");
-  }, [open]);
+    if (open) {
+      setSearch("");
+      // Scoped fetch: only the selected question IDs, not the whole bank.
+      if (selectedIds.length) fetchQuestionsByIds(selectedIds);
+    }
+  }, [open, selectedIds, fetchQuestionsByIds]);
+
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);

@@ -35,7 +35,7 @@ export default function QuestionPickerSheet({
   initialSelectedIds,
   onSave,
 }: Props) {
-  const { questions } = useQuestionStore();
+  const { questions, ensureQuestionsLoaded } = useQuestionStore();
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
 
@@ -48,7 +48,7 @@ export default function QuestionPickerSheet({
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  // Reset buffered state when sheet opens
+  // Reset buffered state when sheet opens + lazy-load the full question list
   useEffect(() => {
     if (open) {
       setSelected(new Set(initialSelectedIds));
@@ -58,8 +58,10 @@ export default function QuestionPickerSheet({
       setTypeFilter("all");
       setExpanded(new Set());
       setPage(1);
+      ensureQuestionsLoaded();
     }
-  }, [open, initialSelectedIds]);
+  }, [open, initialSelectedIds, ensureQuestionsLoaded]);
+
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
