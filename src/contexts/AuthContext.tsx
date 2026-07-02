@@ -147,7 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         currentRole: user?.role ?? 'employee',
         isAuthenticated: !!user,
         loading,
-        login,
         loginWithAzure,
         logout,
         refreshUser,
