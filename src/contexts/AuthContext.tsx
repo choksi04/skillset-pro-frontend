@@ -26,9 +26,8 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
-
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 
 const msalInstance = new PublicClientApplication(msalConfig);
 const msalReady = msalInstance.initialize();
