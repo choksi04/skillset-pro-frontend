@@ -174,12 +174,60 @@ interface AssessmentStore {
   loading: boolean;
   initialized: boolean;
   fetchAssessments: () => Promise<void>;
+  fetchAssessmentById: (id: string) => Promise<Assessment | null>;
   addAssessment: (params: GenerateAssessmentParams) => Promise<string>;
   getAssessmentsForEmployee: (employeeId: string) => Assessment[];
   updateAssessmentStatus: (id: string, status: string) => Promise<void>;
   softDeleteAssessment: (id: string) => Promise<void>;
   removeAssessmentQuestion: (assessmentId: string, questionId: string) => Promise<void>;
   addAssessmentQuestion: (assessmentId: string, question: AssessmentQuestion) => Promise<void>;
+}
+
+/** Map raw DB rows into an Assessment domain object. */
+function mapAssessmentRow(a: any, questionRows: any[]): Assessment {
+  const aqs = questionRows.map((q: any) => ({
+    question_id: q.question_id,
+    skill_id: q.skill_id,
+    target_level: q.target_level as CompetencyLevel,
+  }));
+  const skillIds = [...new Set(aqs.map((q) => q.skill_id))];
+  return {
+    id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
+    submission_id: a.submission_id, domain_id: a.domain_id,
+    template_id: a.template_id ?? null, is_reassessment: a.is_reassessment ?? false,
+    is_adaptive: a.is_adaptive ?? false,
+    parent_assessment_id: a.parent_assessment_id ?? null,
+    skill_ids: skillIds, assessment_questions: aqs,
+    status: a.status, duration_minutes: a.duration_minutes,
+    created_at: a.created_at, updated_at: a.updated_at,
+  };
+}
+
+/**
+ * Fetch ALL rows for an `.in()` batched query, paginating past the 1000-row
+ * PostgREST default so we never silently drop child rows.
+ */
+async function fetchAllIn<T = any>(
+  table: string, column: string, values: string[], orderColumn?: string,
+): Promise<T[]> {
+  if (values.length === 0) return [];
+  const PAGE = 1000;
+  const out: T[] = [];
+  let from = 0;
+  // Loop until fewer than PAGE rows come back
+  // (PostgREST returns at most 1000 per request by default).
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    let q = supabase.from(table as any).select('*').in(column, values).range(from, from + PAGE - 1);
+    if (orderColumn) q = q.order(orderColumn, { ascending: true });
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = (data as any[]) ?? [];
+    out.push(...(rows as T[]));
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
 }
 
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
