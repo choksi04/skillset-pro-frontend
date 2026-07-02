@@ -163,44 +163,16 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       if (error) throw error;
 
       const attemptIds = (attemptRows || []).map((a: any) => a.id);
-      let answerRows: any[] = [];
-      let evalRows: any[] = [];
-      let scoreRows: any[] = [];
+      // Paginated so we don't silently truncate at 1000 rows per child table.
+      const [answerRows, evalRows, scoreRows] = await Promise.all([
+        fetchAllIn<any>('attempt_answers', 'attempt_id', attemptIds),
+        fetchAllIn<any>('ai_evaluations', 'attempt_id', attemptIds),
+        fetchAllIn<any>('attempt_skill_scores', 'attempt_id', attemptIds),
+      ]);
 
-      if (attemptIds.length > 0) {
-        const [answersRes, evalsRes, scoresRes] = await Promise.all([
-          supabase.from('attempt_answers').select('*').in('attempt_id', attemptIds),
-          supabase.from('ai_evaluations').select('*').in('attempt_id', attemptIds),
-          supabase.from('attempt_skill_scores').select('*').in('attempt_id', attemptIds),
-        ]);
-        answerRows = answersRes.data || [];
-        evalRows = evalsRes.data || [];
-        scoreRows = scoresRes.data || [];
-      }
-
-      const attempts: AssessmentAttempt[] = (attemptRows || []).map((a: any) => ({
-        id: a.id, assessment_id: a.assessment_id, tenant_id: a.tenant_id, employee_id: a.employee_id,
-        answers: answerRows
-          .filter((ans: any) => ans.attempt_id === a.id)
-          .map((ans: any) => ({ question_id: ans.question_id, answer_text: ans.answer_text, time_spent_seconds: ans.time_spent_seconds })),
-        ai_evaluations: evalRows
-          .filter((ev: any) => ev.attempt_id === a.id)
-          .map((ev: any) => ({
-            question_id: ev.question_id, score: ev.score, feedback: ev.feedback,
-            dimensions: ev.dimensions as DimensionScore[], confidence: Number(ev.confidence),
-          })),
-        skill_scores: scoreRows
-          .filter((ss: any) => ss.attempt_id === a.id)
-          .map((ss: any) => ({
-            skill_id: ss.skill_id, avg_score: ss.avg_score,
-            calculated_level: ss.calculated_level, target_level: ss.target_level ?? ss.calculated_level,
-            question_count: ss.question_count,
-          })),
-        total_ai_score: a.total_ai_score, status: a.status,
-        started_at: a.started_at, submitted_at: a.submitted_at, evaluated_at: a.evaluated_at,
-        paused_at: a.paused_at ?? null, remaining_seconds: a.remaining_seconds ?? null,
-        evaluation_error: a.evaluation_error ?? null,
-      }));
+      const attempts: AssessmentAttempt[] = (attemptRows || []).map((a: any) =>
+        mapAttemptRow(a, answerRows, evalRows, scoreRows),
+      );
 
       set({ attempts, loading: false, initialized: true });
     } catch (err) {
@@ -208,6 +180,43 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       set({ loading: false, initialized: true });
     }
   },
+
+  /**
+   * Scoped fetch: pulls attempts + child rows for ONE assessment only.
+   * Used by the detail page so it doesn't depend on the global preload.
+   */
+  fetchAttemptsForAssessment: async (assessmentId) => {
+    const { data: attemptRows, error } = await supabase
+      .from('assessment_attempts')
+      .select('*')
+      .eq('assessment_id', assessmentId)
+      .order('started_at', { ascending: false });
+    if (error) {
+      console.error('Failed to fetch attempts for assessment:', error);
+      return [];
+    }
+    const attemptIds = (attemptRows || []).map((a: any) => a.id);
+    const [answersRes, evalsRes, scoresRes] = await Promise.all([
+      attemptIds.length ? supabase.from('attempt_answers').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+      attemptIds.length ? supabase.from('ai_evaluations').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+      attemptIds.length ? supabase.from('attempt_skill_scores').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+    const answerRows = (answersRes as any).data || [];
+    const evalRows = (evalsRes as any).data || [];
+    const scoreRows = (scoresRes as any).data || [];
+    const attempts: AssessmentAttempt[] = (attemptRows || []).map((a: any) =>
+      mapAttemptRow(a, answerRows, evalRows, scoreRows),
+    );
+    // Merge into store (replace attempts for this assessment).
+    set((state) => ({
+      attempts: [
+        ...attempts,
+        ...state.attempts.filter((x) => x.assessment_id !== assessmentId),
+      ],
+    }));
+    return attempts;
+  },
+
 
   startAttempt: async (assessmentId, tenantId, employeeId, forceNew = false) => {
     if (!forceNew) {
