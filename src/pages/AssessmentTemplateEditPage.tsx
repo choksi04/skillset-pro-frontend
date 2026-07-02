@@ -43,7 +43,7 @@ export default function AssessmentTemplateEditPage() {
   const { templates, fetchTemplates, fetchTemplateRelations, saveTemplate } = useTemplateStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
   const { skills, fetchSkills } = useSkillStore();
-  const { questions, fetchQuestions } = useQuestionStore();
+  const { questions, fetchQuestionsByIds } = useQuestionStore();
 
   const tenantId = user?.tenant_id ?? "tenant-001";
 
@@ -81,8 +81,9 @@ export default function AssessmentTemplateEditPage() {
   useEffect(() => {
     fetchDomains();
     fetchSkills();
-    fetchQuestions();
     fetchLevels();
+    // NOTE: no full question preload here. The picker sheet lazy-loads on open;
+    // for the summary we scoped-fetch only the picked IDs below.
     if (isNew) {
       fetchTemplates();
       return;
@@ -107,10 +108,15 @@ export default function AssessmentTemplateEditPage() {
         const rel = await fetchTemplateRelations(t.id);
         setPickedSkills(rel.skill_ids);
         setPickedQuestions(rel.question_ids);
+        // Scoped fetch: only the questions actually referenced by this template.
+        if (rel.question_ids.length) {
+          await fetchQuestionsByIds(rel.question_ids);
+        }
       }
       setLoaded(true);
     })();
   }, [templateId, isNew]);
+
 
   // Live page title (breadcrumb)
   useEffect(() => {

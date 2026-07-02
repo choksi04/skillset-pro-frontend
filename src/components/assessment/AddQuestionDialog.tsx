@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuestionStore } from '@/stores/questionStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/competencyLevelStore';
@@ -24,11 +24,17 @@ interface AddQuestionDialogProps {
 export default function AddQuestionDialog({
   open, onOpenChange, skillIds, existingQuestionIds, onAdd,
 }: AddQuestionDialogProps) {
-  const { questions } = useQuestionStore();
+  const { questions, ensureQuestionsLoaded } = useQuestionStore();
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+
+  // Lazy-load question bank only when dialog opens.
+  useEffect(() => {
+    if (open) ensureQuestionsLoaded();
+  }, [open, ensureQuestionsLoaded]);
+
 
   const skillMap = useMemo(() => new Map(skills.map(s => [s.id, s])), [skills]);
   const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);

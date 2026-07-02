@@ -17,7 +17,7 @@ export default function QuickStartChecklist() {
 
   const { domains, mappings } = useDomainStore();
   const { skills } = useSkillStore();
-  const { questions } = useQuestionStore();
+  const { counts: questionCounts } = useQuestionStore();
   const { assessments } = useAssessmentStore();
   const { attempts } = useAttemptStore();
   const { submissions } = useRegistryStore();
@@ -29,14 +29,16 @@ export default function QuickStartChecklist() {
     hasDomains: domains.length > 0,
     hasCustomSkills: skills.length > 0,
     hasMappings: mappings.length > 0,
-    hasQuestions: questions.length > 0,
+    // Use aggregated count, not the full row preload.
+    hasQuestions: questionCounts.total > 0,
     hasAssessments: assessments.length > 0,
     hasSubmission: submissions.some((s) => s.employee_id === employeeId && s.status !== 'draft'),
     hasAttempt: attempts.some((a) => a.employee_id === employeeId && a.status !== 'in_progress'),
     hasFeedback: attempts.some((a) => a.employee_id === employeeId && a.ai_evaluations.length > 0),
     hasReview: reviews.some((r) => r.status !== 'pending'),
     hasCompletedReview: reviews.some((r) => r.status === 'completed'),
-  }), [domains, skills, mappings, questions, assessments, submissions, attempts, reviews, employeeId]);
+  }), [domains, skills, mappings, questionCounts.total, assessments, submissions, attempts, reviews, employeeId]);
+
 
   const roleItems = checklistItems.filter((item) => item.roles.includes(currentRole));
   const completedCount = roleItems.filter((item) => completionMap[item.checkFn]).length;

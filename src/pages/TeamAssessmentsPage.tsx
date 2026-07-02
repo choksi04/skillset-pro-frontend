@@ -81,7 +81,7 @@ const COMPLETE_STATUSES = new Set(["submitted", "evaluated", "under_review", "ap
 export default function TeamAssessmentsPage() {
   const { assessments, fetchAssessments, loading, initialized } = useAssessmentStore();
   const { fetchAttempts, getAttemptForAssessment } = useAttemptStore();
-  const { fetchQuestions } = useQuestionStore();
+  const { fetchQuestionCounts } = useQuestionStore();
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
   const { fetchReviews, reviews } = useReviewStore();
@@ -106,13 +106,16 @@ export default function TeamAssessmentsPage() {
 
   useEffect(() => {
     fetchAssessments();
-    fetchQuestions();
+    // Team-assessments list only needs question counts (from assessment_questions),
+    // not the full ~7000-row question preload.
+    fetchQuestionCounts();
     fetchSkills();
     fetchDomains();
     fetchAttempts();
     fetchReviews();
     fetchTemplates();
     fetchLevels();
+
   }, []);
 
   useEffect(() => {
