@@ -174,12 +174,60 @@ interface AssessmentStore {
   loading: boolean;
   initialized: boolean;
   fetchAssessments: () => Promise<void>;
+  fetchAssessmentById: (id: string) => Promise<Assessment | null>;
   addAssessment: (params: GenerateAssessmentParams) => Promise<string>;
   getAssessmentsForEmployee: (employeeId: string) => Assessment[];
   updateAssessmentStatus: (id: string, status: string) => Promise<void>;
   softDeleteAssessment: (id: string) => Promise<void>;
   removeAssessmentQuestion: (assessmentId: string, questionId: string) => Promise<void>;
   addAssessmentQuestion: (assessmentId: string, question: AssessmentQuestion) => Promise<void>;
+}
+
+/** Map raw DB rows into an Assessment domain object. */
+function mapAssessmentRow(a: any, questionRows: any[]): Assessment {
+  const aqs = questionRows.map((q: any) => ({
+    question_id: q.question_id,
+    skill_id: q.skill_id,
+    target_level: q.target_level as CompetencyLevel,
+  }));
+  const skillIds = [...new Set(aqs.map((q) => q.skill_id))];
+  return {
+    id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
+    submission_id: a.submission_id, domain_id: a.domain_id,
+    template_id: a.template_id ?? null, is_reassessment: a.is_reassessment ?? false,
+    is_adaptive: a.is_adaptive ?? false,
+    parent_assessment_id: a.parent_assessment_id ?? null,
+    skill_ids: skillIds, assessment_questions: aqs,
+    status: a.status, duration_minutes: a.duration_minutes,
+    created_at: a.created_at, updated_at: a.updated_at,
+  };
+}
+
+/**
+ * Fetch ALL rows for an `.in()` batched query, paginating past the 1000-row
+ * PostgREST default so we never silently drop child rows.
+ */
+async function fetchAllIn<T = any>(
+  table: string, column: string, values: string[], orderColumn?: string,
+): Promise<T[]> {
+  if (values.length === 0) return [];
+  const PAGE = 1000;
+  const out: T[] = [];
+  let from = 0;
+  // Loop until fewer than PAGE rows come back
+  // (PostgREST returns at most 1000 per request by default).
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    let q = supabase.from(table as any).select('*').in(column, values).range(from, from + PAGE - 1);
+    if (orderColumn) q = q.order(orderColumn, { ascending: true });
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = (data as any[]) ?? [];
+    out.push(...(rows as T[]));
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
 }
 
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
@@ -199,36 +247,15 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       if (error) throw error;
 
       const assessmentIds = (assessmentRows || []).map((a: any) => a.id);
-      let questionRows: any[] = [];
-      if (assessmentIds.length > 0) {
-        const { data, error: qError } = await supabase
-          .from('assessment_questions')
-          .select('*')
-          .in('assessment_id', assessmentIds);
-        if (qError) throw qError;
-        questionRows = data || [];
-      }
+      // Paginated fetch to bypass the 1000-row PostgREST default so no child
+      // rows are silently dropped when the table grows past 1k.
+      const questionRows = await fetchAllIn<any>(
+        'assessment_questions', 'assessment_id', assessmentIds, 'created_at',
+      );
 
-      const assessments: Assessment[] = (assessmentRows || []).map((a: any) => {
-        const aqs = questionRows
-          .filter((q: any) => q.assessment_id === a.id)
-          .map((q: any) => ({
-            question_id: q.question_id,
-            skill_id: q.skill_id,
-            target_level: q.target_level as CompetencyLevel,
-          }));
-        const skillIds = [...new Set(aqs.map((q) => q.skill_id))];
-        return {
-          id: a.id, tenant_id: a.tenant_id, employee_id: a.employee_id,
-          submission_id: a.submission_id, domain_id: a.domain_id,
-          template_id: a.template_id ?? null, is_reassessment: a.is_reassessment ?? false,
-          is_adaptive: a.is_adaptive ?? false,
-          parent_assessment_id: a.parent_assessment_id ?? null,
-          skill_ids: skillIds, assessment_questions: aqs,
-          status: a.status, duration_minutes: a.duration_minutes,
-          created_at: a.created_at, updated_at: a.updated_at,
-        };
-      });
+      const assessments: Assessment[] = (assessmentRows || []).map((a: any) =>
+        mapAssessmentRow(a, questionRows.filter((q: any) => q.assessment_id === a.id)),
+      );
 
       set({ assessments, loading: false, initialized: true });
     } catch (err) {
@@ -236,6 +263,41 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       set({ loading: false, initialized: true });
     }
   },
+
+  /**
+   * Scoped fetch for a single assessment — used by the detail page so it never
+   * depends on the list preload (which can be stale or filtered elsewhere).
+   * Upserts into the store so navigating back to the list is consistent.
+   */
+  fetchAssessmentById: async (id) => {
+    const { data: a, error } = await supabase
+      .from('assessments')
+      .select('*')
+      .eq('id', id)
+      .is('deleted_on', null)
+      .maybeSingle();
+    if (error) {
+      console.error('Failed to fetch assessment by id:', error);
+      return null;
+    }
+    if (!a) return null;
+
+    const { data: qs, error: qError } = await supabase
+      .from('assessment_questions')
+      .select('*')
+      .eq('assessment_id', id)
+      .order('created_at', { ascending: true });
+    if (qError) {
+      console.error('Failed to fetch assessment questions:', qError);
+    }
+
+    const assessment = mapAssessmentRow(a, qs ?? []);
+    set((state) => ({
+      assessments: [assessment, ...state.assessments.filter((x) => x.id !== id)],
+    }));
+    return assessment;
+  },
+
 
   addAssessment: async (params) => {
     const { tenant_id, employee_id, submission_id, domain_id, template_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
