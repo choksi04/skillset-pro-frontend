@@ -1,19 +1,31 @@
 ## Goal
-Remove the demo login path entirely from the production app so only Azure AD SSO remains.
+Make AI question generation topic-aware, and replace the mandatory "Organization context" with an optional free-form "Additional context".
 
-## Context
-- `src/pages/LoginPage.tsx` already only shows the "Continue with 1Rivet Account" Microsoft SSO button and has no visible demo UI.
-- `src/contexts/AuthContext.tsx` still exposes a `login(email)` fallback labeled "Demo email login (fallback)". It is currently unused by any UI component, but remains callable from the auth context and was the source of the earlier impersonation issue (hardcoded "Admin" button logging in as another user).
+## Changes
 
-## Plan
-1. **Strip dead demo login code**
-   - Remove the `login` function from `AuthContext.tsx`.
-   - Remove `login` from the `AuthContextType` interface and from the provider value.
-   - Keep `loginWithAzure` and the rest of the Azure AD SSO flow untouched.
-2. **Sanity-check the login page**
-   - Confirm `LoginPage.tsx` imports only `loginWithAzure` and renders no demo/test/admin buttons.
-3. **Update memory**
-   - Update `mem://auth/login-methods` to record that production builds use Azure AD SSO only and the demo fallback is disabled.
+### 1. Edge Function — `supabase/functions/generate-questions/index.ts`
+- Accept new inputs: `topicName?: string`, `topicDescription?: string`, `additionalContext?: string`.
+- Remove `organizationContext` from the request and prompt.
+- Update the system/user prompt:
+  - If `topicName` present: add a rule like `Focus specifically on the topic "${topicName}" within the "${skillName}" skill.` and, if `topicDescription` present, append `Topic description: "${topicDescription}"`.
+  - If `additionalContext` present: include as `Additional context: "${additionalContext}"`; otherwise omit entirely (no default org line).
 
-## Outcome
-No UI or code path exists in the deployed app to sign in as another user by email. Only 1Rivet Azure AD SSO remains.
+### 2. Caller — `src/pages/QuestionBankPage.tsx`
+- Replace `aiContext` default string with empty string; state stays but becomes optional.
+- Update Zod schema: `organization_context` → `additional_context: z.string().trim().max(1000).optional().or(z.literal(''))` (no min length).
+- When invoking `generate-questions`, send:
+  - `topicName` (already passed) — keep.
+  - `topicDescription`: look up from `topics[aiSkillId]` by `aiTopicId` and pass `.description` when available.
+  - `additionalContext`: pass `aiContext` only if non-empty; drop `organizationContext`.
+- UI (AI panel):
+  - Rename the textarea label from "Organization context" to "Additional context (optional)".
+  - Update placeholder to something like "Optional: add any extra guidance for the AI (audience, tech stack, tone, etc.)".
+  - Remove the required-field asterisk/validation error display for this field.
+
+### 3. Topic description lookup
+- `topicMap` currently stores only names. Add a small `topicDescMap` (id → description) built the same way from `topics` in `useSkillStore`, used only inside the generate handler.
+
+## Out of scope
+- No DB schema changes.
+- No changes to non-AI question authoring flow.
+- No changes to other callers (none exist besides QuestionBankPage).

@@ -119,9 +119,10 @@ const genSchema = z.object({
   skill_id: z.string().min(1, 'Skill is required'),
   competency_level: z.string().min(1, 'Level is required'),
   question_type: z.string().min(1, 'Type is required'),
-  organization_context: z.string().trim().min(10, 'Context must be at least 10 characters').max(1000),
+  additional_context: z.string().trim().max(1000).optional().or(z.literal('')),
   count: z.number().min(1).max(10),
 });
+
 
 interface GeneratedPreview {
   question_text: string;
@@ -171,7 +172,7 @@ export default function QuestionBankPage() {
   const [aiTopicId, setAiTopicId] = useState('');
   const [aiLevel, setAiLevel] = useState('');
   const [aiQType, setAiQType] = useState('');
-  const [aiContext, setAiContext] = useState('This organization primarily builds internal back-office portals and dashboards. Avoid SEO and marketing website scenarios.');
+  const [aiContext, setAiContext] = useState('');
   const [aiCount, setAiCount] = useState(3);
   const [aiErrors, setAiErrors] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
@@ -192,6 +193,12 @@ export default function QuestionBankPage() {
     Object.values(topics).flat().forEach((t) => m.set(t.id, t.name));
     return m;
   }, [topics]);
+  const topicDescMap = useMemo(() => {
+    const m = new Map<string, string>();
+    Object.values(topics).flat().forEach((t: any) => { if (t.description) m.set(t.id, t.description); });
+    return m;
+  }, [topics]);
+
 
   const filtered = useMemo(() => {
     const result = questions.filter((q) => {
@@ -261,7 +268,7 @@ export default function QuestionBankPage() {
   const handleGenerate = async () => {
     const result = genSchema.safeParse({
       skill_id: aiSkillId, competency_level: aiLevel, question_type: aiQType,
-      organization_context: aiContext, count: aiCount,
+      additional_context: aiContext, count: aiCount,
     });
     if (!result.success) {
       const fe: Record<string, string> = {};
@@ -276,17 +283,20 @@ export default function QuestionBankPage() {
 
     const skill = skills.find((s) => s.id === aiSkillId);
     const topic = aiTopicId ? topicMap.get(aiTopicId) : undefined;
+    const topicDesc = aiTopicId ? topicDescMap.get(aiTopicId) : undefined;
     // Get level NAME for AI prompt (AI needs human-readable name, not UUID)
     const aiLevelName = getLevelNameById(clSettings, aiLevel) || aiLevel;
+    const trimmedContext = aiContext.trim();
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-questions', {
         body: {
           skillName: skill?.skill_name ?? 'Unknown',
           topicName: topic || undefined,
+          topicDescription: topicDesc || undefined,
           competencyLevel: aiLevelName,
           questionType: aiQType,
-          organizationContext: aiContext,
+          additionalContext: trimmedContext || undefined,
           count: aiCount,
         },
       });
@@ -302,6 +312,7 @@ export default function QuestionBankPage() {
       setGenerating(false);
     }
   };
+
 
   const togglePreview = (i: number) => setPreviews((prev) => prev.map((p, idx) => idx === i ? { ...p, accepted: !p.accepted } : p));
 
@@ -457,13 +468,14 @@ export default function QuestionBankPage() {
 
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Organization Context <span className="text-destructive">*</span></Label>
-                  <Textarea value={aiContext} onChange={(e) => setAiContext(e.target.value)} maxLength={1000} rows={2} placeholder="Describe the context..." />
+                  <Label>Additional Context <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Textarea value={aiContext} onChange={(e) => setAiContext(e.target.value)} maxLength={1000} rows={2} placeholder="Optional: add any extra guidance for the AI (audience, tech stack, tone, focus areas, etc.)" />
                   <div className="flex justify-between">
-                    {aiErrors.organization_context && <p className="text-xs text-destructive">{aiErrors.organization_context}</p>}
+                    {aiErrors.additional_context && <p className="text-xs text-destructive">{aiErrors.additional_context}</p>}
                     <p className="text-xs text-muted-foreground ml-auto">{aiContext.length}/1000</p>
                   </div>
                 </div>
+
                 <Button onClick={handleGenerate} disabled={generating} className="gap-1.5">
                   {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   {generating ? 'Generating...' : 'Generate Questions'}

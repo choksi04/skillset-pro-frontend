@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { skillName, competencyLevel, questionType, organizationContext, count } = await req.json();
+    const { skillName, topicName, topicDescription, competencyLevel, questionType, additionalContext, count } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -35,22 +35,29 @@ serve(async (req) => {
       questionType === "mcq" ? mcqFormat :
       questionType === "coding" ? codingFormat : scenarioFormat;
 
+    const topicRule = topicName
+      ? `\n- Focus specifically on the topic "${topicName}" within the "${skillName}" skill${topicDescription ? `. Topic description: "${topicDescription}"` : ""}`
+      : "";
+    const contextRule = additionalContext && String(additionalContext).trim()
+      ? `\n- Additional context to consider: "${String(additionalContext).trim()}"`
+      : "";
+
     const systemPrompt = `You are an expert assessment question generator for technical skills evaluation in enterprise organizations. Generate high-quality, practical questions that test real-world competency.
 
 Rules:
 - Questions must be at the "${competencyLevel}" competency level
-- Questions must test "${skillName}" skill
-- Questions must be relevant to this organizational context: "${organizationContext}"
+- Questions must test "${skillName}" skill${topicRule}${contextRule}
 - Each question must be unique and test different aspects of the skill
 - For MCQs: exactly 4 options, 1 correct answer, options should be plausible
 - For coding: include clear problem statements with example input/output
 - For scenarios: create realistic workplace situations requiring analysis`;
 
-    const userPrompt = `Generate exactly ${count} ${questionType} question(s) for the skill "${skillName}" at the "${competencyLevel}" level.
+    const userPrompt = `Generate exactly ${count} ${questionType} question(s) for the skill "${skillName}"${topicName ? ` (topic: "${topicName}")` : ""} at the "${competencyLevel}" level.
 
 ${formatInstructions}
 
 Return a JSON array of ${count} question object(s). Only return the JSON array, no other text.`;
+
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
