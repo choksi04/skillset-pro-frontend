@@ -179,6 +179,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   const timerRef = useRef(initialRemaining);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [isOpeningReview, setIsOpeningReview] = useState(false);
+  const busy = isNavigating || isPausing || isResuming || isExiting || isOpeningReview || isSubmitting;
 
   const currentAQ = currentQuestions[currentIdx];
   const currentQuestion = currentAQ ? questionMap.get(currentAQ.question_id) : null;
@@ -252,34 +258,62 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   }, [assessment, currentAQ, answers, timeSpent, getAttemptForAssessment, saveAnswer]);
 
   const goTo = useCallback(async (idx: number) => {
-    recordTimeSpent();
-    await saveCurrentAnswer();
-    setCurrentIdx(idx);
-    setQuestionStartTime(Date.now());
-  }, [recordTimeSpent, saveCurrentAnswer]);
+    if (isNavigating) return;
+    setIsNavigating(true);
+    try {
+      recordTimeSpent();
+      await saveCurrentAnswer();
+      setCurrentIdx(idx);
+      setQuestionStartTime(Date.now());
+    } finally {
+      setIsNavigating(false);
+    }
+  }, [recordTimeSpent, saveCurrentAnswer, isNavigating]);
 
   const handlePause = async () => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (!attempt) return;
-    recordTimeSpent();
-    await saveCurrentAnswer();
-    await pauseAttempt(attempt.id, timerRef.current);
-    setIsPaused(true);
-    toast.info('Assessment paused. Your progress has been saved.');
+    if (isPausing) return;
+    setIsPausing(true);
+    try {
+      recordTimeSpent();
+      await saveCurrentAnswer();
+      await pauseAttempt(attempt.id, timerRef.current);
+      setIsPaused(true);
+      toast.info('Assessment paused. Your progress has been saved.');
+    } finally {
+      setIsPausing(false);
+    }
   };
 
   const handleResume = async () => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (!attempt) return;
-    // If the timer ran out earlier, top up to a minimal amount so the user can
-    // finish reviewing / submitting — don't auto-submit on their behalf.
-    if (timerRef.current <= 0) {
-      timerRef.current = 60;
-      setTimerSeconds(60);
+    if (isResuming) return;
+    setIsResuming(true);
+    try {
+      // If the timer ran out earlier, top up to a minimal amount so the user can
+      // finish reviewing / submitting — don't auto-submit on their behalf.
+      if (timerRef.current <= 0) {
+        timerRef.current = 60;
+        setTimerSeconds(60);
+      }
+      await resumeAttempt(attempt.id);
+      setIsPaused(false);
+      setQuestionStartTime(Date.now());
+    } finally {
+      setIsResuming(false);
     }
-    await resumeAttempt(attempt.id);
-    setIsPaused(false);
-    setQuestionStartTime(Date.now());
+  };
+
+  const handleExit = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    try {
+      await onCancel();
+    } finally {
+      setIsExiting(false);
+    }
   };
 
   const doSubmit = async () => {
@@ -358,8 +392,14 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   };
 
   const openReview = async () => {
-    await saveCurrentAnswer();
-    setReviewOpen(true);
+    if (isOpeningReview) return;
+    setIsOpeningReview(true);
+    try {
+      await saveCurrentAnswer();
+      setReviewOpen(true);
+    } finally {
+      setIsOpeningReview(false);
+    }
   };
 
   const handleSubmitFromReview = () => {
@@ -527,14 +567,20 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
             onTimeUp={handleTimeUp}
             onTick={(s) => { timerRef.current = s; }}
           />
-          <Button size="sm" variant="ghost" onClick={isPaused ? handleResume : handlePause} className="gap-1.5">
-            {isPaused ? <><Play size={14} /> Resume</> : <><Pause size={14} /> Pause</>}
+          <Button size="sm" variant="ghost" onClick={isPaused ? handleResume : handlePause} disabled={isPausing || isResuming || isSubmitting || isExiting} className="gap-1.5">
+            {isPausing || isResuming ? (
+              <><Loader2 size={14} className="animate-spin" /> {isPaused ? 'Resuming…' : 'Pausing…'}</>
+            ) : isPaused ? (
+              <><Play size={14} /> Resume</>
+            ) : (
+              <><Pause size={14} /> Pause</>
+            )}
           </Button>
-          <Button size="sm" variant="outline" onClick={onCancel} className="gap-1.5">
-            Exit
+          <Button size="sm" variant="outline" onClick={handleExit} disabled={isExiting || isSubmitting} className="gap-1.5">
+            {isExiting ? <><Loader2 size={14} className="animate-spin" /> Exiting…</> : 'Exit'}
           </Button>
-          <Button size="sm" variant="default" onClick={openReview} disabled={isPaused || isSubmitting} className="gap-1.5">
-            <ListChecks size={14} /> Review & submit
+          <Button size="sm" variant="default" onClick={openReview} disabled={isPaused || isSubmitting || isOpeningReview || isNavigating} className="gap-1.5">
+            {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Review & submit
           </Button>
         </div>
       </div>
@@ -549,7 +595,9 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
               <h2 className="text-lg font-semibold text-foreground">Assessment paused</h2>
               <p className="text-sm text-muted-foreground mt-1">Your progress is saved. Click Resume to continue where you left off.</p>
             </div>
-            <Button onClick={handleResume} className="gap-1.5"><Play size={14} /> Resume assessment</Button>
+            <Button onClick={handleResume} disabled={isResuming} className="gap-1.5">
+              {isResuming ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} {isResuming ? 'Resuming…' : 'Resume assessment'}
+            </Button>
           </div>
         </div>
       )}
@@ -586,7 +634,8 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                   <button
                     key={aq.question_id}
                     onClick={() => goTo(i)}
-                    className={`flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-all ${btnClass}`}
+                    disabled={isNavigating}
+                    className={`flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-all ${btnClass} ${isNavigating ? 'opacity-60 cursor-wait' : ''}`}
                     title={`Q${i + 1}${hasAnswer ? ' • answered' : ''}${isReview ? ' • flagged' : ''}`}
                   >
                     {i + 1}
@@ -706,12 +755,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
 
                 <div className="border-t border-border px-6 py-3 flex items-center justify-between bg-card">
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} className="gap-1">
-                      <ChevronLeft size={14} /> Previous
+                    <Button variant="outline" size="sm" onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0 || isNavigating} className="gap-1">
+                      {isNavigating ? <Loader2 size={14} className="animate-spin" /> : <ChevronLeft size={14} />} Previous
                     </Button>
                     {currentIdx < currentQuestions.length - 1 && (
-                      <Button variant="ghost" size="sm" onClick={() => goTo(currentIdx + 1)} className="gap-1 text-muted-foreground">
-                        Skip <SkipForward size={14} />
+                      <Button variant="ghost" size="sm" onClick={() => goTo(currentIdx + 1)} disabled={isNavigating} className="gap-1 text-muted-foreground">
+                        Skip {isNavigating ? <Loader2 size={14} className="animate-spin" /> : <SkipForward size={14} />}
                       </Button>
                     )}
                   </div>
@@ -721,7 +770,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                       variant="ghost"
                       size="sm"
                       onClick={resetAnswer}
-                      disabled={!answers[currentAQ.question_id]?.trim()}
+                      disabled={!answers[currentAQ.question_id]?.trim() || isNavigating}
                       className="gap-1 text-muted-foreground"
                     >
                       <RotateCcw size={12} /> Reset
@@ -739,12 +788,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
 
                   <div className="flex items-center gap-2">
                     {currentIdx < currentQuestions.length - 1 ? (
-                      <Button size="sm" onClick={() => goTo(currentIdx + 1)} className="gap-1">
-                        Next <ChevronRight size={14} />
+                      <Button size="sm" onClick={() => goTo(currentIdx + 1)} disabled={isNavigating} className="gap-1">
+                        {isNavigating ? <><Loader2 size={14} className="animate-spin" /> Next</> : <>Next <ChevronRight size={14} /></>}
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={openReview} disabled={isSubmitting} className="gap-1">
-                        <ListChecks size={14} /> Review & submit
+                      <Button size="sm" onClick={openReview} disabled={isSubmitting || isOpeningReview || isNavigating} className="gap-1">
+                        {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Review & submit
                       </Button>
                     )}
                   </div>
