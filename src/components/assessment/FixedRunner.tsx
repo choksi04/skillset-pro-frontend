@@ -179,6 +179,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   const timerRef = useRef(initialRemaining);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [isOpeningReview, setIsOpeningReview] = useState(false);
+  const busy = isNavigating || isPausing || isResuming || isExiting || isOpeningReview || isSubmitting;
 
   const currentAQ = currentQuestions[currentIdx];
   const currentQuestion = currentAQ ? questionMap.get(currentAQ.question_id) : null;
