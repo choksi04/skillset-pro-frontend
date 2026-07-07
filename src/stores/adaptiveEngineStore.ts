@@ -196,26 +196,15 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         .eq('template_id', templateId);
       candidateSkills = (tplSkills || []).map((s: any) => s.skill_id);
     } else {
-      const { data: subs } = await supabase
-        .from('skill_registry_submissions')
-        .select('id')
-        .eq('employee_id', assessmentRow.employee_id)
-        .eq('domain_id', assessmentRow.domain_id)
-        .eq('status', 'submitted')
-        .is('deleted_on', null)
-        .order('submitted_at', { ascending: false })
-        .limit(1);
-      const submission = subs?.[0];
-      if (submission) {
-        const { data: ratings } = await supabase
-          .from('skill_self_ratings')
-          .select('skill_id, rating')
-          .eq('submission_id', submission.id);
-        candidateSkills = [...(ratings || [])]
-          .sort((a: any, b: any) => b.rating - a.rating)
-          .slice(0, templateRow.skills_per_assessment ?? 5)
-          .map((r: any) => r.skill_id);
-      }
+      // Pick the top-N highest self-rated skills from the employee's latest registry.
+      const ratingMap = await getLatestSelfRatingMap(
+        assessmentRow.employee_id,
+        assessmentRow.domain_id,
+      );
+      candidateSkills = Object.entries(ratingMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, templateRow.skills_per_assessment ?? 5)
+        .map(([skillId]) => skillId);
     }
 
     // Fallback: when no registry submission / no ratings exist, fall back to the
