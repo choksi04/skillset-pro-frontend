@@ -6,6 +6,7 @@ import { Question } from './questionStore';
 import { useAttemptStore, AssessmentAttempt, AnswerEntry, SkillScore } from './attemptStore';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { syncAssignmentForAttempt } from './assignmentStore';
+import { getLatestSelfRatingMap } from '@/lib/selfRatings';
 
 /**
  * Per-skill state tracked in assessment_attempts.adaptive_state.
