@@ -809,3 +809,58 @@ export default function AssessmentDetailPage() {
     </div>
   );
 }
+
+function RunnerShell({
+  assessment,
+  attempt,
+  userName,
+  onExited,
+  fetchAssessments,
+  fetchAttempts,
+}: {
+  assessment: Assessment;
+  attempt: ReturnType<typeof useAttemptStore.getState>["attempts"][number] | null | undefined;
+  userName: string;
+  onExited: () => void;
+  fetchAssessments: () => Promise<void>;
+  fetchAttempts: () => Promise<void>;
+}) {
+  const [isExiting, setIsExiting] = useState(false);
+  const exitRunner = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    try {
+      await fetchAssessments();
+      await fetchAttempts();
+      onExited();
+    } finally {
+      setIsExiting(false);
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={exitRunner}
+        disabled={isExiting}
+        className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
+      >
+        {isExiting ? <Loader2 size={14} className="animate-spin" /> : <ArrowLeft size={14} />}
+        {isExiting ? "Exiting…" : "Back to Assessment"}
+      </Button>
+      {assessment.is_adaptive ? (
+        <AdaptiveRunner
+          assessment={assessment}
+          attemptId={attempt?.id ?? ""}
+          employeeId={assessment.employee_id}
+          tenantId={assessment.tenant_id}
+          employeeName={userName}
+          onComplete={exitRunner}
+        />
+      ) : (
+        <FixedRunner assessment={assessment} onComplete={exitRunner} onCancel={exitRunner} />
+      )}
+    </div>
+  );
+}
