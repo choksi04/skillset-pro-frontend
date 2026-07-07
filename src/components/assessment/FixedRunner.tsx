@@ -634,7 +634,8 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                   <button
                     key={aq.question_id}
                     onClick={() => goTo(i)}
-                    className={`flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-all ${btnClass}`}
+                    disabled={isNavigating}
+                    className={`flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-all ${btnClass} ${isNavigating ? 'opacity-60 cursor-wait' : ''}`}
                     title={`Q${i + 1}${hasAnswer ? ' • answered' : ''}${isReview ? ' • flagged' : ''}`}
                   >
                     {i + 1}
