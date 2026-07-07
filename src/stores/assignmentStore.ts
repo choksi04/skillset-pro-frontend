@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { useTemplateStore, AssessmentTemplate } from './templateStore';
+import { getLatestSelfRatings } from '@/lib/selfRatings';
 
 export type AssignmentStatus =
   | 'new'
