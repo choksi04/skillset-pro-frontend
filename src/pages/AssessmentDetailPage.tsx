@@ -398,21 +398,17 @@ export default function AssessmentDetailPage() {
 
   // Inline runner mode — replaces the legacy /assessment-exec page
   if (runnerActive && isOwner) {
-    const exitRunner = async () => {
-      await fetchAssessments();
-      await fetchAttempts();
-      setRunnerActive(false);
-    };
-    return (
-      <div className="space-y-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={exitRunner}
-          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={14} /> Back to Assessment
-        </Button>
+    return <RunnerShell
+      assessment={assessment}
+      attemptId={attempt?.id ?? ""}
+      userName={user?.full_name ?? "Employee"}
+      onExit={async () => {
+        await fetchAssessments();
+        await fetchAttempts();
+        setRunnerActive(false);
+      }}
+    />;
+  }
         {assessment.is_adaptive ? (
           <AdaptiveRunner
             assessment={assessment}
