@@ -755,12 +755,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
 
                 <div className="border-t border-border px-6 py-3 flex items-center justify-between bg-card">
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} className="gap-1">
-                      <ChevronLeft size={14} /> Previous
+                    <Button variant="outline" size="sm" onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0 || isNavigating} className="gap-1">
+                      {isNavigating ? <Loader2 size={14} className="animate-spin" /> : <ChevronLeft size={14} />} Previous
                     </Button>
                     {currentIdx < currentQuestions.length - 1 && (
-                      <Button variant="ghost" size="sm" onClick={() => goTo(currentIdx + 1)} className="gap-1 text-muted-foreground">
-                        Skip <SkipForward size={14} />
+                      <Button variant="ghost" size="sm" onClick={() => goTo(currentIdx + 1)} disabled={isNavigating} className="gap-1 text-muted-foreground">
+                        Skip {isNavigating ? <Loader2 size={14} className="animate-spin" /> : <SkipForward size={14} />}
                       </Button>
                     )}
                   </div>
@@ -770,7 +770,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                       variant="ghost"
                       size="sm"
                       onClick={resetAnswer}
-                      disabled={!answers[currentAQ.question_id]?.trim()}
+                      disabled={!answers[currentAQ.question_id]?.trim() || isNavigating}
                       className="gap-1 text-muted-foreground"
                     >
                       <RotateCcw size={12} /> Reset
@@ -788,12 +788,12 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
 
                   <div className="flex items-center gap-2">
                     {currentIdx < currentQuestions.length - 1 ? (
-                      <Button size="sm" onClick={() => goTo(currentIdx + 1)} className="gap-1">
-                        Next <ChevronRight size={14} />
+                      <Button size="sm" onClick={() => goTo(currentIdx + 1)} disabled={isNavigating} className="gap-1">
+                        {isNavigating ? <><Loader2 size={14} className="animate-spin" /> Next</> : <>Next <ChevronRight size={14} /></>}
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={openReview} disabled={isSubmitting} className="gap-1">
-                        <ListChecks size={14} /> Review & submit
+                      <Button size="sm" onClick={openReview} disabled={isSubmitting || isOpeningReview || isNavigating} className="gap-1">
+                        {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Review & submit
                       </Button>
                     )}
                   </div>
