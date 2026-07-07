@@ -77,6 +77,9 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
       if (assignRes.error) throw assignRes.error;
 
       const subIds = (subsRes.data || []).map((s: any) => s.id);
+      const empIds = [...new Set((subsRes.data || []).map((s: any) => s.employee_id))];
+
+      // Legacy per-submission ratings (may be empty in newer deployments).
       let ratingsData: any[] = [];
       if (subIds.length > 0) {
         const { data, error } = await supabase.from('skill_self_ratings').select('*').in('submission_id', subIds);
@@ -84,14 +87,58 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
         ratingsData = data || [];
       }
 
-      const submissions: SkillRegistrySubmission[] = (subsRes.data || []).map((s: any) => ({
-        id: s.id, tenant_id: s.tenant_id, employee_id: s.employee_id, domain_id: s.domain_id,
-        cycle: s.cycle, status: s.status as any,
-        ratings: ratingsData.filter((r: any) => r.submission_id === s.id).map((r: any) => ({
-          skill_id: r.skill_id, rating: r.rating as RatingLevel, comment: r.comment || undefined,
-        })),
-        submitted_at: s.submitted_at, created_at: s.created_at, updated_at: s.updated_at,
-      }));
+      // New source: skill_registries + skill_registry_items keyed by employee.
+      // Build employee_id -> [{ skill_id, rating }] using the latest non-deleted registry per employee.
+      const empRatingsMap = new Map<string, { skill_id: string; rating: RatingLevel; comment?: string }[]>();
+      if (empIds.length > 0) {
+        const { data: regRows } = await supabase
+          .from('skill_registries')
+          .select('id, employee_id, status, version_number, submitted_at, created_at')
+          .in('employee_id', empIds)
+          .is('deleted_on', null);
+        const byEmp = new Map<string, any>();
+        for (const r of regRows || []) {
+          const cur = byEmp.get((r as any).employee_id);
+          if (!cur) { byEmp.set((r as any).employee_id, r); continue; }
+          const score = (row: any) => (row.status === 'submitted' ? 1e9 : 0) + (row.version_number ?? 0);
+          if (score(r) > score(cur)) byEmp.set((r as any).employee_id, r);
+        }
+        const latestRegIds = [...byEmp.values()].map((r: any) => r.id);
+        if (latestRegIds.length > 0) {
+          const { data: itemRows } = await supabase
+            .from('skill_registry_items')
+            .select('registry_id, skill_id, self_score, comment')
+            .in('registry_id', latestRegIds);
+          const regIdToEmp = new Map<string, string>();
+          for (const [emp, reg] of byEmp.entries()) regIdToEmp.set((reg as any).id, emp);
+          for (const it of itemRows || []) {
+            const emp = regIdToEmp.get((it as any).registry_id);
+            if (!emp) continue;
+            const list = empRatingsMap.get(emp) ?? [];
+            list.push({
+              skill_id: (it as any).skill_id,
+              rating: (it as any).self_score as RatingLevel,
+              comment: (it as any).comment || undefined,
+            });
+            empRatingsMap.set(emp, list);
+          }
+        }
+      }
+
+      const submissions: SkillRegistrySubmission[] = (subsRes.data || []).map((s: any) => {
+        const legacy = ratingsData
+          .filter((r: any) => r.submission_id === s.id)
+          .map((r: any) => ({
+            skill_id: r.skill_id, rating: r.rating as RatingLevel, comment: r.comment || undefined,
+          }));
+        const fromRegistry = empRatingsMap.get(s.employee_id) ?? [];
+        return {
+          id: s.id, tenant_id: s.tenant_id, employee_id: s.employee_id, domain_id: s.domain_id,
+          cycle: s.cycle, status: s.status as any,
+          ratings: legacy.length > 0 ? legacy : fromRegistry,
+          submitted_at: s.submitted_at, created_at: s.created_at, updated_at: s.updated_at,
+        };
+      });
 
       const assignments: EmployeeDomainAssignment[] = (assignRes.data || []).map((a: any) => ({
         employee_id: a.employee_id, domain_id: a.domain_id, tenant_id: a.tenant_id,
