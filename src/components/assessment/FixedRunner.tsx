@@ -258,34 +258,62 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   }, [assessment, currentAQ, answers, timeSpent, getAttemptForAssessment, saveAnswer]);
 
   const goTo = useCallback(async (idx: number) => {
-    recordTimeSpent();
-    await saveCurrentAnswer();
-    setCurrentIdx(idx);
-    setQuestionStartTime(Date.now());
-  }, [recordTimeSpent, saveCurrentAnswer]);
+    if (isNavigating) return;
+    setIsNavigating(true);
+    try {
+      recordTimeSpent();
+      await saveCurrentAnswer();
+      setCurrentIdx(idx);
+      setQuestionStartTime(Date.now());
+    } finally {
+      setIsNavigating(false);
+    }
+  }, [recordTimeSpent, saveCurrentAnswer, isNavigating]);
 
   const handlePause = async () => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (!attempt) return;
-    recordTimeSpent();
-    await saveCurrentAnswer();
-    await pauseAttempt(attempt.id, timerRef.current);
-    setIsPaused(true);
-    toast.info('Assessment paused. Your progress has been saved.');
+    if (isPausing) return;
+    setIsPausing(true);
+    try {
+      recordTimeSpent();
+      await saveCurrentAnswer();
+      await pauseAttempt(attempt.id, timerRef.current);
+      setIsPaused(true);
+      toast.info('Assessment paused. Your progress has been saved.');
+    } finally {
+      setIsPausing(false);
+    }
   };
 
   const handleResume = async () => {
     const attempt = getAttemptForAssessment(assessment.id);
     if (!attempt) return;
-    // If the timer ran out earlier, top up to a minimal amount so the user can
-    // finish reviewing / submitting — don't auto-submit on their behalf.
-    if (timerRef.current <= 0) {
-      timerRef.current = 60;
-      setTimerSeconds(60);
+    if (isResuming) return;
+    setIsResuming(true);
+    try {
+      // If the timer ran out earlier, top up to a minimal amount so the user can
+      // finish reviewing / submitting — don't auto-submit on their behalf.
+      if (timerRef.current <= 0) {
+        timerRef.current = 60;
+        setTimerSeconds(60);
+      }
+      await resumeAttempt(attempt.id);
+      setIsPaused(false);
+      setQuestionStartTime(Date.now());
+    } finally {
+      setIsResuming(false);
     }
-    await resumeAttempt(attempt.id);
-    setIsPaused(false);
-    setQuestionStartTime(Date.now());
+  };
+
+  const handleExit = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    try {
+      await onCancel();
+    } finally {
+      setIsExiting(false);
+    }
   };
 
   const doSubmit = async () => {
