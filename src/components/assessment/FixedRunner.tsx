@@ -595,7 +595,9 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
               <h2 className="text-lg font-semibold text-foreground">Assessment paused</h2>
               <p className="text-sm text-muted-foreground mt-1">Your progress is saved. Click Resume to continue where you left off.</p>
             </div>
-            <Button onClick={handleResume} className="gap-1.5"><Play size={14} /> Resume assessment</Button>
+            <Button onClick={handleResume} disabled={isResuming} className="gap-1.5">
+              {isResuming ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} {isResuming ? 'Resuming…' : 'Resume assessment'}
+            </Button>
           </div>
         </div>
       )}
