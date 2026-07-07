@@ -225,26 +225,10 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       return { state: null, reason: 'No skills resolved for this adaptive assessment' };
     }
 
-    let selfRatingMap: Record<string, number> = {};
-    {
-      const { data: subs } = await supabase
-        .from('skill_registry_submissions')
-        .select('id')
-        .eq('employee_id', assessmentRow.employee_id)
-        .eq('domain_id', assessmentRow.domain_id)
-        .eq('status', 'submitted')
-        .is('deleted_on', null)
-        .order('submitted_at', { ascending: false })
-        .limit(1);
-      const submission = subs?.[0];
-      if (submission) {
-        const { data: ratings } = await supabase
-          .from('skill_self_ratings')
-          .select('skill_id, rating')
-          .eq('submission_id', submission.id);
-        for (const r of ratings || []) selfRatingMap[(r as any).skill_id] = (r as any).rating;
-      }
-    }
+    const selfRatingMap: Record<string, number> = await getLatestSelfRatingMap(
+      assessmentRow.employee_id,
+      assessmentRow.domain_id,
+    );
 
     const { data: mcqAvailability } = await supabase
       .from('questions')
