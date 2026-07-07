@@ -392,8 +392,14 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   };
 
   const openReview = async () => {
-    await saveCurrentAnswer();
-    setReviewOpen(true);
+    if (isOpeningReview) return;
+    setIsOpeningReview(true);
+    try {
+      await saveCurrentAnswer();
+      setReviewOpen(true);
+    } finally {
+      setIsOpeningReview(false);
+    }
   };
 
   const handleSubmitFromReview = () => {
