@@ -567,14 +567,20 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
             onTimeUp={handleTimeUp}
             onTick={(s) => { timerRef.current = s; }}
           />
-          <Button size="sm" variant="ghost" onClick={isPaused ? handleResume : handlePause} className="gap-1.5">
-            {isPaused ? <><Play size={14} /> Resume</> : <><Pause size={14} /> Pause</>}
+          <Button size="sm" variant="ghost" onClick={isPaused ? handleResume : handlePause} disabled={isPausing || isResuming || isSubmitting || isExiting} className="gap-1.5">
+            {isPausing || isResuming ? (
+              <><Loader2 size={14} className="animate-spin" /> {isPaused ? 'Resuming…' : 'Pausing…'}</>
+            ) : isPaused ? (
+              <><Play size={14} /> Resume</>
+            ) : (
+              <><Pause size={14} /> Pause</>
+            )}
           </Button>
-          <Button size="sm" variant="outline" onClick={onCancel} className="gap-1.5">
-            Exit
+          <Button size="sm" variant="outline" onClick={handleExit} disabled={isExiting || isSubmitting} className="gap-1.5">
+            {isExiting ? <><Loader2 size={14} className="animate-spin" /> Exiting…</> : 'Exit'}
           </Button>
-          <Button size="sm" variant="default" onClick={openReview} disabled={isPaused || isSubmitting} className="gap-1.5">
-            <ListChecks size={14} /> Review & submit
+          <Button size="sm" variant="default" onClick={openReview} disabled={isPaused || isSubmitting || isOpeningReview || isNavigating} className="gap-1.5">
+            {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Review & submit
           </Button>
         </div>
       </div>
