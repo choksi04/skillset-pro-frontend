@@ -206,19 +206,10 @@ async function generateAssessmentForTemplate(
     return { assessmentId: null, reason: 'Adaptive template missing domain' };
   }
 
-  // Registry submission is OPTIONAL. If the employee has one, we use it for
-  // self-rating-driven skill picking; otherwise we fall back to domain skills.
-  const { data: subs } = await supabase
-    .from('skill_registry_submissions')
-    .select('id')
-    .eq('employee_id', employeeId)
-    .eq('domain_id', template.domain_id)
-    .eq('status', 'submitted')
-    .is('deleted_on', null)
-    .order('submitted_at', { ascending: false })
-    .limit(1);
-  const submission = subs?.[0];
-  const submissionId = submission?.id ?? `tmpl-${template.id}`;
+  // Try to seed skill selection from the employee's latest self-ratings.
+  // Registry submission is OPTIONAL — fall back to domain skills below.
+  const latestRatings = await getLatestSelfRatings(employeeId, template.domain_id);
+  const submissionId = `tmpl-${template.id}`;
 
   // Pre-flight: make sure we can resolve at least one usable skill with MCQs.
   let candidateSkills: string[] = [];
@@ -228,15 +219,11 @@ async function generateAssessmentForTemplate(
       .select('skill_id')
       .eq('template_id', template.id);
     candidateSkills = (tplSkills || []).map((s: any) => s.skill_id);
-  } else if (submission) {
-    const { data: ratingsData } = await supabase
-      .from('skill_self_ratings')
-      .select('skill_id, rating')
-      .eq('submission_id', submission.id);
-    candidateSkills = [...(ratingsData || [])]
-      .sort((a: any, b: any) => b.rating - a.rating)
+  } else if (latestRatings.length > 0) {
+    candidateSkills = [...latestRatings]
+      .sort((a, b) => b.rating - a.rating)
       .slice(0, template.skills_per_assessment)
-      .map((r: any) => r.skill_id);
+      .map((r) => r.skill_id);
   }
   // Fallback: pull skills mapped to the domain when no registry / no ratings.
   if (candidateSkills.length === 0) {
