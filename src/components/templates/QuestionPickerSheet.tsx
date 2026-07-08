@@ -51,6 +51,7 @@ export default function QuestionPickerSheet({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const PAGE_SIZE = 20;
+  const initialSelectedKey = useMemo(() => initialSelectedIds.join('|'), [initialSelectedIds]);
 
   // Reset buffered state when sheet opens. Questions are loaded page-by-page.
   useEffect(() => {
@@ -62,11 +63,12 @@ export default function QuestionPickerSheet({
       setTypeFilter("all");
       setExpanded(new Set());
       setPage(1);
-      if (initialSelectedIds.length > 0) {
-        fetchQuestionsByIds(initialSelectedIds);
+      const selectedIds = initialSelectedKey ? initialSelectedKey.split('|').filter(Boolean) : [];
+      if (selectedIds.length > 0) {
+        fetchQuestionsByIds(selectedIds);
       }
     }
-  }, [open, initialSelectedIds, fetchQuestionsByIds]);
+  }, [open, initialSelectedKey, fetchQuestionsByIds]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
