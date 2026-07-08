@@ -67,9 +67,10 @@ interface QuestionFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editQuestion?: Question | null;
+  onSaved?: () => void;
 }
 
-export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: QuestionFormSheetProps) {
+export default function QuestionFormSheet({ open, onOpenChange, editQuestion, onSaved }: QuestionFormSheetProps) {
   const { addQuestion, updateQuestion } = useQuestionStore();
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { skills, topics, fetchTopicsForSkill } = useSkillStore();
@@ -210,6 +211,7 @@ export default function QuestionFormSheet({ open, onOpenChange, editQuestion }: 
         toast.success('Question created as draft.');
       }
       onOpenChange(false);
+      onSaved?.();
     } finally {
       setSaving(false);
     }

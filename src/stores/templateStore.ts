@@ -67,6 +67,8 @@ export interface SaveTemplateInput {
   question_ids?: string[];
 }
 
+interface FetchOptions { force?: boolean }
+
 interface TemplateStore {
   templates: AssessmentTemplate[];
   skillsByTemplate: Map<string, string[]>;
@@ -74,7 +76,7 @@ interface TemplateStore {
   loading: boolean;
   initialized: boolean;
 
-  fetchTemplates: () => Promise<void>;
+  fetchTemplates: (options?: FetchOptions) => Promise<void>;
   getTemplate: (id: string) => AssessmentTemplate | undefined;
   fetchTemplateRelations: (id: string) => Promise<{ skill_ids: string[]; question_ids: string[] }>;
   saveTemplate: (input: SaveTemplateInput) => Promise<string | null>;
@@ -107,6 +109,8 @@ function rowToTemplate(r: any): AssessmentTemplate {
   };
 }
 
+let fetchTemplatesInFlight: Promise<void> | null = null;
+
 export const useTemplateStore = create<TemplateStore>((set, get) => ({
   templates: [],
   skillsByTemplate: new Map(),
@@ -114,27 +118,38 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  fetchTemplates: async () => {
-    set({ loading: true });
-    try {
+  fetchTemplates: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchTemplatesInFlight) return fetchTemplatesInFlight;
+
+    fetchTemplatesInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data, error } = await supabase
         .from("assessment_templates")
-        .select("*")
+        .select("id, tenant_id, name, description, type, status, duration_minutes, max_attempts, reattempt_enabled, domain_id, skill_selection_mode, skills_per_assessment, questions_per_skill, question_types, shuffle_questions, shuffle_options, created_at, modified_at, created_by, modified_by")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      set({ templates: (data || []).map(rowToTemplate), loading: false, initialized: true });
-    } catch (err) {
-      console.error("Failed to fetch templates:", err);
-      set({ loading: false, initialized: true });
-    }
+        set({ templates: (data || []).map(rowToTemplate), loading: false, initialized: true });
+      } catch (err) {
+        console.error("Failed to fetch templates:", err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchTemplatesInFlight = null;
+      }
+    })();
+
+    return fetchTemplatesInFlight;
   },
 
   getTemplate: (id) => get().templates.find((t) => t.id === id),
 
   fetchTemplateRelations: async (id) => {
     const [skillsRes, questionsRes] = await Promise.all([
-      supabase.from("assessment_template_skills").select("*").eq("template_id", id),
-      supabase.from("assessment_template_questions").select("*").eq("template_id", id).order("position"),
+      supabase.from("assessment_template_skills").select("skill_id").eq("template_id", id),
+      supabase.from("assessment_template_questions").select("question_id, position").eq("template_id", id).order("position"),
     ]);
     const skill_ids = (skillsRes.data || []).map((s: any) => s.skill_id);
     const question_ids = (questionsRes.data || []).map((q: any) => q.question_id);
@@ -217,7 +232,7 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
       }
     }
 
-    await get().fetchTemplates();
+    await get().fetchTemplates({ force: true });
     await get().fetchTemplateRelations(templateId);
     return templateId;
   },

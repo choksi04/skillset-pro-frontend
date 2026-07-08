@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import SearchableSelect from "@/components/ui/searchable-select";
 import { Search, ChevronDown, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
-import { useQuestionStore } from "@/stores/questionStore";
+import { Question, useQuestionStore } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
 import {
   useCompetencyLevelStore,
@@ -35,7 +35,7 @@ export default function QuestionPickerSheet({
   initialSelectedIds,
   onSave,
 }: Props) {
-  const { questions, ensureQuestionsLoaded } = useQuestionStore();
+  const { fetchQuestionPage, fetchQuestionsByIds } = useQuestionStore();
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
 
@@ -46,63 +46,71 @@ export default function QuestionPickerSheet({
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pageItems, setPageItems] = useState<Question[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const PAGE_SIZE = 20;
+  const initialSelectedKey = useMemo(() => initialSelectedIds.join('|'), [initialSelectedIds]);
 
-  // Reset buffered state when sheet opens + lazy-load the full question list
+  // Reset buffered state when sheet opens. Questions are loaded page-by-page.
   useEffect(() => {
     if (open) {
-      setSelected(new Set(initialSelectedIds));
+      const selectedIds = initialSelectedKey ? initialSelectedKey.split('|').filter(Boolean) : [];
+      setSelected(new Set(selectedIds));
       setSearch("");
       setSkillFilter("all");
       setLevelFilter("all");
       setTypeFilter("all");
       setExpanded(new Set());
       setPage(1);
-      ensureQuestionsLoaded();
+      if (selectedIds.length > 0) {
+        fetchQuestionsByIds(selectedIds);
+      }
     }
-  }, [open, initialSelectedIds, ensureQuestionsLoaded]);
+  }, [open, initialSelectedKey, fetchQuestionsByIds]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setPage(1);
-  }, [search, skillFilter, levelFilter, typeFilter]);
+  }, [debouncedSearch, skillFilter, levelFilter, typeFilter]);
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const levelLabels = useMemo(() => getLevelLabelsByIdMap(competencyLevels), [competencyLevels]);
 
-  const published = useMemo(
-    () => questions.filter((q) => q.status === "published"),
-    [questions],
-  );
-
-  // Skills present in published questions
-  const skillOptions = useMemo(() => {
-    const ids = new Set(published.map((q) => q.skill_id));
-    return skills.filter((s) => ids.has(s.id));
-  }, [published, skills]);
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return published.filter((q) => {
-      if (skillFilter !== "all" && q.skill_id !== skillFilter) return false;
-      if (levelFilter !== "all" && q.competency_level !== levelFilter) return false;
-      if (typeFilter !== "all" && q.question_type !== typeFilter) return false;
-      if (!term) return true;
-      const skillName = (skillMap.get(q.skill_id) || "").toLowerCase();
-      const display = formatQuestionForDisplay(q).display.toLowerCase();
-      return display.includes(term) || skillName.includes(term);
-    });
-  }, [published, search, skillFilter, levelFilter, typeFilter, skillMap]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const skillOptions = useMemo(() => skills.filter((s) => s.status === "active"), [skills]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = useMemo(
-    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filtered, safePage],
-  );
-  const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(safePage * PAGE_SIZE, filtered.length);
+  const rangeStart = total === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, total);
+
+  const loadPage = useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+    const result = await fetchQuestionPage({
+      page,
+      pageSize: PAGE_SIZE,
+      search: debouncedSearch,
+      skillId: skillFilter,
+      levelId: levelFilter,
+      questionType: typeFilter as any,
+      status: "published",
+      sortOrder: "recent",
+    });
+    setPageItems(result.questions);
+    setTotal(result.total);
+    setLoading(false);
+  }, [open, fetchQuestionPage, page, debouncedSearch, skillFilter, levelFilter, typeFilter]);
+
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -211,7 +219,9 @@ export default function QuestionPickerSheet({
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto px-6 py-3">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-12">Loading questions…</p>
+          ) : total === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-12">
               No published questions match these filters.
             </p>
@@ -301,10 +311,10 @@ export default function QuestionPickerSheet({
           )}
         </div>
 
-        {filtered.length > 0 && (
+        {total > 0 && (
           <div className="flex items-center justify-between gap-2 px-6 py-2 border-t border-border bg-muted/20">
             <span className="text-[11px] text-muted-foreground">
-              Showing {rangeStart}–{rangeEnd} of {filtered.length}
+              Showing {rangeStart}–{rangeEnd} of {total}
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -335,7 +345,7 @@ export default function QuestionPickerSheet({
         <SheetFooter className="px-6 py-3 border-t border-border bg-card">
           <div className="flex items-center justify-between w-full">
             <span className="text-xs text-muted-foreground">
-              {filtered.length} match · {selected.size} selected
+              {total} match · {selected.size} selected
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>

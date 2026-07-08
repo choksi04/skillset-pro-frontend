@@ -12,25 +12,35 @@ export interface AssessmentConfig {
   max_questions: number;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface AssessmentConfigStore {
   configs: AssessmentConfig[];
   loading: boolean;
   initialized: boolean;
-  fetchConfigs: () => Promise<void>;
+  fetchConfigs: (options?: FetchOptions) => Promise<void>;
   updateConfig: (id: string, updates: Partial<AssessmentConfig>) => Promise<void>;
 }
+
+let fetchConfigsInFlight: Promise<void> | null = null;
 
 export const useAssessmentConfigStore = create<AssessmentConfigStore>((set, get) => ({
   configs: [],
   loading: false,
   initialized: false,
 
-  fetchConfigs: async () => {
-    set({ loading: true });
-    try {
+  fetchConfigs: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchConfigsInFlight) return fetchConfigsInFlight;
+
+    fetchConfigsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data, error } = await supabase
         .from('assessment_config')
-        .select('*')
+        .select('id, tenant_id, config_type, reference_id, question_type, min_questions, max_questions')
         .order('question_type');
       if (error) throw error;
       const configs: AssessmentConfig[] = (data || []).map((c: any) => ({
@@ -42,11 +52,16 @@ export const useAssessmentConfigStore = create<AssessmentConfigStore>((set, get)
         min_questions: c.min_questions,
         max_questions: c.max_questions,
       }));
-      set({ configs, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch assessment configs:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ configs, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch assessment configs:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchConfigsInFlight = null;
+      }
+    })();
+
+    return fetchConfigsInFlight;
   },
 
   updateConfig: async (id, updates) => {

@@ -39,7 +39,7 @@ export interface SkillScore {
 async function fetchAndScoreToLevel(score: number): Promise<number> {
   if (score === 0) return 1;
   try {
-    const { data } = await supabase.from('competency_levels').select('*').eq('status', 'active').order('level');
+    const { data } = await supabase.from('competency_levels').select('id, tenant_id, level, name, label, description, score_range_min, score_range_max, min_questions, status').eq('status', 'active').order('level');
     if (data && data.length > 0) {
       const levels: CompetencyLevelConfig[] = data.map((s: any) => ({
         id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,
@@ -84,11 +84,13 @@ export interface AssessmentAttempt {
   evaluation_error?: string | null;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface AttemptStore {
   attempts: AssessmentAttempt[];
   loading: boolean;
   initialized: boolean;
-  fetchAttempts: () => Promise<void>;
+  fetchAttempts: (options?: FetchOptions) => Promise<void>;
   fetchAttemptsForAssessment: (assessmentId: string) => Promise<AssessmentAttempt[]>;
   startAttempt: (assessmentId: string, tenantId: string, employeeId: string, forceNew?: boolean) => Promise<string>;
   saveAnswer: (attemptId: string, answer: AnswerEntry) => Promise<void>;
@@ -103,7 +105,7 @@ interface AttemptStore {
  * Paginated `.in()` fetch so we bypass the 1000-row PostgREST default and
  * never silently drop child rows (answers / evaluations / skill scores).
  */
-async function fetchAllIn<T = any>(table: string, column: string, values: string[]): Promise<T[]> {
+async function fetchAllIn<T = any>(table: string, column: string, values: string[], select = '*'): Promise<T[]> {
   if (values.length === 0) return [];
   const PAGE = 1000;
   const out: T[] = [];
@@ -111,7 +113,7 @@ async function fetchAllIn<T = any>(table: string, column: string, values: string
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data, error } = await supabase
-      .from(table as any).select('*').in(column, values).range(from, from + PAGE - 1);
+      .from(table as any).select(select).in(column, values).range(from, from + PAGE - 1);
     if (error) throw error;
     const rows = (data as any[]) ?? [];
     out.push(...(rows as T[]));
@@ -148,37 +150,50 @@ function mapAttemptRow(a: any, answerRows: any[], evalRows: any[], scoreRows: an
 }
 
 
+let fetchAttemptsInFlight: Promise<void> | null = null;
+
 export const useAttemptStore = create<AttemptStore>((set, get) => ({
   attempts: [],
   loading: false,
   initialized: false,
 
-  fetchAttempts: async () => {
-    set({ loading: true });
-    try {
+  fetchAttempts: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchAttemptsInFlight) return fetchAttemptsInFlight;
+
+    fetchAttemptsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data: attemptRows, error } = await supabase
         .from('assessment_attempts')
-        .select('*')
+        .select('id, assessment_id, tenant_id, employee_id, total_ai_score, status, started_at, submitted_at, evaluated_at, paused_at, remaining_seconds, evaluation_error')
         .order('started_at', { ascending: false });
       if (error) throw error;
 
       const attemptIds = (attemptRows || []).map((a: any) => a.id);
       // Paginated so we don't silently truncate at 1000 rows per child table.
       const [answerRows, evalRows, scoreRows] = await Promise.all([
-        fetchAllIn<any>('attempt_answers', 'attempt_id', attemptIds),
-        fetchAllIn<any>('ai_evaluations', 'attempt_id', attemptIds),
-        fetchAllIn<any>('attempt_skill_scores', 'attempt_id', attemptIds),
+        fetchAllIn<any>('attempt_answers', 'attempt_id', attemptIds, 'attempt_id, question_id, answer_text, time_spent_seconds'),
+        fetchAllIn<any>('ai_evaluations', 'attempt_id', attemptIds, 'attempt_id, question_id, score, feedback, dimensions, confidence'),
+        fetchAllIn<any>('attempt_skill_scores', 'attempt_id', attemptIds, 'attempt_id, skill_id, avg_score, calculated_level, target_level, question_count'),
       ]);
 
       const attempts: AssessmentAttempt[] = (attemptRows || []).map((a: any) =>
         mapAttemptRow(a, answerRows, evalRows, scoreRows),
       );
 
-      set({ attempts, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch attempts:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ attempts, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch attempts:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchAttemptsInFlight = null;
+      }
+    })();
+
+    return fetchAttemptsInFlight;
   },
 
   /**
@@ -188,7 +203,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
   fetchAttemptsForAssessment: async (assessmentId) => {
     const { data: attemptRows, error } = await supabase
       .from('assessment_attempts')
-      .select('*')
+      .select('id, assessment_id, tenant_id, employee_id, total_ai_score, status, started_at, submitted_at, evaluated_at, paused_at, remaining_seconds, evaluation_error')
       .eq('assessment_id', assessmentId)
       .order('started_at', { ascending: false });
     if (error) {
@@ -197,9 +212,9 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     }
     const attemptIds = (attemptRows || []).map((a: any) => a.id);
     const [answersRes, evalsRes, scoresRes] = await Promise.all([
-      attemptIds.length ? supabase.from('attempt_answers').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
-      attemptIds.length ? supabase.from('ai_evaluations').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
-      attemptIds.length ? supabase.from('attempt_skill_scores').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+      attemptIds.length ? supabase.from('attempt_answers').select('attempt_id, question_id, answer_text, time_spent_seconds').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+      attemptIds.length ? supabase.from('ai_evaluations').select('attempt_id, question_id, score, feedback, dimensions, confidence').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
+      attemptIds.length ? supabase.from('attempt_skill_scores').select('attempt_id, skill_id, avg_score, calculated_level, target_level, question_count').in('attempt_id', attemptIds) : Promise.resolve({ data: [] as any[], error: null }),
     ]);
     const answerRows = (answersRes as any).data || [];
     const evalRows = (evalsRes as any).data || [];
@@ -366,7 +381,7 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
       // Build target level map per skill from assessment questions
       let idToLevelMap: Record<string, number> = {};
       try {
-        const { data: clData } = await supabase.from('competency_levels').select('*').eq('status', 'active');
+        const { data: clData } = await supabase.from('competency_levels').select('id, tenant_id, level, name, label, description, score_range_min, score_range_max, min_questions, status').eq('status', 'active');
         if (clData && clData.length > 0) {
           const clLevels: CompetencyLevelConfig[] = clData.map((s: any) => ({
             id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,

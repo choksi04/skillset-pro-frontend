@@ -119,15 +119,16 @@ export default function NotificationDropdown() {
     const load = async () => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id, tenant_id, target_role, target_user_id, message, type, reference_id, action_link, read, created_at')
+        .or(`target_user_id.eq.${user.id},and(target_user_id.is.null,target_role.eq.${currentRole})`)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(20);
       if (!error && data) {
         setNotifications(data as AppNotification[]);
       }
     };
     load();
-  }, [user]);
+  }, [user?.id, currentRole]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

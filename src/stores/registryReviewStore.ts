@@ -22,6 +22,8 @@ export interface RegistryReview {
 /** Lightweight status cache for list/grid views — avoids fetching full review payloads. */
 export type ReviewStatusValue = 'pending' | 'approved';
 
+let fetchedReviewStatusIds = new Set<string>();
+
 interface RegistryReviewStore {
   reviews: Map<string, RegistryReview>; // keyed by registry_id
   /** registry_id -> latest review status (pending/approved). Absent ⇒ no review row. */
@@ -55,7 +57,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
 
   fetchReviewStatusesForRegistries: async (registryIds) => {
     const cache = get().reviewStatuses;
-    const missing = Array.from(new Set(registryIds.filter((id) => !(id in cache))));
+    const missing = Array.from(new Set(registryIds.filter((id) => !(id in cache) && !fetchedReviewStatusIds.has(id))));
     if (missing.length === 0) return;
     const { data, error } = await supabase
       .from('registry_reviews')
@@ -71,6 +73,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
       (data ?? []).forEach((r: any) => {
         next[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
       });
+      fetchedReviewStatusIds = new Set([...fetchedReviewStatusIds, ...missing]);
       return { reviewStatuses: next };
     });
   },
@@ -78,7 +81,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
   fetchReviewForRegistry: async (registryId) => {
     const { data: review, error } = await supabase
       .from('registry_reviews')
-      .select('*')
+      .select('id, tenant_id, registry_id, reviewer_id, status, overall_comment, completed_at')
       .eq('registry_id', registryId)
       .is('deleted_on', null)
       .maybeSingle();
@@ -90,7 +93,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
 
     const { data: items } = await supabase
       .from('registry_review_items')
-      .select('*')
+      .select('skill_id, manager_score, manager_comment')
       .eq('review_id', (review as any).id);
 
     const r: RegistryReview = {

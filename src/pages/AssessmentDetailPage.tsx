@@ -185,7 +185,7 @@ export default function AssessmentDetailPage() {
       .reconstructEvaluationsFromHistory(attempt.id)
       .then((didWork) => {
         if (didWork) {
-          fetchAttempts();
+          fetchAttemptsForAssessment(assessment.id);
           toast.success("Per-question results restored");
         }
       })
@@ -337,7 +337,7 @@ export default function AssessmentDetailPage() {
 
       await startAttempt(assessment.id, assessment.tenant_id, assessment.employee_id, forceNewAttempt);
       await useAssessmentStore.getState().updateAssessmentStatus(assessment.id, "in_progress");
-      await fetchAttempts();
+      await fetchAttemptsForAssessment(assessment.id);
       setRunnerActive(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to start assessment");
@@ -832,16 +832,16 @@ function RunnerShell({
   attempt: ReturnType<typeof useAttemptStore.getState>["attempts"][number] | null | undefined;
   userName: string;
   onExited: () => void;
-  fetchAssessments: () => Promise<void>;
-  fetchAttempts: () => Promise<void>;
+  fetchAssessments: (options?: { force?: boolean }) => Promise<void>;
+  fetchAttempts: (options?: { force?: boolean }) => Promise<void>;
 }) {
   const [isExiting, setIsExiting] = useState(false);
   const exitRunner = async () => {
     if (isExiting) return;
     setIsExiting(true);
     try {
-      await fetchAssessments();
-      await fetchAttempts();
+      await fetchAssessments({ force: true });
+      await fetchAttempts({ force: true });
       onExited();
     } finally {
       setIsExiting(false);

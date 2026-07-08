@@ -15,25 +15,35 @@ export interface CompetencyLevel {
   status: string;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface CompetencyLevelStore {
   levels: CompetencyLevel[];
   loading: boolean;
   initialized: boolean;
-  fetchLevels: () => Promise<void>;
+  fetchLevels: (options?: FetchOptions) => Promise<void>;
   updateLevel: (id: string, updates: Partial<CompetencyLevel>) => Promise<void>;
 }
+
+let fetchLevelsInFlight: Promise<void> | null = null;
 
 export const useCompetencyLevelStore = create<CompetencyLevelStore>((set, get) => ({
   levels: [],
   loading: false,
   initialized: false,
 
-  fetchLevels: async () => {
-    set({ loading: true });
-    try {
+  fetchLevels: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchLevelsInFlight) return fetchLevelsInFlight;
+
+    fetchLevelsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data, error } = await supabase
         .from('competency_levels')
-        .select('*')
+        .select('id, tenant_id, level, name, label, description, score_range_min, score_range_max, min_questions, status')
         .order('level');
       if (error) throw error;
       const levels: CompetencyLevel[] = (data || []).map((s: any) => ({
@@ -42,11 +52,16 @@ export const useCompetencyLevelStore = create<CompetencyLevelStore>((set, get) =
         score_range_min: s.score_range_min, score_range_max: s.score_range_max,
         min_questions: s.min_questions, status: s.status,
       }));
-      set({ levels, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch competency levels:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ levels, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch competency levels:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchLevelsInFlight = null;
+      }
+    })();
+
+    return fetchLevelsInFlight;
   },
 
   updateLevel: async (id, updates) => {
