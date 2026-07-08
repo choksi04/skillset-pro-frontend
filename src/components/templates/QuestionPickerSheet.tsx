@@ -56,14 +56,14 @@ export default function QuestionPickerSheet({
   // Reset buffered state when sheet opens. Questions are loaded page-by-page.
   useEffect(() => {
     if (open) {
-      setSelected(new Set(initialSelectedIds));
+      const selectedIds = initialSelectedKey ? initialSelectedKey.split('|').filter(Boolean) : [];
+      setSelected(new Set(selectedIds));
       setSearch("");
       setSkillFilter("all");
       setLevelFilter("all");
       setTypeFilter("all");
       setExpanded(new Set());
       setPage(1);
-      const selectedIds = initialSelectedKey ? initialSelectedKey.split('|').filter(Boolean) : [];
       if (selectedIds.length > 0) {
         fetchQuestionsByIds(selectedIds);
       }
