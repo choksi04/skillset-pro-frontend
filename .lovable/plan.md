@@ -1,48 +1,49 @@
-## Verification plan: confirm 57014 timeouts are gone on assessment pages
+# Plan
 
-Goal: prove the new indexes actually eliminate the `canceling statement due to statement timeout` errors on the assessment surfaces, not just look good on paper.
+## Issue 1 — Questions cluster on a single topic per skill
 
-### 1. Confirm indexes are live
-- Query `pg_indexes` for the tables we indexed (`questions`, `skills`, `domain_skill_mappings`, `ai_evaluations`, `attempt_answers`, `attempt_skill_scores`, `assessment_questions`, `assessment_attempts`, `notifications`, `review_skill_entries`, `skill_registry_items`) and confirm each expected index name is present.
-- Run `ANALYZE` sanity check via `pg_stat_user_tables.last_analyze` — ensure planner has stats.
+**Where:** `src/stores/assessmentStore.ts` → `generateAssessmentQuestions` (fixed template flow) and `src/stores/adaptiveEngineStore.ts` (adaptive flow).
 
-### 2. Confirm planner uses them
-- Run `EXPLAIN (ANALYZE, BUFFERS)` on the exact query from the screenshot:
-  `SELECT skill_id FROM questions WHERE skill_id IN (...) AND question_type = 'mcq' AND status = 'published' AND deleted_on IS NULL`
-  → expect `Index Scan` / `Bitmap Index Scan` on `questions (skill_id, question_type, status) WHERE deleted_on IS NULL`, not `Seq Scan`.
-- Same check for the other hot queries called from assessment flows:
-  - `assessment_questions` by `assessment_id`
-  - `attempt_answers`, `ai_evaluations`, `attempt_skill_scores` by `attempt_id`
-  - `assessment_attempts` by `employee_id, assessment_id` and by `started_at DESC`
-  - `notifications` by `target_user_id, created_at DESC`
+**Current behavior:** Candidates are filtered by `skill_id + competency_level + question_type`, sorted by `created_at`, then the first N are picked. When a skill is populated topic-by-topic (SQL Server first, then MySQL, etc.), the earliest-created batch dominates and only that topic's questions get selected.
 
-### 3. Re-check slow-query stats
-- Reset `pg_stat_statements` (or note the current snapshot), then re-run `supabase--slow_queries` after driving traffic.
-- Compare `max_exec_time` for the four offenders (`questions`, `skills`, `domain_skill_mappings`, `notifications`) against the pre-fix numbers documented in `.lovable/plan.md`. Target: max_exec_time well under the 2s cancel threshold, no more `57014` in db logs.
+**Fix — topic-diversified round-robin per (skill, level, question_type):**
 
-### 4. Exercise the actual assessment pages
-Drive the live preview with Playwright as an authenticated employee (`LOVABLE_BROWSER_AUTH_STATUS=injected`) and cover:
-1. Assessments list (`/assessments`)
-2. Assessment detail (`/assessments/:id`)
-3. Start a `FixedRunner` attempt → answer 2–3 questions → pause → resume → open review dialog → submit
-4. Notifications dropdown open
-5. Team Assessments (`/team/assessments`) as a manager, if session allows
+1. Group candidate questions by `topic_id` (treat `null`/missing topic as its own bucket).
+2. Shuffle candidates within each topic bucket (seeded per assessment so a retry is stable within one run).
+3. Shuffle the topic order.
+4. Pick round-robin across topics until `targetCount` is reached:
+   - Rotate through topics one question each pass.
+   - Skip a topic when its bucket is empty.
+   - Only when every topic has been used at least once, allow a second pass (i.e. repeats) — matches the user's rule "topics fewer than expected questions → repeats are OK, but all topics must be covered first."
+5. When candidate topics ≥ `targetCount`: each picked question comes from a distinct topic (no repeats).
+6. Keep the existing `usedIds` de-dup so the same question isn't picked twice inside one assessment across question types.
 
-For each step:
-- Capture `console` errors and failed `fetch` responses.
-- Fail the check if any response contains `"code":"57014"` or status is aborted with a Supabase error body.
-- Save screenshots + a JSON log under `/tmp/browser/verify-57014/`.
+Apply the same round-robin selection in `adaptiveEngineStore` where the next question is chosen for a skill so consecutive questions in an adaptive attempt don't stick to one topic either.
 
-### 5. Report
-Summarize per-page results:
-- indexes present: yes/no
-- planner using them: yes/no (with the operator seen)
-- max_exec_time before vs after
-- runtime `57014` count during the Playwright run (should be 0)
+**No schema change.** `questions.topic_id` already exists and is loaded into the store.
 
-If any check fails, list the offending query + plan and propose the next narrow fix (usually a missing composite index or a query that still selects `*`). No code changes are made as part of this verification — this plan is read-only.
+## Issue 2 — Dash (—) on the Results page for question 1
 
-### Technical notes
-- Read-only tools only: `supabase--read_query`, `supabase--slow_queries`, `supabase--db_health`, Playwright via shell.
-- No migrations, no edits to stores or components in this step.
-- If planner still picks `Seq Scan` despite the index, that becomes a follow-up plan (adjust index column order or add a covering index), not part of this verification.
+**Where:** `src/pages/AssessmentDetailPage.tsx` lines ~641–657 (Attempted Questions table, Result column).
+
+**Root cause:** The cell falls back to a bare `—` badge whenever there is no `ai_evaluations` row for that `question_id`. That happens when the employee skipped the question (no answer submitted), so the AI evaluator produced no row. The user sees an unexplained dash.
+
+**Fix:**
+- Look up the corresponding `attempt.answers` entry for `aq.question_id`.
+- If no answer OR answer text is empty → render a `Skipped` badge (neutral/muted variant).
+- If answer exists but `ev` is missing → render `Pending` (evaluation not yet produced).
+- Otherwise keep the current `Correct` / `Incorrect` badges.
+
+Mirror the same status in `EvalResults.tsx` header if needed for consistency (only if the same ambiguity shows up there — otherwise leave untouched).
+
+## Files to change
+
+- `src/stores/assessmentStore.ts` — replace the `slice(0, targetCount)` block with the topic round-robin picker (small helper function inside the file).
+- `src/stores/adaptiveEngineStore.ts` — apply topic-diversity when selecting the next candidate for a skill.
+- `src/pages/AssessmentDetailPage.tsx` — replace the fallback `—` badge with `Skipped` / `Pending` logic based on `attempt.answers`.
+
+## Out of scope
+
+- No changes to question authoring, topic setup, or DB schema.
+- No changes to scoring math or manager review workflow.
+- Manual retesting on a real assessment is expected after the fix ships.
