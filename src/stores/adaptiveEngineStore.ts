@@ -356,6 +356,9 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     }
 
     state.excludedQuestionIds.push(chosen.row.id);
+    if (chosen.row.topic_id) {
+      skill.askedTopicIds = [...(skill.askedTopicIds ?? []), chosen.row.topic_id];
+    }
     await persistState(attemptId, state);
 
     const question: Question = {
