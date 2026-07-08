@@ -176,7 +176,7 @@ export default function AdaptiveRunner({
     setProgress((p) => ({ ...p, asked: p.asked + 1 }));
 
     // Refresh local attempt cache so AnswerEntry reflects the saved state
-    await useAttemptStore.getState().fetchAttempts();
+    await useAttemptStore.getState().fetchAttemptsForAssessment(assessment.id);
 
     await loadNext();
     setSubmitting(false);

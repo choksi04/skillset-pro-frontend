@@ -24,13 +24,15 @@ export interface SkillRegistryItem {
   comment: string | null;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface SkillRegistryStore {
   registries: SkillRegistry[];
   items: Map<string, SkillRegistryItem[]>;
   loading: boolean;
   initialized: boolean;
 
-  fetchRegistries: (employeeId?: string) => Promise<void>;
+  fetchRegistries: (employeeId?: string, options?: FetchOptions) => Promise<void>;
   fetchItems: (registryId: string) => Promise<SkillRegistryItem[]>;
   getLatest: (employeeId: string) => SkillRegistry | undefined;
   getDraft: (employeeId: string) => SkillRegistry | undefined;
@@ -41,18 +43,29 @@ interface SkillRegistryStore {
   discardDraft: (registryId: string) => Promise<void>;
 }
 
+let fetchRegistriesInFlight: Promise<void> | null = null;
+let fetchRegistriesScope: string | null = null;
+
 export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
   registries: [],
   items: new Map(),
   loading: false,
   initialized: false,
 
-  fetchRegistries: async (employeeId?: string) => {
-    set({ loading: true });
-    try {
+  fetchRegistries: async (employeeId?: string, options = {}) => {
+    const { force = false } = options;
+    const scope = employeeId ?? '__all__';
+    const state = get();
+    if (!force && state.initialized && fetchRegistriesScope === scope) return;
+    if (!force && fetchRegistriesInFlight && fetchRegistriesScope === scope) return fetchRegistriesInFlight;
+
+    fetchRegistriesScope = scope;
+    fetchRegistriesInFlight = (async () => {
+      set({ loading: true });
+      try {
       let query = supabase
         .from('skill_registries')
-        .select('*')
+        .select('id, tenant_id, employee_id, domain_id, version_number, status, submitted_at, created_at, created_by, modified_by, modified_at')
         .is('deleted_on', null)
         .order('version_number', { ascending: false });
 
@@ -77,11 +90,16 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
         modified_at: r.modified_at,
       }));
 
-      set({ registries, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch skill registries:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ registries, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch skill registries:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchRegistriesInFlight = null;
+      }
+    })();
+
+    return fetchRegistriesInFlight;
   },
 
   fetchItems: async (registryId: string) => {
@@ -90,7 +108,7 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
 
     const { data, error } = await supabase
       .from('skill_registry_items')
-      .select('*')
+      .select('id, registry_id, skill_id, self_score, comment')
       .eq('registry_id', registryId);
 
     if (error) {
@@ -232,7 +250,7 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
 
     const { data, error } = await supabase
       .from('skill_registry_items')
-      .select('*')
+      .select('id, registry_id, skill_id, self_score, comment')
       .in('registry_id', uncached);
 
     if (error) {

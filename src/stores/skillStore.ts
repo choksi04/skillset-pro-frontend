@@ -37,13 +37,15 @@ export interface SkillTopic {
   created_at?: string;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface SkillStore {
   categories: SkillCategory[];
   skills: Skill[];
   topics: Record<string, SkillTopic[]>; // keyed by skill_id
   loading: boolean;
   initialized: boolean;
-  fetchSkills: () => Promise<void>;
+  fetchSkills: (options?: FetchOptions) => Promise<void>;
   fetchTopicsForSkill: (skillId: string) => Promise<void>;
   addCategory: (cat: Omit<SkillCategory, 'id' | 'created_at'>) => Promise<string | undefined>;
   updateCategory: (id: string, updates: Partial<SkillCategory>) => Promise<void>;
@@ -59,6 +61,8 @@ interface SkillStore {
   checkSkillDeletable: (id: string) => Promise<{ deletable: boolean; reason?: string }>;
 }
 
+let fetchSkillsInFlight: Promise<void> | null = null;
+
 export const useSkillStore = create<SkillStore>((set, get) => ({
   categories: [],
   skills: [],
@@ -66,12 +70,18 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  fetchSkills: async () => {
-    set({ loading: true });
-    try {
+  fetchSkills: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchSkillsInFlight) return fetchSkillsInFlight;
+
+    fetchSkillsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const [skillsRes, catsRes] = await Promise.all([
-        supabase.from('skills').select('*').is('deleted_on', null).order('created_at'),
-        supabase.from('skill_categories').select('*').is('deleted_on', null),
+        supabase.from('skills').select('id, tenant_id, skill_name, skill_description, category_id, skill_category, tags, status, created_at, updated_at').is('deleted_on', null).order('created_at'),
+        supabase.from('skill_categories').select('id, tenant_id, name, description, status, created_at').is('deleted_on', null),
       ]);
       if (skillsRes.error) throw skillsRes.error;
       if (catsRes.error) throw catsRes.error;
@@ -96,18 +106,23 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
         status: (c.status || 'active') as 'active' | 'disabled',
         created_at: c.created_at,
       }));
-      set({ skills, categories, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch skills:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ skills, categories, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch skills:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchSkillsInFlight = null;
+      }
+    })();
+
+    return fetchSkillsInFlight;
   },
 
   fetchTopicsForSkill: async (skillId: string) => {
     try {
       const { data, error } = await supabase
         .from('skill_topics')
-        .select('*')
+        .select('id, skill_id, tenant_id, name, description, status, created_at')
         .eq('skill_id', skillId)
         .is('deleted_on', null)
         .order('created_at');

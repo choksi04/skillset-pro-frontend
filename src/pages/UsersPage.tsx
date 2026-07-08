@@ -58,7 +58,7 @@ export default function UsersPage() {
   });
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('users').select('*').order('created_at', { ascending: true });
+    const { data } = await supabase.from('users').select('id, tenant_id, full_name, email, role, domain_id, department, designation, status, created_at').order('created_at', { ascending: true });
     if (data) setUsers(data as unknown as UserRow[]);
     setLoading(false);
   };

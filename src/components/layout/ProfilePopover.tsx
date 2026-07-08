@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
-import { supabase } from '@/integrations/supabase/client';
+import { useDomainStore } from '@/stores/domainStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,8 @@ const roleConfig: Record<string, { label: string; className: string }> = {
 export default function ProfilePopover({ children }: ProfilePopoverProps) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { domains, fetchDomains } = useDomainStore();
   const [open, setOpen] = useState(false);
-  const [homeDomain, setHomeDomain] = useState<string | null>(null);
-  const [ledDomains, setLedDomains] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,19 +30,12 @@ export default function ProfilePopover({ children }: ProfilePopoverProps) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [home, led] = await Promise.all([
-        user.domain_id
-          ? supabase.from('domains').select('name').eq('id', user.domain_id).maybeSingle()
-          : Promise.resolve({ data: null } as any),
-        supabase.from('domains').select('id, name').eq('domain_lead_id', user.id).is('deleted_on', null),
-      ]);
+      await fetchDomains();
       if (cancelled) return;
-      setHomeDomain(home.data?.name ?? null);
-      setLedDomains((led.data ?? []) as { id: string; name: string }[]);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [open, user]);
+  }, [open, user, fetchDomains]);
 
   if (!user) return <>{children}</>;
 
@@ -56,6 +48,8 @@ export default function ProfilePopover({ children }: ProfilePopoverProps) {
       .join('') || '?';
 
   const role = roleConfig[user.role] ?? roleConfig.employee;
+  const homeDomain = user.domain_id ? domains.find((d) => d.id === user.domain_id)?.name ?? null : null;
+  const ledDomains = domains.filter((d) => d.domain_lead_id === user.id).map((d) => ({ id: d.id, name: d.name }));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

@@ -78,7 +78,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
   fetchReviewForRegistry: async (registryId) => {
     const { data: review, error } = await supabase
       .from('registry_reviews')
-      .select('*')
+      .select('id, tenant_id, registry_id, reviewer_id, status, overall_comment, completed_at')
       .eq('registry_id', registryId)
       .is('deleted_on', null)
       .maybeSingle();
@@ -90,7 +90,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
 
     const { data: items } = await supabase
       .from('registry_review_items')
-      .select('*')
+      .select('skill_id, manager_score, manager_comment')
       .eq('review_id', (review as any).id);
 
     const r: RegistryReview = {

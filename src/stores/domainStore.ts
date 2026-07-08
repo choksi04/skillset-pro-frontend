@@ -22,12 +22,14 @@ export interface DomainSkillMap {
   created_at: string;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface DomainStore {
   domains: Domain[];
   mappings: DomainSkillMap[];
   loading: boolean;
   initialized: boolean;
-  fetchDomains: () => Promise<void>;
+  fetchDomains: (options?: FetchOptions) => Promise<void>;
   addDomain: (domain: Omit<Domain, 'id' | 'created_at' | 'updated_at'>) => Promise<string | undefined>;
   updateDomain: (id: string, updates: Partial<Domain>) => Promise<void>;
   toggleDomainStatus: (id: string) => Promise<void>;
@@ -38,18 +40,26 @@ interface DomainStore {
   deleteDomain: (id: string) => Promise<boolean>;
 }
 
+let fetchDomainsInFlight: Promise<void> | null = null;
+
 export const useDomainStore = create<DomainStore>((set, get) => ({
   domains: [],
   mappings: [],
   loading: false,
   initialized: false,
 
-  fetchDomains: async () => {
-    set({ loading: true });
-    try {
+  fetchDomains: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchDomainsInFlight) return fetchDomainsInFlight;
+
+    fetchDomainsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const [domainsRes, mappingsRes] = await Promise.all([
-        supabase.from('domains').select('*').is('deleted_on', null).order('created_at'),
-        supabase.from('domain_skill_mappings').select('*').is('deleted_on', null),
+        supabase.from('domains').select('id, tenant_id, name, description, status, domain_lead_id, created_at, updated_at').is('deleted_on', null).order('created_at'),
+        supabase.from('domain_skill_mappings').select('id, domain_id, skill_id, tenant_id, skill_weight, created_at').is('deleted_on', null),
       ]);
       if (domainsRes.error) throw domainsRes.error;
       if (mappingsRes.error) throw mappingsRes.error;
@@ -63,11 +73,16 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
         id: m.id, domain_id: m.domain_id, skill_id: m.skill_id, tenant_id: m.tenant_id,
         skill_weight: Number(m.skill_weight), created_at: m.created_at,
       }));
-      set({ domains, mappings, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch domains:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ domains, mappings, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch domains:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchDomainsInFlight = null;
+      }
+    })();
+
+    return fetchDomainsInFlight;
   },
 
   addDomain: async (domain) => {

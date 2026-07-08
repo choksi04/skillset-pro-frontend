@@ -216,11 +216,13 @@ export function generateAssessmentQuestions(
   return selected;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface AssessmentStore {
   assessments: Assessment[];
   loading: boolean;
   initialized: boolean;
-  fetchAssessments: () => Promise<void>;
+  fetchAssessments: (options?: FetchOptions) => Promise<void>;
   fetchAssessmentById: (id: string) => Promise<Assessment | null>;
   addAssessment: (params: GenerateAssessmentParams) => Promise<string>;
   getAssessmentsForEmployee: (employeeId: string) => Assessment[];
@@ -255,7 +257,7 @@ function mapAssessmentRow(a: any, questionRows: any[]): Assessment {
  * PostgREST default so we never silently drop child rows.
  */
 async function fetchAllIn<T = any>(
-  table: string, column: string, values: string[], orderColumn?: string,
+  table: string, column: string, values: string[], orderColumn?: string, select = '*',
 ): Promise<T[]> {
   if (values.length === 0) return [];
   const PAGE = 1000;
@@ -265,7 +267,7 @@ async function fetchAllIn<T = any>(
   // (PostgREST returns at most 1000 per request by default).
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    let q = supabase.from(table as any).select('*').in(column, values).range(from, from + PAGE - 1);
+    let q = supabase.from(table as any).select(select).in(column, values).range(from, from + PAGE - 1);
     if (orderColumn) q = q.order(orderColumn, { ascending: true });
     const { data, error } = await q;
     if (error) throw error;
@@ -277,17 +279,25 @@ async function fetchAllIn<T = any>(
   return out;
 }
 
+let fetchAssessmentsInFlight: Promise<void> | null = null;
+
 export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
   assessments: [],
   loading: false,
   initialized: false,
 
-  fetchAssessments: async () => {
-    set({ loading: true });
-    try {
+  fetchAssessments: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchAssessmentsInFlight) return fetchAssessmentsInFlight;
+
+    fetchAssessmentsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data: assessmentRows, error } = await supabase
         .from('assessments')
-        .select('*')
+        .select('id, tenant_id, employee_id, submission_id, domain_id, template_id, is_reassessment, is_adaptive, parent_assessment_id, status, duration_minutes, created_at, updated_at')
         .is('deleted_on', null)
         .order('created_at', { ascending: false });
 
@@ -297,18 +307,23 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
       // Paginated fetch to bypass the 1000-row PostgREST default so no child
       // rows are silently dropped when the table grows past 1k.
       const questionRows = await fetchAllIn<any>(
-        'assessment_questions', 'assessment_id', assessmentIds, 'created_at',
+        'assessment_questions', 'assessment_id', assessmentIds, 'created_at', 'assessment_id, question_id, skill_id, target_level, created_at',
       );
 
       const assessments: Assessment[] = (assessmentRows || []).map((a: any) =>
         mapAssessmentRow(a, questionRows.filter((q: any) => q.assessment_id === a.id)),
       );
 
-      set({ assessments, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch assessments:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ assessments, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch assessments:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchAssessmentsInFlight = null;
+      }
+    })();
+
+    return fetchAssessmentsInFlight;
   },
 
   /**
@@ -319,7 +334,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
   fetchAssessmentById: async (id) => {
     const { data: a, error } = await supabase
       .from('assessments')
-      .select('*')
+      .select('id, tenant_id, employee_id, submission_id, domain_id, template_id, is_reassessment, is_adaptive, parent_assessment_id, status, duration_minutes, created_at, updated_at')
       .eq('id', id)
       .is('deleted_on', null)
       .maybeSingle();
@@ -331,7 +346,7 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
 
     const { data: qs, error: qError } = await supabase
       .from('assessment_questions')
-      .select('*')
+      .select('assessment_id, question_id, skill_id, target_level, created_at')
       .eq('assessment_id', id)
       .order('created_at', { ascending: true });
     if (qError) {
@@ -350,8 +365,8 @@ export const useAssessmentStore = create<AssessmentStore>((set, get) => ({
     const { tenant_id, employee_id, submission_id, domain_id, template_id, ratings, publishedQuestions, maxQuestionsPerSkill, excludeQuestionIds } = params;
     // Fetch competency levels and assessment configs for dynamic mapping
     const [{ data: levelsData }, { data: configsData }] = await Promise.all([
-      supabase.from('competency_levels').select('*').order('level'),
-      supabase.from('assessment_config').select('*'),
+      supabase.from('competency_levels').select('id, tenant_id, level, name, label, description, score_range_min, score_range_max, min_questions, status').order('level'),
+      supabase.from('assessment_config').select('id, tenant_id, config_type, reference_id, question_type, min_questions, max_questions'),
     ]);
     const clSettings: CompetencyLevelConfig[] = (levelsData || []).map((s: any) => ({
       id: s.id, tenant_id: s.tenant_id, level: s.level, name: s.name, label: s.label,

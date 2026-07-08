@@ -58,6 +58,8 @@ export interface OfficialSkillEntry {
   review_id: string;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface ReviewStore {
   reviews: ManagerReview[];
   notifications: Notification[];
@@ -65,7 +67,7 @@ interface ReviewStore {
   loading: boolean;
   initialized: boolean;
 
-  fetchReviews: () => Promise<void>;
+  fetchReviews: (options?: FetchOptions) => Promise<void>;
   createReview: (params: {
     tenant_id: string;
     assessment_id: string;
@@ -92,6 +94,8 @@ interface ReviewStore {
   reassignReviewer: (reviewId: string, newReviewerId: string) => Promise<void>;
 }
 
+let fetchReviewsInFlight: Promise<void> | null = null;
+
 export const useReviewStore = create<ReviewStore>((set, get) => ({
   reviews: [],
   notifications: [],
@@ -99,20 +103,26 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  fetchReviews: async () => {
-    set({ loading: true });
-    try {
+  fetchReviews: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchReviewsInFlight) return fetchReviewsInFlight;
+
+    fetchReviewsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const [reviewsRes, notifsRes, entriesRes] = await Promise.all([
-        supabase.from('manager_reviews').select('*').is('deleted_on', null).order('created_at', { ascending: false }),
-        supabase.from('notifications').select('*').order('created_at', { ascending: false }),
-        supabase.from('official_skill_entries').select('*').is('deleted_on', null),
+        supabase.from('manager_reviews').select('id, tenant_id, assessment_id, attempt_id, employee_id, employee_name, domain_id, reviewer_id, overall_comment, status, created_at, updated_at, completed_at').is('deleted_on', null).order('created_at', { ascending: false }),
+        supabase.from('notifications').select('id, tenant_id, target_role, target_user_id, message, type, reference_id, action_link, read, created_at').order('created_at', { ascending: false }).limit(50),
+        supabase.from('official_skill_entries').select('id, employee_id, tenant_id, skill_id, final_level, assessment_reference, manager_comments, created_at, cycle, self_rating, ai_level, review_id').is('deleted_on', null),
       ]);
       if (reviewsRes.error) throw reviewsRes.error;
 
       const reviewIds = (reviewsRes.data || []).map((r: any) => r.id);
       let skillEntries: any[] = [];
       if (reviewIds.length > 0) {
-        const { data, error } = await supabase.from('review_skill_entries').select('*').in('review_id', reviewIds);
+        const { data, error } = await supabase.from('review_skill_entries').select('review_id, skill_id, self_rating, ai_calculated_level, ai_score, verified_level, manager_comment').in('review_id', reviewIds);
         if (error) throw error;
         skillEntries = data || [];
       }
@@ -145,11 +155,16 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         self_rating: e.self_rating as RatingLevel, ai_level: e.ai_level, review_id: e.review_id,
       }));
 
-      set({ reviews, notifications, officialEntries, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch reviews:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ reviews, notifications, officialEntries, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch reviews:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchReviewsInFlight = null;
+      }
+    })();
+
+    return fetchReviewsInFlight;
   },
 
   createReview: async (params) => {

@@ -29,6 +29,25 @@ export interface QuestionCounts {
   aiGenerated: number;
 }
 
+export interface QuestionPageParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  skillId?: string;
+  skillIds?: string[];
+  levelId?: string;
+  questionType?: QuestionType | 'all';
+  status?: QuestionStatus | 'all';
+  source?: 'all' | 'ai' | 'manual';
+  sortOrder?: 'recent' | 'oldest';
+  excludeIds?: string[];
+}
+
+export interface QuestionPageResult {
+  questions: Question[];
+  total: number;
+}
+
 interface QuestionStore {
   questions: Question[];
   counts: QuestionCounts;
@@ -40,7 +59,8 @@ interface QuestionStore {
   ensureQuestionsLoaded: () => Promise<void>;
   /** Scoped fetch by question IDs — merges into store, returns rows. */
   fetchQuestionsByIds: (ids: string[]) => Promise<Question[]>;
-  fetchQuestionCounts: () => Promise<void>;
+  fetchQuestionPage: (params?: QuestionPageParams) => Promise<QuestionPageResult>;
+  fetchQuestionCounts: (options?: { force?: boolean }) => Promise<void>;
   addQuestion: (q: Omit<Question, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   addQuestions: (qs: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
@@ -53,6 +73,12 @@ interface QuestionStore {
 
 
 const BATCH_SIZE = 1000;
+const QUESTION_SELECT = 'id, tenant_id, skill_id, topic_id, competency_level, question_type, question_text, evaluation_guidelines, status, ai_generated, created_at, updated_at';
+const QUESTION_COUNTS_TTL_MS = 60_000;
+
+let fetchQuestionsInFlight: Promise<void> | null = null;
+let fetchQuestionCountsInFlight: Promise<void> | null = null;
+let questionCountsFetchedAt = 0;
 
 function mapQuestionRow(q: any): Question {
   return {
@@ -73,8 +99,13 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  fetchQuestionCounts: async () => {
-    try {
+  fetchQuestionCounts: async (options = {}) => {
+    const { force = false } = options;
+    if (!force && Date.now() - questionCountsFetchedAt < QUESTION_COUNTS_TTL_MS) return;
+    if (!force && fetchQuestionCountsInFlight) return fetchQuestionCountsInFlight;
+
+    fetchQuestionCountsInFlight = (async () => {
+      try {
       const { data, error } = await supabase.rpc('get_question_counts');
       if (error) throw error;
       if (data) {
@@ -88,15 +119,77 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
             aiGenerated: d.ai_generated ?? 0,
           },
         });
+        questionCountsFetchedAt = Date.now();
       }
-    } catch (err) {
-      console.error('Failed to fetch question counts:', err);
+      } catch (err) {
+        console.error('Failed to fetch question counts:', err);
+      } finally {
+        fetchQuestionCountsInFlight = null;
+      }
+    })();
+
+    return fetchQuestionCountsInFlight;
+  },
+
+  fetchQuestionPage: async (params = {}) => {
+    const {
+      page = 1,
+      pageSize = 50,
+      search = '',
+      skillId = 'all',
+      skillIds,
+      levelId = 'all',
+      questionType = 'all',
+      status = 'all',
+      source = 'all',
+      sortOrder = 'recent',
+      excludeIds = [],
+    } = params;
+    const from = Math.max(0, (page - 1) * pageSize);
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('questions')
+      .select(QUESTION_SELECT, { count: 'exact' })
+      .is('deleted_on', null);
+
+    const term = search.trim();
+    if (term) query = query.ilike('question_text', `%${term.replace(/[%_]/g, '\\$&')}%`);
+    if (skillId !== 'all') query = query.eq('skill_id', skillId);
+    if (skillIds && skillIds.length > 0) query = query.in('skill_id', skillIds);
+    if (levelId !== 'all') query = query.eq('competency_level', levelId);
+    if (questionType !== 'all') query = query.eq('question_type', questionType);
+    if (status !== 'all') query = query.eq('status', status);
+    if (source === 'ai') query = query.eq('ai_generated', true);
+    if (source === 'manual') query = query.eq('ai_generated', false);
+    if (excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: sortOrder === 'oldest' })
+      .range(from, to);
+
+    if (error) {
+      console.error('Failed to fetch question page:', error);
+      return { questions: [], total: 0 };
     }
+
+    const rows = (data || []).map(mapQuestionRow);
+    set((state) => {
+      const map = new Map(state.questions.map((q) => [q.id, q]));
+      for (const q of rows) map.set(q.id, q);
+      return { questions: Array.from(map.values()) };
+    });
+    return { questions: rows, total: count ?? rows.length };
   },
 
   fetchQuestions: async () => {
-    set({ loading: true });
-    try {
+    const state = get();
+    if (state.initialized) return;
+    if (fetchQuestionsInFlight) return fetchQuestionsInFlight;
+
+    fetchQuestionsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const allRows: any[] = [];
       let offset = 0;
       let keepFetching = true;
@@ -104,7 +197,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       while (keepFetching) {
         const { data, error } = await supabase
           .from('questions')
-          .select('*')
+          .select(QUESTION_SELECT)
           .is('deleted_on', null)
           .order('created_at')
           .range(offset, offset + BATCH_SIZE - 1);
@@ -120,10 +213,15 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
 
       const questions: Question[] = allRows.map(mapQuestionRow);
       set({ questions, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch questions:', err);
-      set({ loading: false, initialized: true });
-    }
+      } catch (err) {
+        console.error('Failed to fetch questions:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchQuestionsInFlight = null;
+      }
+    })();
+
+    return fetchQuestionsInFlight;
   },
 
   /** Only preload the full list if we haven't already. In-flight-safe. */
@@ -148,7 +246,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
         const slice = uniqueIds.slice(i, i + CHUNK);
         const { data, error } = await supabase
           .from('questions')
-          .select('*')
+          .select(QUESTION_SELECT)
           .in('id', slice)
           .is('deleted_on', null);
         if (error) throw error;
@@ -181,7 +279,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       }],
     }));
     // Refresh counts
-    get().fetchQuestionCounts();
+    get().fetchQuestionCounts({ force: true });
   },
 
   addQuestions: async (qs) => {
@@ -202,7 +300,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
     }));
     set((state) => ({ questions: [...state.questions, ...newQuestions] }));
     // Refresh counts
-    get().fetchQuestionCounts();
+    get().fetchQuestionCounts({ force: true });
   },
 
   updateQuestion: async (id, updates) => {
@@ -217,7 +315,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       ),
     }));
     // Refresh counts if status changed
-    if (updates.status) get().fetchQuestionCounts();
+    if (updates.status) get().fetchQuestionCounts({ force: true });
   },
 
   toggleQuestionStatus: async (id) => {
@@ -245,7 +343,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       ),
     }));
     // Refresh counts
-    get().fetchQuestionCounts();
+    get().fetchQuestionCounts({ force: true });
     return ids.length;
   },
 
@@ -278,7 +376,7 @@ export const useQuestionStore = create<QuestionStore>((set, get) => ({
       questions: state.questions.filter((q) => q.id !== id),
     }));
     // Refresh counts
-    get().fetchQuestionCounts();
+    get().fetchQuestionCounts({ force: true });
     return { success: true };
   },
 }));

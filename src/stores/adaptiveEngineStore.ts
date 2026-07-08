@@ -119,7 +119,7 @@ async function loadCompetencyLevelMap(): Promise<{
   levelToId: Record<number, string>;
   idToLevel: Record<string, number>;
 }> {
-  const { data } = await supabase.from('competency_levels').select('*').eq('status', 'active').order('level');
+  const { data } = await supabase.from('competency_levels').select('id, level, name').eq('status', 'active').order('level');
   const levels: CompetencyLevelConfig[] = (data || []).map((s: any) => ({
     id: s.id,
     tenant_id: s.tenant_id,
@@ -298,7 +298,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       if (!levelId) continue;
       const { data: rows } = await supabase
         .from('questions')
-        .select('*')
+        .select('id, skill_id, topic_id, competency_level, question_type, question_text, evaluation_guidelines, status, ai_generated, created_at, updated_at')
         .eq('skill_id', skill.skill_id)
         .eq('question_type', 'mcq')
         .eq('status', 'published')
@@ -525,7 +525,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         : 0;
 
     // Refresh attempts so EvalResults sees the new ai_evaluations rows.
-    await useAttemptStore.getState().fetchAttempts();
+    await useAttemptStore.getState().fetchAttempts({ force: true });
     useAttemptStore.setState((s) => ({
       attempts: s.attempts.map((a) =>
         a.id === attemptId
@@ -634,7 +634,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       })
       .eq('id', attemptId);
 
-    await useAttemptStore.getState().fetchAttempts();
+    await useAttemptStore.getState().fetchAttempts({ force: true });
     return true;
   },
 }));

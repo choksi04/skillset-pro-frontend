@@ -43,13 +43,15 @@ export interface EmployeeDomainAssignment {
   tenant_id: string;
 }
 
+interface FetchOptions { force?: boolean }
+
 interface RegistryStore {
   submissions: SkillRegistrySubmission[];
   assignments: EmployeeDomainAssignment[];
   currentCycle: string;
   loading: boolean;
   initialized: boolean;
-  fetchRegistry: () => Promise<void>;
+  fetchRegistry: (options?: FetchOptions) => Promise<void>;
   setCurrentCycle: (cycle: string) => void;
   getSubmission: (employeeId: string, cycle: string) => SkillRegistrySubmission | undefined;
   createOrUpdateDraft: (employeeId: string, tenantId: string, domainId: string, ratings: SkillSelfRating[]) => Promise<void>;
@@ -59,6 +61,8 @@ interface RegistryStore {
   resetSubmissionStatus: (submissionId: string) => Promise<void>;
 }
 
+let fetchRegistryInFlight: Promise<void> | null = null;
+
 export const useRegistryStore = create<RegistryStore>((set, get) => ({
   submissions: [],
   assignments: [],
@@ -66,12 +70,18 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  fetchRegistry: async () => {
-    set({ loading: true });
-    try {
+  fetchRegistry: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchRegistryInFlight) return fetchRegistryInFlight;
+
+    fetchRegistryInFlight = (async () => {
+      set({ loading: true });
+      try {
       const [subsRes, assignRes] = await Promise.all([
-        supabase.from('skill_registry_submissions').select('*').is('deleted_on', null).order('created_at', { ascending: false }),
-        supabase.from('employee_domain_assignments').select('*'),
+        supabase.from('skill_registry_submissions').select('id, tenant_id, employee_id, domain_id, cycle, status, submitted_at, created_at, updated_at').is('deleted_on', null).order('created_at', { ascending: false }),
+        supabase.from('employee_domain_assignments').select('employee_id, domain_id, tenant_id'),
       ]);
       if (subsRes.error) throw subsRes.error;
       if (assignRes.error) throw assignRes.error;
@@ -82,7 +92,7 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
       // Legacy per-submission ratings (may be empty in newer deployments).
       let ratingsData: any[] = [];
       if (subIds.length > 0) {
-        const { data, error } = await supabase.from('skill_self_ratings').select('*').in('submission_id', subIds);
+        const { data, error } = await supabase.from('skill_self_ratings').select('submission_id, skill_id, rating, comment').in('submission_id', subIds);
         if (error) throw error;
         ratingsData = data || [];
       }
@@ -144,11 +154,16 @@ export const useRegistryStore = create<RegistryStore>((set, get) => ({
         employee_id: a.employee_id, domain_id: a.domain_id, tenant_id: a.tenant_id,
       }));
 
-      set({ submissions, assignments, loading: false, initialized: true });
-    } catch (err) {
-      console.error('Failed to fetch registry:', err);
-      set({ loading: false, initialized: true });
-    }
+        set({ submissions, assignments, loading: false, initialized: true });
+      } catch (err) {
+        console.error('Failed to fetch registry:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchRegistryInFlight = null;
+      }
+    })();
+
+    return fetchRegistryInFlight;
   },
 
   setCurrentCycle: (cycle) => set({ currentCycle: cycle }),

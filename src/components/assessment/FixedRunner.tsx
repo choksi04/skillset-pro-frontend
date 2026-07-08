@@ -382,7 +382,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
     setReviewOpen(false);
     setIsSubmitting(false);
     isSubmittingRef.current = false;
-    await fetchAssessments();
+    await fetchAssessments({ force: true });
     if (evalFailed) {
       toast.error(`Submitted, but evaluation failed: ${evalErrorMsg}. You can retry from the assessment list.`);
     } else {

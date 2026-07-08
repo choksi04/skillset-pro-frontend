@@ -134,22 +134,22 @@ interface GeneratedPreview {
 
 export default function QuestionBankPage() {
   const {
-    questions, counts, fetchQuestions, fetchQuestionCounts,
+    questions, counts, fetchQuestionPage, fetchQuestionCounts,
     toggleQuestionStatus, publishQuestion, bulkPublish, deleteQuestion, addQuestions,
-    loading: questionsLoading, initialized: questionsInitialized,
   } = useQuestionStore();
   const { levels: clSettings, fetchLevels } = useCompetencyLevelStore();
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
   const { currentRole, user } = useAuth();
   const canEdit = currentRole === 'admin' || currentRole === 'manager';
 
-  useEffect(() => { fetchQuestions(); fetchQuestionCounts(); fetchSkills(); fetchLevels(); }, [fetchQuestions, fetchQuestionCounts, fetchSkills, fetchLevels]);
+  useEffect(() => { fetchQuestionCounts(); fetchSkills(); fetchLevels(); }, [fetchQuestionCounts, fetchSkills, fetchLevels]);
 
   const PAGE_SIZE = 50;
   const [currentPage, setCurrentPage] = useState(1);
 
   // --- List state ---
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -165,6 +165,9 @@ export default function QuestionBankPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [pageQuestions, setPageQuestions] = useState<Question[]>([]);
+  const [questionTotal, setQuestionTotal] = useState(0);
+  const [questionPageLoading, setQuestionPageLoading] = useState(false);
 
   // --- AI generation state ---
   const [aiOpen, setAiOpen] = useState(false);
@@ -184,6 +187,11 @@ export default function QuestionBankPage() {
     if (aiSkillId) fetchTopicsForSkill(aiSkillId);
   }, [aiSkillId, fetchTopicsForSkill]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const activeSkills = skills.filter((s) => s.status === 'active');
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
   const dynamicLevels = useMemo(() => getActiveLevelIds(clSettings), [clSettings]);
@@ -200,33 +208,33 @@ export default function QuestionBankPage() {
   }, [topics]);
 
 
-  const filtered = useMemo(() => {
-    const result = questions.filter((q) => {
-      const { display } = parseQuestionText(q.question_text, q.question_type);
-      const matchesSearch = display.toLowerCase().includes(search.toLowerCase());
-      const matchesSkill = skillFilter === 'all' || q.skill_id === skillFilter;
-      const matchesLevel = levelFilter === 'all' || q.competency_level === levelFilter;
-      const matchesType = typeFilter === 'all' || q.question_type === typeFilter;
-      const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
-      const matchesSource = sourceFilter === 'all' || (sourceFilter === 'ai' ? q.ai_generated : !q.ai_generated);
-      return matchesSearch && matchesSkill && matchesLevel && matchesType && matchesStatus && matchesSource;
-    });
-    result.sort((a, b) => {
-      const da = new Date(a.created_at).getTime();
-      const db = new Date(b.created_at).getTime();
-      return sortOrder === 'recent' ? db - da : da - db;
-    });
-    return result;
-  }, [questions, search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
-
   // Reset page when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginatedQuestions = useMemo(
-    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filtered, currentPage]
-  );
+  const loadQuestionPage = useCallback(async () => {
+    setQuestionPageLoading(true);
+    const result = await fetchQuestionPage({
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      search: debouncedSearch,
+      skillId: skillFilter,
+      levelId: levelFilter,
+      questionType: typeFilter as QuestionType | 'all',
+      status: statusFilter as QuestionStatus | 'all',
+      source: sourceFilter,
+      sortOrder,
+    });
+    setPageQuestions(result.questions);
+    setQuestionTotal(result.total);
+    setQuestionPageLoading(false);
+  }, [fetchQuestionPage, currentPage, debouncedSearch, skillFilter, levelFilter, typeFilter, statusFilter, sourceFilter, sortOrder]);
+
+  useEffect(() => {
+    loadQuestionPage();
+  }, [loadQuestionPage]);
+
+  const totalPages = Math.max(1, Math.ceil(questionTotal / PAGE_SIZE));
+  const paginatedQuestions = pageQuestions;
 
   // Format large numbers: 10k, 100k etc.
   function formatCount(n: number): string {
@@ -240,29 +248,7 @@ export default function QuestionBankPage() {
   }
 
   // --- Coverage indicator (respects filters) ---
-  const coverageData = useMemo(() => {
-    const minRequired = clSettings.length > 0 ? Math.min(...clSettings.map((s) => s.min_questions)) : 3;
-    const skillCoverage: Record<string, Record<string, number>> = {};
-    for (const q of questions) {
-      if (q.status === 'disabled') continue;
-      if (!skillCoverage[q.skill_id]) skillCoverage[q.skill_id] = {};
-      skillCoverage[q.skill_id][q.competency_level] = (skillCoverage[q.skill_id][q.competency_level] || 0) + 1;
-    }
-    const filteredSkills = skillFilter === 'all' ? activeSkills : activeSkills.filter((s) => s.id === skillFilter);
-    const filteredLevels = levelFilter === 'all' ? dynamicLevels : dynamicLevels.filter((l) => l === levelFilter);
-    const result: { skillId: string; skillName: string; levels: { level: string; count: number; min: number }[]; hasGaps: boolean }[] = [];
-    for (const skill of filteredSkills) {
-      const counts = skillCoverage[skill.id] || {};
-      const levels = filteredLevels.map((l) => {
-        const setting = clSettings.find((s) => s.id === l);
-        const min = setting?.min_questions ?? minRequired;
-        return { level: l, count: counts[l] || 0, min };
-      });
-      const hasGaps = levels.some((lv) => lv.count < lv.min);
-      if (hasGaps) result.push({ skillId: skill.id, skillName: skill.skill_name, levels, hasGaps });
-    }
-    return result;
-  }, [questions, activeSkills, clSettings, skillFilter, levelFilter, dynamicLevels]);
+  const coverageData: { skillId: string; skillName: string; levels: { level: string; count: number; min: number }[]; hasGaps: boolean }[] = [];
 
   // --- AI Generation handlers ---
   const handleGenerate = async () => {
@@ -316,10 +302,10 @@ export default function QuestionBankPage() {
 
   const togglePreview = (i: number) => setPreviews((prev) => prev.map((p, idx) => idx === i ? { ...p, accepted: !p.accepted } : p));
 
-  const handleSaveAccepted = () => {
+  const handleSaveAccepted = async () => {
     const accepted = previews.filter((p) => p.accepted);
     if (accepted.length === 0) return;
-    addQuestions(accepted.map((p) => ({
+    await addQuestions(accepted.map((p) => ({
       tenant_id: user?.tenant_id ?? 'tenant-001',
       skill_id: aiSkillId,
       topic_id: aiTopicId || null,
@@ -332,6 +318,7 @@ export default function QuestionBankPage() {
     })));
     toast.success(`${accepted.length} question(s) saved as draft.`);
     setPreviews([]);
+    loadQuestionPage();
   };
 
   const acceptedCount = previews.filter((p) => p.accepted).length;
@@ -639,6 +626,7 @@ export default function QuestionBankPage() {
               const count = await bulkPublish(draftIds);
               toast.success(`Published ${count} question(s).`);
               setSelectedIds(new Set());
+              loadQuestionPage();
             }}
           >
             <CheckCircle size={14} className="mr-1.5" /> Publish Selected
@@ -690,7 +678,7 @@ export default function QuestionBankPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {questionsLoading && !questionsInitialized ? (
+            {questionPageLoading ? (
               [1, 2, 3, 4, 5].map((i) => (
                 <TableRow key={`skel-${i}`}>
                   {canEdit && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
@@ -801,21 +789,21 @@ export default function QuestionBankPage() {
       </div>
 
       {/* Pagination — fixed bottom */}
-      {filtered.length > 0 && (
+      {questionTotal > 0 && (
         <div className="sticky -bottom-6 border-t border-border bg-background py-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
           <p className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
-            {filtered.length >= 10000 ? (
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, questionTotal)} of{' '}
+            {questionTotal >= 10000 ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-default underline decoration-dotted">{formatCount(filtered.length)}</span>
+                    <span className="cursor-default underline decoration-dotted">{formatCount(questionTotal)}</span>
                   </TooltipTrigger>
-                  <TooltipContent><p>{rawFormatCount(filtered.length)}</p></TooltipContent>
+                  <TooltipContent><p>{rawFormatCount(questionTotal)}</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              filtered.length
+              questionTotal
             )} questions
           </p>
           {totalPages > 1 && (
@@ -989,7 +977,7 @@ export default function QuestionBankPage() {
       })()}
 
       {/* Form Sheet */}
-      <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} />
+      <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} onSaved={loadQuestionPage} />
 
       {/* Bulk Upload */}
       <BulkUploadSheet open={bulkOpen} onOpenChange={setBulkOpen} />
@@ -1017,6 +1005,7 @@ export default function QuestionBankPage() {
                 if (result.success) {
                   toast.success('Question deleted successfully.');
                   setDeleteTarget(null);
+                  loadQuestionPage();
                 } else {
                   toast.error(result.error || 'Failed to delete question.');
                 }
@@ -1056,6 +1045,7 @@ export default function QuestionBankPage() {
                 setBulkDeleteLoading(false);
                 setBulkDeleteOpen(false);
                 setSelectedIds(new Set());
+                loadQuestionPage();
                 if (success > 0) toast.success(`Deleted ${success} question(s).`);
                 if (skipped.length > 0) toast.error(`${skipped.length} question(s) could not be deleted (in use by assessments).`);
               }}

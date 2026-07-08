@@ -41,11 +41,13 @@ export interface CreateAssignmentResult {
   failed: { employee_id: string; reason: string }[];
 }
 
+interface FetchOptions { force?: boolean }
+
 interface AssignmentStore {
   assignments: AssessmentAssignment[];
   loading: boolean;
   initialized: boolean;
-  fetchAssignments: () => Promise<void>;
+  fetchAssignments: (options?: FetchOptions) => Promise<void>;
   getActiveAssignmentsForEmployee: (templateId: string, employeeId: string) => AssessmentAssignment | undefined;
   getAssignmentsForTemplate: (templateId: string) => AssessmentAssignment[];
   getAssignmentByAssessmentId: (assessmentId: string) => AssessmentAssignment | undefined;
@@ -296,17 +298,25 @@ async function generateAssessmentForTemplate(
   return { assessmentId };
 }
 
+let fetchAssignmentsInFlight: Promise<void> | null = null;
+
 export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   assignments: [],
   loading: false,
   initialized: false,
 
-  fetchAssignments: async () => {
-    set({ loading: true });
-    try {
+  fetchAssignments: async (options = {}) => {
+    const { force = false } = options;
+    const state = get();
+    if (!force && state.initialized) return;
+    if (!force && fetchAssignmentsInFlight) return fetchAssignmentsInFlight;
+
+    fetchAssignmentsInFlight = (async () => {
+      set({ loading: true });
+      try {
       const { data, error } = await supabase
         .from('assessment_assignments')
-        .select('*')
+        .select('id, tenant_id, template_id, employee_id, domain_id, status, attempt_count, max_attempts, assessment_id, assigned_at, assigned_by, created_at')
         .is('deleted_on', null)
         .order('assigned_at', { ascending: false });
       if (error) throw error;
@@ -315,10 +325,15 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
         loading: false,
         initialized: true,
       });
-    } catch (err) {
-      console.error('Failed to fetch assignments:', err);
-      set({ loading: false, initialized: true });
-    }
+      } catch (err) {
+        console.error('Failed to fetch assignments:', err);
+        set({ loading: false, initialized: true });
+      } finally {
+        fetchAssignmentsInFlight = null;
+      }
+    })();
+
+    return fetchAssignmentsInFlight;
   },
 
   getActiveAssignmentsForEmployee: (templateId, employeeId) =>
@@ -339,7 +354,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     // Load template
     let template = useTemplateStore.getState().getTemplate(template_id);
     if (!template) {
-      await useTemplateStore.getState().fetchTemplates();
+      await useTemplateStore.getState().fetchTemplates({ force: true });
       template = useTemplateStore.getState().getTemplate(template_id);
     }
     if (!template) {
@@ -353,7 +368,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     // Make sure assignments cache is fresh for duplicate check
     if (!get().initialized) {
-      await get().fetchAssignments();
+      await get().fetchAssignments({ force: true });
     }
 
     const tenantId = template.tenant_id;
