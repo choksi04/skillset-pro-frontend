@@ -1,61 +1,62 @@
-## Problem
 
-In the assessment runner (`FixedRunner`) and the assessment detail page's runner shell, several buttons trigger async work (save answer → DB round-trip, pause DB write, submit, exit-with-refetch), but give no immediate visual feedback. The user clicks Exit / Pause / Next / Previous / Skip / question-navigator tile and it looks frozen, then "suddenly" something happens. Also nothing prevents double-clicks during the async gap.
+## Diagnosis
 
-## Fix (UI-only, no business logic changes)
+Lovable Cloud backend is healthy (status check passed). The `57014 canceling statement due to statement timeout` errors are coming from **our own queries hitting Postgres' statement timeout**, not a provider outage.
 
-Add per-action loading state + immediate disable + spinner on every interactive button in the runner. Nothing changes about what the buttons do — only how reactive they feel.
+Evidence from `pg_stat_statements` (top offenders by total time):
 
-### 1. `src/components/assessment/FixedRunner.tsx` — top bar
+| Query | Calls | Mean | Max |
+|---|---|---|---|
+| `SELECT * FROM questions WHERE deleted_on IS NULL ORDER BY created_at` | 20,277 | 59 ms | **2827 ms** |
+| `SELECT * FROM skills WHERE deleted_on IS NULL ORDER BY created_at` | 11,929 | 34 ms | 2478 ms |
+| `SELECT * FROM domain_skill_mappings WHERE deleted_on IS NULL` | 16,420 | 16 ms | 2778 ms |
+| `SELECT * FROM ai_evaluations WHERE attempt_id = ANY($1)` | 7,165 | 28 ms | 2105 ms |
+| `SELECT * FROM attempt_answers WHERE attempt_id = ANY($1)` | 7,168 | 22 ms | 2458 ms |
+| `SELECT * FROM notifications ORDER BY created_at DESC` | 8,339 | 17 ms | 2106 ms |
+| `SELECT * FROM assessment_attempts ORDER BY started_at DESC` | 5,682 | 18 ms | 1976 ms |
 
-- **Exit**: wrap `onCancel` in a local `isExiting` state. On click: set `isExiting=true`, disable the button, swap the icon for `Loader2` (spinning), await `onCancel()`, then reset. Also disable Exit while `isSubmitting`.
-- **Pause / Resume**: add `isPausing` / `isResuming` state. Show spinner in-place while the DB call runs; disable both buttons during the transition.
-- **Review & submit**: already has `isSubmitting`; also add a `isOpeningReview` state so the button shows a spinner while `saveCurrentAnswer()` finishes before opening the review panel.
-- **Timer area**: unchanged.
+The failing request in your screenshot (`questions?select=skill_id&skill_id=in.(…)&type=eq.mcq&status=eq.published`) is a sequential scan on `questions` filtered by `skill_id + type + status` — no supporting index, and the table has grown enough that peak latency crosses the 2s cancel threshold under load.
 
-### 2. `FixedRunner.tsx` — question area footer
+So: **not an outage. Missing indexes + a few over-broad fetches in our stores.**
 
-- **Previous / Next / Skip**: add a shared `isNavigating` state. `goTo(i)` becomes: set `isNavigating=true` → await save → change index → set `false`. All three buttons show spinner + disabled while navigating. Prevents the "click did nothing" gap caused by the awaited `saveAnswer`.
-- **Reset**: instant (local state) — no change needed, but confirm no async.
-- **Flag for review**: instant local state — no change.
+## Plan
 
-### 3. `FixedRunner.tsx` — question navigator sidebar tiles
+### 1. Add indexes (single migration)
 
-- The numbered tiles call `goTo(i)` which awaits DB write. Wire them into the same `isNavigating` flag: disable pointer events + add `opacity-60` while navigating so the user sees the click was received.
+Partial indexes scoped to `deleted_on IS NULL` where applicable to match our query patterns:
 
-### 4. `FixedRunner.tsx` — Review panel
+- `questions (skill_id, question_type, status) WHERE deleted_on IS NULL` — fixes the failing call
+- `questions (created_at) WHERE deleted_on IS NULL`
+- `skills (created_at) WHERE deleted_on IS NULL`
+- `domain_skill_mappings (domain_id) WHERE deleted_on IS NULL`
+- `domain_skill_mappings (skill_id) WHERE deleted_on IS NULL`
+- `ai_evaluations (attempt_id)`
+- `attempt_answers (attempt_id)`
+- `attempt_skill_scores (attempt_id)`
+- `assessment_questions (assessment_id)` (batched fetch in `assessmentStore.fetchAssessments`)
+- `assessment_attempts (started_at DESC)`
+- `assessment_attempts (employee_id, assessment_id)`
+- `notifications (user_id, created_at DESC)` (currently unfiltered `SELECT * ORDER BY created_at`)
+- `review_skill_entries (review_id)`
+- `skill_registry_items (registry_id)`
 
-- **Back to questions**: instant, no change.
-- **Submit assessment / Submit anyway**: already have `isSubmitting`; ensure the spinner shows on the exact button clicked and both dialog buttons disable together.
-- **Jump to Q#**: shares `isNavigating` (also awaits save via `goTo`-style flow) — add spinner/disable.
+All via one `supabase--migration` call. Plain `CREATE INDEX IF NOT EXISTS` (not CONCURRENTLY — migrations run in a transaction).
 
-### 5. `src/pages/AssessmentDetailPage.tsx` — runner shell
+### 2. Tighten hot queries (frontend only, no logic change)
 
-- **Back to Assessment** (top of runnerActive view, calls `exitRunner` which awaits `fetchAssessments` + `fetchAttempts`): add `isExitingRunner` state, disable + spinner while running.
-- No other buttons on this page need changes (Start / Regenerate / Re-attempt already have `startingRunner` / `regenerating` flags).
+- **NotificationDropdown / notifications store**: filter by `user_id = auth.uid()` and add `.limit(50)` — right now we pull the whole table.
+- **assessmentStore.fetchAssessments**: keep the paginated `.in()` helper but drop `select('*')` where the caller only needs a few columns (assessment list header).
+- **questionStore listing on Question Bank**: verify it uses the new `(skill_id, question_type, status)` index by keeping filters in that order; no code change if selectors already match.
 
-### Common pattern applied
+Only cosmetic query narrowing — no business logic touched.
 
-```
-const [busy, setBusy] = useState(false);
-const handler = async () => {
-  if (busy) return;
-  setBusy(true);
-  try { await doWork(); } finally { setBusy(false); }
-};
-<Button disabled={busy || otherBusyFlags} onClick={handler}>
-  {busy ? <Loader2 className="animate-spin" size={14} /> : <Icon size={14} />}
-  Label
-</Button>
-```
+### 3. Verify
+
+- Re-run `supabase--slow_queries` after deploy; the `questions`/`skills`/`domain_skill_mappings` rows should drop off the top.
+- Reload the pages in the screenshot (assessment detail, notifications) and confirm no `57014` errors in Network.
 
 ### Out of scope
 
-- No changes to save/submit/pause/resume logic in `attemptStore`.
-- No changes to timer, adaptive engine, or evaluation flow.
-- No visual redesign — only spinner/disabled affordances on existing buttons.
-
-## Files changed
-
-- `src/components/assessment/FixedRunner.tsx`
-- `src/pages/AssessmentDetailPage.tsx` (only the `runnerActive` back button)
+- No RLS changes.
+- No changes to assessment/adaptive engine, evaluation, or scoring.
+- No compute resize — indexes should resolve this at current size.
