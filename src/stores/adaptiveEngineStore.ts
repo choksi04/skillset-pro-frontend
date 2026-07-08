@@ -26,6 +26,8 @@ export interface SkillAdaptiveState {
   attemptedCount: number;
   done: boolean;
   history: { question_id: string; level: number; correct: boolean; fallback?: boolean }[];
+  /** Topic IDs already asked for this skill — used to diversify topic coverage. */
+  askedTopicIds?: string[];
 }
 
 export interface AdaptiveAttemptState {
@@ -307,10 +309,13 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         (r: any) => !state.excludedQuestionIds.includes(r.id),
       );
       if (filtered.length > 0) {
-        filtered.sort(
-          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        );
-        chosen = { row: filtered[0], level: lvl, fallback: lvl !== skill.currentLevel };
+        // Topic-diversify: prefer a question from a topic we haven't
+        // used yet for this skill (falls back to any topic).
+        const usedTopics = new Set(skill.askedTopicIds ?? []);
+        const fresh = filtered.filter((r: any) => r.topic_id && !usedTopics.has(r.topic_id));
+        const pool = fresh.length > 0 ? fresh : filtered;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        chosen = { row: pick, level: lvl, fallback: lvl !== skill.currentLevel };
         break;
       }
     }
@@ -351,6 +356,9 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     }
 
     state.excludedQuestionIds.push(chosen.row.id);
+    if (chosen.row.topic_id) {
+      skill.askedTopicIds = [...(skill.askedTopicIds ?? []), chosen.row.topic_id];
+    }
     await persistState(attemptId, state);
 
     const question: Question = {
