@@ -26,6 +26,8 @@ export interface SkillAdaptiveState {
   attemptedCount: number;
   done: boolean;
   history: { question_id: string; level: number; correct: boolean; fallback?: boolean }[];
+  /** Topic IDs already asked for this skill — used to diversify topic coverage. */
+  askedTopicIds?: string[];
 }
 
 export interface AdaptiveAttemptState {
@@ -308,12 +310,8 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       );
       if (filtered.length > 0) {
         // Topic-diversify: prefer a question from a topic we haven't
-        // used yet in this skill's history (falls back to any topic).
-        const usedTopics = new Set(
-          (skill.history || [])
-            .map((h: any) => h.topic_id)
-            .filter((t: any): t is string => !!t),
-        );
+        // used yet for this skill (falls back to any topic).
+        const usedTopics = new Set(skill.askedTopicIds ?? []);
         const fresh = filtered.filter((r: any) => r.topic_id && !usedTopics.has(r.topic_id));
         const pool = fresh.length > 0 ? fresh : filtered;
         const pick = pool[Math.floor(Math.random() * pool.length)];
