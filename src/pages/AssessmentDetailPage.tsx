@@ -637,12 +637,10 @@ export default function AssessmentDetailPage() {
                     {assessment.assessment_questions.map((aq, idx) => {
                       const q = questionMap.get(aq.question_id);
                       const ev = evalByQuestionId.get(aq.question_id);
+                      const ans = attempt?.answers.find((a) => a.question_id === aq.question_id);
+                      const hasAnswer = !!(ans && ans.answer_text && ans.answer_text.trim().length > 0);
                       const isMCQ = q?.question_type === "mcq";
-                      let resultBadge: JSX.Element = (
-                        <Badge variant="outline" className="text-[10px]">
-                          —
-                        </Badge>
-                      );
+                      let resultBadge: JSX.Element;
                       if (ev) {
                         const correct = isMCQ ? ev.score === 100 : ev.score >= 50;
                         resultBadge = correct ? (
@@ -652,6 +650,18 @@ export default function AssessmentDetailPage() {
                         ) : (
                           <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/20 gap-1">
                             <span className="inline-flex items-center gap-1">✗ Incorrect</span>
+                          </Badge>
+                        );
+                      } else if (!hasAnswer) {
+                        resultBadge = (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Skipped
+                          </Badge>
+                        );
+                      } else {
+                        resultBadge = (
+                          <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
+                            Pending
                           </Badge>
                         );
                       }

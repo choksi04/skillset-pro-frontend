@@ -307,10 +307,17 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         (r: any) => !state.excludedQuestionIds.includes(r.id),
       );
       if (filtered.length > 0) {
-        filtered.sort(
-          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        // Topic-diversify: prefer a question from a topic we haven't
+        // used yet in this skill's history (falls back to any topic).
+        const usedTopics = new Set(
+          (skill.history || [])
+            .map((h: any) => h.topic_id)
+            .filter((t: any): t is string => !!t),
         );
-        chosen = { row: filtered[0], level: lvl, fallback: lvl !== skill.currentLevel };
+        const fresh = filtered.filter((r: any) => r.topic_id && !usedTopics.has(r.topic_id));
+        const pool = fresh.length > 0 ? fresh : filtered;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        chosen = { row: pick, level: lvl, fallback: lvl !== skill.currentLevel };
         break;
       }
     }

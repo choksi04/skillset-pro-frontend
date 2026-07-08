@@ -127,11 +127,60 @@ export async function validateQuestionAvailability(
   return { valid: true };
 }
 
+/** Fisher-Yates shuffle (in place); returns the same array. */
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * Pick up to `targetCount` items from `candidates`, distributing across topics.
+ * - Groups by topic_id (null bucketed as its own topic).
+ * - Round-robin across topics so each topic is covered before any repeats.
+ * - Never picks the same question twice.
+ * When candidates have as many distinct topics as `targetCount`, each pick
+ * comes from a distinct topic. When there are fewer topics than needed,
+ * additional picks cycle through the same topics using their remaining pool.
+ */
+function pickTopicDiversified(candidates: Question[], targetCount: number): Question[] {
+  if (targetCount <= 0 || candidates.length === 0) return [];
+  const buckets = new Map<string, Question[]>();
+  for (const q of candidates) {
+    const key = q.topic_id ?? '__none__';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(q);
+  }
+  for (const list of buckets.values()) shuffleInPlace(list);
+  const topicOrder = shuffleInPlace([...buckets.keys()]);
+  const picked: Question[] = [];
+  const pickedIds = new Set<string>();
+  while (picked.length < targetCount) {
+    let progressed = false;
+    for (const topic of topicOrder) {
+      if (picked.length >= targetCount) break;
+      const bucket = buckets.get(topic)!;
+      const next = bucket.shift();
+      if (next && !pickedIds.has(next.id)) {
+        picked.push(next);
+        pickedIds.add(next.id);
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  return picked;
+}
+
 /**
  * Generate assessment questions using assessment config limits per question type.
  * For each skill rated at level n, pick questions ONLY from level n (exact match).
  * For each question type, pick between min and max questions as per config.
- * Questions are picked deterministically by created_at order.
+ * Questions are distributed across topics so a skill grouping multiple
+ * sub-topics (e.g. SQL Server / MySQL / MongoDB as topics under one skill)
+ * gets coverage across every topic rather than clustering on one.
  */
 export function generateAssessmentQuestions(
   ratings: SkillSelfRating[],
@@ -153,13 +202,11 @@ export function generateAssessmentQuestions(
       const { min, max } = getQuestionLimits(configs, qType);
       const targetCount = Math.max(min, Math.min(max, min)); // use min as target, up to max
 
-      const candidates = publishedQuestions
-        .filter(
-          (q) => q.skill_id === skill_id && q.competency_level === targetLevel && q.question_type === qType && !usedIds.has(q.id)
-        )
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const candidates = publishedQuestions.filter(
+        (q) => q.skill_id === skill_id && q.competency_level === targetLevel && q.question_type === qType && !usedIds.has(q.id)
+      );
 
-      const picked = candidates.slice(0, targetCount);
+      const picked = pickTopicDiversified(candidates, targetCount);
       for (const q of picked) {
         usedIds.add(q.id);
         selected.push({ question_id: q.id, skill_id: q.skill_id, target_level: targetLevel });
