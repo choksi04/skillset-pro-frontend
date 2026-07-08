@@ -22,6 +22,8 @@ export interface RegistryReview {
 /** Lightweight status cache for list/grid views — avoids fetching full review payloads. */
 export type ReviewStatusValue = 'pending' | 'approved';
 
+let fetchedReviewStatusIds = new Set<string>();
+
 interface RegistryReviewStore {
   reviews: Map<string, RegistryReview>; // keyed by registry_id
   /** registry_id -> latest review status (pending/approved). Absent ⇒ no review row. */
@@ -55,7 +57,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
 
   fetchReviewStatusesForRegistries: async (registryIds) => {
     const cache = get().reviewStatuses;
-    const missing = Array.from(new Set(registryIds.filter((id) => !(id in cache))));
+    const missing = Array.from(new Set(registryIds.filter((id) => !(id in cache) && !fetchedReviewStatusIds.has(id))));
     if (missing.length === 0) return;
     const { data, error } = await supabase
       .from('registry_reviews')
@@ -71,6 +73,7 @@ export const useRegistryReviewStore = create<RegistryReviewStore>((set, get) => 
       (data ?? []).forEach((r: any) => {
         next[r.registry_id] = r.status === 'approved' ? 'approved' : 'pending';
       });
+      fetchedReviewStatusIds = new Set([...fetchedReviewStatusIds, ...missing]);
       return { reviewStatuses: next };
     });
   },
