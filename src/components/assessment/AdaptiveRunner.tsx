@@ -11,7 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ChevronRight, Loader2, Sparkles, CheckCircle, Brain } from 'lucide-react';
+import {
+  ChevronRight, Loader2, Sparkles, CheckCircle, Brain, ListChecks,
+  ArrowLeft, Send,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,6 +25,14 @@ interface Props {
   tenantId: string;
   employeeName: string;
   onComplete: () => void;
+}
+
+interface AnsweredEntry {
+  questionId: string;
+  question: Question;
+  skillId: string;
+  level: number;
+  answer: string;
 }
 
 function parseMCQOptions(text: string) {
@@ -40,6 +51,22 @@ function parseMCQOptions(text: string) {
     /* not JSON */
   }
   return { body: text, optionLines: [] as { key: string; text: string }[] };
+}
+
+// ── Progress ring (matches FixedRunner) ──
+function ProgressRing({ answered, total }: { answered: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, Math.round((answered / total) * 100)) : 0;
+  const r = 18, c = 2 * Math.PI * r;
+  const offset = c - (pct / 100) * c;
+  return (
+    <div className="relative flex items-center justify-center">
+      <svg width="44" height="44" className="-rotate-90">
+        <circle cx="22" cy="22" r={r} strokeWidth="4" className="fill-none stroke-muted" />
+        <circle cx="22" cy="22" r={r} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} className="fill-none stroke-primary transition-all" />
+      </svg>
+      <span className="absolute text-[10px] font-semibold text-foreground">{pct}%</span>
+    </div>
+  );
 }
 
 export default function AdaptiveRunner({
@@ -62,7 +89,10 @@ export default function AdaptiveRunner({
   const [progress, setProgress] = useState({ asked: 0, total: 0 });
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [answered, setAnswered] = useState<AnsweredEntry[]>([]);
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
 
@@ -84,7 +114,7 @@ export default function AdaptiveRunner({
         setLoading(false);
         return;
       }
-      const total = state.skills.reduce((acc, s) => acc + state.questionsPerSkill, 0);
+      const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
       setProgress({ asked: 0, total });
       await loadNext();
       setLoading(false);
@@ -95,7 +125,9 @@ export default function AdaptiveRunner({
   async function loadNext() {
     const { question, skillState } = await getNextQuestion(attemptId, assessment.id);
     if (!question || !skillState) {
-      await finalize();
+      // No more questions — open review instead of auto-finalizing.
+      setCurrentQuestion(null);
+      setReviewOpen(true);
       return;
     }
     setCurrentQuestion(question);
@@ -106,80 +138,96 @@ export default function AdaptiveRunner({
   }
 
   async function finalize() {
-    setLoading(true);
-    const skillScores = await finalizeAdaptiveAttempt(attemptId, assessment.id);
-
-    // Auto-create manager review (mirror of the legacy flow in AssessmentExecPage)
+    setFinalizing(true);
     try {
-      const { submissions } = useRegistryStore.getState();
-      const submission = submissions.find((s) => s.employee_id === employeeId);
-      const selfRatings =
-        submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
+      const skillScores = await finalizeAdaptiveAttempt(attemptId, assessment.id);
 
-      let reviewerId = '';
-      const { data: domainRow } = await supabase
-        .from('domains')
-        .select('domain_lead_id')
-        .eq('id', assessment.domain_id)
-        .single();
-      if (domainRow?.domain_lead_id) {
-        reviewerId = domainRow.domain_lead_id;
-      } else {
-        const { data: admins } = await supabase
-          .from('users')
-          .select('id')
-          .eq('role', 'admin')
-          .eq('status', 'active')
-          .limit(1);
-        reviewerId = admins?.[0]?.id ?? '';
+      // Auto-create manager review (mirror of the legacy flow in AssessmentExecPage)
+      try {
+        const { submissions } = useRegistryStore.getState();
+        const submission = submissions.find((s) => s.employee_id === employeeId);
+        const selfRatings =
+          submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
+
+        let reviewerId = '';
+        const { data: domainRow } = await supabase
+          .from('domains')
+          .select('domain_lead_id')
+          .eq('id', assessment.domain_id)
+          .single();
+        if (domainRow?.domain_lead_id) {
+          reviewerId = domainRow.domain_lead_id;
+        } else {
+          const { data: admins } = await supabase
+            .from('users')
+            .select('id')
+            .eq('role', 'admin')
+            .eq('status', 'active')
+            .limit(1);
+          reviewerId = admins?.[0]?.id ?? '';
+        }
+
+        if (reviewerId && skillScores.length > 0) {
+          await useReviewStore.getState().createReview({
+            tenant_id: tenantId,
+            assessment_id: assessment.id,
+            attempt_id: attemptId,
+            employee_id: employeeId,
+            employee_name: employeeName,
+            domain_id: assessment.domain_id,
+            reviewer_id: reviewerId,
+            skill_scores: skillScores,
+            self_ratings: selfRatings,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to auto-create review:', err);
       }
 
-      if (reviewerId && skillScores.length > 0) {
-        await useReviewStore.getState().createReview({
-          tenant_id: tenantId,
-          assessment_id: assessment.id,
-          attempt_id: attemptId,
-          employee_id: employeeId,
-          employee_name: employeeName,
-          domain_id: assessment.domain_id,
-          reviewer_id: reviewerId,
-          skill_scores: skillScores,
-          self_ratings: selfRatings,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to auto-create review:', err);
+      setFinished(true);
+      toast.success('Adaptive assessment complete!');
+      onComplete();
+    } finally {
+      setFinalizing(false);
     }
-
-    setFinished(true);
-    setLoading(false);
-    toast.success('Adaptive assessment complete!');
-    onComplete();
   }
 
   async function handleSubmitAnswer() {
-    if (!currentQuestion || !selectedOption) return;
+    if (!currentQuestion || !selectedOption || submitting) return;
     setSubmitting(true);
-    const isCorrect = gradeMCQ(currentQuestion, selectedOption);
-    const elapsed = Math.round((Date.now() - startedAtRef.current) / 1000);
+    try {
+      const isCorrect = gradeMCQ(currentQuestion, selectedOption);
+      const elapsed = Math.round((Date.now() - startedAtRef.current) / 1000);
 
-    await recordAnswer(
-      attemptId,
-      assessment.id,
-      currentQuestion.id,
-      currentSkillId,
-      isCorrect,
-      selectedOption,
-      elapsed,
-    );
+      await recordAnswer(
+        attemptId,
+        assessment.id,
+        currentQuestion.id,
+        currentSkillId,
+        isCorrect,
+        selectedOption,
+        elapsed,
+      );
 
-    setProgress((p) => ({ ...p, asked: p.asked + 1 }));
+      setAnswered((prev) => [
+        ...prev,
+        {
+          questionId: currentQuestion.id,
+          question: currentQuestion,
+          skillId: currentSkillId,
+          level: currentLevel,
+          answer: selectedOption,
+        },
+      ]);
+      setProgress((p) => ({ ...p, asked: p.asked + 1 }));
 
-    // Refresh local attempt cache so AnswerEntry reflects the saved state
-    await useAttemptStore.getState().fetchAttemptsForAssessment(assessment.id);
+      // Refresh local attempt cache so AnswerEntry reflects the saved state
+      await useAttemptStore.getState().fetchAttemptsForAssessment(assessment.id);
 
-    await loadNext();
-    setSubmitting(false);
+      await loadNext();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (loading) {
@@ -203,10 +251,98 @@ export default function AdaptiveRunner({
     );
   }
 
+  // ── Review Panel ──
+  if (reviewOpen) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-8rem)]">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ListChecks size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-card-foreground">Review your answers</h3>
+              <p className="text-xs text-muted-foreground">
+                {answered.length} question{answered.length === 1 ? '' : 's'} answered · adaptive engine complete
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentQuestion && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewOpen(false)}
+                disabled={finalizing}
+                className="gap-1.5"
+              >
+                <ArrowLeft size={14} /> Back
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={finalize}
+              disabled={finalizing || answered.length === 0}
+              className="gap-1.5"
+            >
+              {finalizing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {finalizing ? 'Submitting…' : 'Submit assessment'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 rounded-xl border border-border bg-card overflow-y-auto">
+          {answered.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-sm text-muted-foreground py-12">
+              No answers recorded yet.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {answered.map((entry, i) => {
+                const mcq = parseMCQOptions(entry.question.question_text);
+                const skillName = skillNameMap.get(entry.skillId) ?? 'Skill';
+                const levelLabel = getLevelLabelByNumber(levels, entry.level);
+                const chosen = mcq.optionLines.find((o) => o.key === entry.answer);
+                return (
+                  <li key={`${entry.questionId}-${i}`} className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success text-xs font-semibold">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+                          <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
+                        </div>
+                        <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-2">{mcq.body}</p>
+                        <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Your answer</p>
+                          {chosen ? (
+                            <p className="text-sm text-foreground">
+                              <span className="font-semibold mr-1.5">{chosen.key})</span>
+                              {chosen.text}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">No answer recorded</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!currentQuestion) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-        No more questions — wrapping up…
+        <Loader2 size={14} className="animate-spin mr-2" />
+        Wrapping up…
       </div>
     );
   }
@@ -214,18 +350,23 @@ export default function AdaptiveRunner({
   const mcq = parseMCQOptions(currentQuestion.question_text);
   const skillName = skillNameMap.get(currentSkillId) ?? 'Skill';
   const levelLabel = getLevelLabelByNumber(levels, currentLevel);
+  const totalForRing = Math.max(progress.total, progress.asked + 1);
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Top bar */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
-            <Brain size={14} className="text-primary" /> Adaptive Assessment
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Question {progress.asked + 1} of up to {progress.total} · the next question adapts to your answers
-          </p>
+      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3 mb-4">
+        <div className="flex items-center gap-4">
+          <ProgressRing answered={progress.asked} total={totalForRing} />
+          <div>
+            <h3 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
+              <Brain size={14} className="text-primary" /> Adaptive Assessment
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Question {progress.asked + 1}
+              {progress.total > 0 ? ` of up to ${progress.total}` : ''} · the next question adapts to your answers
+            </p>
+          </div>
         </div>
         <Badge variant="outline" className="gap-1.5">
           <Sparkles size={12} className="text-primary" /> Adaptive Engine
@@ -242,13 +383,18 @@ export default function AdaptiveRunner({
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{mcq.body}</p>
 
           {mcq.optionLines.length > 0 ? (
-            <RadioGroup value={selectedOption} onValueChange={setSelectedOption} className="space-y-2">
+            <RadioGroup
+              value={selectedOption}
+              onValueChange={setSelectedOption}
+              className="space-y-2"
+              disabled={submitting}
+            >
               {mcq.optionLines.map((opt) => (
                 <label
                   key={opt.key}
                   className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
                     selectedOption === opt.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
-                  }`}
+                  } ${submitting ? 'opacity-60 pointer-events-none' : ''}`}
                 >
                   <RadioGroupItem value={opt.key} id={`adp-opt-${opt.key}`} />
                   <Label htmlFor={`adp-opt-${opt.key}`} className="text-sm text-foreground cursor-pointer flex-1">
@@ -262,19 +408,20 @@ export default function AdaptiveRunner({
             <p className="text-xs text-destructive">This question is missing answer options.</p>
           )}
 
-          <div className="flex items-center justify-end pt-4 border-t border-border">
+          <div className="flex items-center justify-between pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              {answered.length} answered so far
+            </p>
             <Button
               size="sm"
               onClick={handleSubmitAnswer}
               disabled={!selectedOption || submitting}
-              className="gap-1"
+              className="gap-1.5"
             >
               {submitting ? (
-                <Loader2 size={14} className="animate-spin" />
+                <><Loader2 size={14} className="animate-spin" /> Saving…</>
               ) : (
-                <>
-                  Next <ChevronRight size={14} />
-                </>
+                <>Next <ChevronRight size={14} /></>
               )}
             </Button>
           </div>
