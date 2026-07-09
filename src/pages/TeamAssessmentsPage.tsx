@@ -94,7 +94,7 @@ export default function TeamAssessmentsPage() {
   const { fetchQuestionCounts } = useQuestionStore();
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
-  const { fetchReviews, reviews } = useReviewStore();
+  const { fetchReviews, reviews, reassignReviewer } = useReviewStore();
   const { templates, fetchTemplates } = useTemplateStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
   const { currentRole, user } = useAuth();
