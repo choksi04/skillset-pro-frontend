@@ -422,6 +422,7 @@ export default function SkillRegistryDetailPage() {
         category: skill?.skill_category || 'Uncategorized',
         score: item.self_score,
         comment: item.comment ?? '',
+        tags: skill?.tags ?? [],
       };
     })
     .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
