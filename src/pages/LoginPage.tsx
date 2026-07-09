@@ -169,16 +169,27 @@ export default function LoginPage() {
             )}
           </div>
 
+          {/* Preview-only demo login — hidden on production custom domain */}
+          {typeof window !== "undefined" && window.location.hostname !== "skillset.1rivet.com" && (
+            <div className="space-y-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                Preview only · Demo login
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 w-full text-xs"
+                onClick={() => {
+                  localStorage.setItem("siap_user_id", "b81a6961-d6f7-470b-960e-b675f9cf3c6c");
+                  window.location.href = "/";
+                }}
+              >
+                Sign in as Admin (Rukshar)
+              </Button>
+            </div>
+          )}
 
 
-
-
-
-          {/* Footer */}
-          <p className="text-center text-xs text-muted-foreground">
-            Don't have an account? Contact your administrator.
-          </p>
-        </div>
       </div>
     </div>
   );
