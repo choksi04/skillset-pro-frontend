@@ -121,7 +121,9 @@ export default function DomainDetailPage() {
 
   const handleSetLead = async (userId: string) => {
     const leadId = userId === 'none' ? null : userId;
+    const previousLeadId = domain?.domain_lead_id ?? null;
     await updateDomain(id!, { domain_lead_id: leadId } as any);
+
     // Auto-promote newly assigned lead to manager role if currently employee
     if (leadId) {
       const target = domainUsers.find((u) => u.id === leadId);
@@ -134,6 +136,38 @@ export default function DomainDetailPage() {
         if (authUser?.id === leadId) await refreshUser();
       }
     }
+
+    // Auto-demote previous lead back to employee if they no longer lead ANY domain
+    // and their role was auto-promoted to manager (i.e. currently 'manager').
+    if (previousLeadId && previousLeadId !== leadId) {
+      const { data: stillLeads } = await supabase
+        .from('domains')
+        .select('id')
+        .eq('domain_lead_id', previousLeadId)
+        .is('deleted_on', null)
+        .limit(1);
+      const hasOtherDomains = (stillLeads?.length ?? 0) > 0;
+      if (!hasOtherDomains) {
+        const { data: prevUser } = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('id', previousLeadId)
+          .maybeSingle();
+        if (prevUser && prevUser.role === 'manager') {
+          const auditId = getCurrentUserId();
+          await supabase.from('users').update({
+            role: 'employee',
+            modified_by: auditId,
+            modified_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }).eq('id', previousLeadId);
+          await fetchDomainUsers();
+          if (authUser?.id === previousLeadId) await refreshUser();
+          toast.info('Previous domain lead was demoted to Employee (no other domains led).');
+        }
+      }
+    }
+
     toast.success(leadId ? 'Domain lead assigned.' : 'Domain lead removed.');
   };
 

@@ -45,6 +45,30 @@ export function getEffectiveStatus(
 }
 
 /**
+ * Per-skill error cap.
+ *
+ * When more than 50% of answers for a skill are wrong (avg_score < 50), the
+ * calculated level for that skill is capped at `max(1, target_level - 1)` so
+ * a barely-passing user can't inflate to the level the assessment targeted.
+ * If `target_level` isn't known, we fall back to `max(1, calculated - 1)`.
+ *
+ * Adaptive attempts already respect this naturally (streaks) — we only apply
+ * the cap on the fixed-runner code path.
+ */
+function applySkillErrorCap(s: {
+  avg_score: number;
+  calculated_level: number;
+  target_level?: number;
+}): number {
+  const raw = Number(s.calculated_level) || 1;
+  const errorRate = 1 - (Number(s.avg_score) || 0) / 100;
+  if (errorRate <= 0.5) return raw;
+  const target = Number(s.target_level) || 0;
+  const ceiling = target > 0 ? target - 1 : raw - 1;
+  return Math.max(1, Math.min(raw, ceiling));
+}
+
+/**
  * Shared "Achieved Level" derivation used by Assessment list, Team list, and
  * the detail Result Summary. Mirrors ResultSummaryCard exactly so the same
  * value is shown everywhere.
@@ -52,7 +76,8 @@ export function getEffectiveStatus(
  * Rule:
  *   - Prefer adaptive_state.skills[].history (max level among correct answers
  *     per skill, average across skills with ≥1 correct answer).
- *   - Fallback to attempt.skill_scores[].calculated_level (non-adaptive flow).
+ *   - Fallback to attempt.skill_scores[].calculated_level (non-adaptive flow),
+ *     with a >50%-wrong error cap applied per skill.
  *   - Returns null if no level can be derived.
  *
  * Also returns the underlying correct/total counts so the UI can show a
@@ -93,7 +118,7 @@ export function getAchievedLevelFromAttempt(
     return { level, correct: totals.correct, total: totals.total };
   }
 
-  // Non-adaptive fallback (fixed runner) — use per-skill calculated_level.
+  // Non-adaptive fallback (fixed runner) — use per-skill calculated_level with error cap.
   const ss = attempt.skill_scores ?? [];
   if (ss.length === 0) return { level: null, correct: 0, total: 0 };
 
@@ -104,9 +129,9 @@ export function getAchievedLevelFromAttempt(
     },
     { correct: 0, total: 0 },
   );
-  const levels = ss.map((s) => s.calculated_level).filter((l): l is number => typeof l === "number");
-  const level = levels.length
-    ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length)
+  const cappedLevels = ss.map((s) => applySkillErrorCap(s));
+  const level = cappedLevels.length
+    ? Math.round(cappedLevels.reduce((a, b) => a + b, 0) / cappedLevels.length)
     : null;
 
   return { level, correct: totals.correct, total: totals.total };
@@ -116,24 +141,39 @@ export function getAchievedLevelFromAttempt(
  * Verified Level derivation — the manager-approved final level.
  *
  * Returns the rounded average of `skill_reviews[].verified_level` from the
- * completed review for the given attempt. Returns `{ level: null }` if no
- * completed review exists for that attempt.
+ * completed review for the given attempt. When the underlying attempt is
+ * provided, each skill's verified level is additionally capped by the same
+ * >50%-wrong error rule so a manager can only *reduce* — never inflate past
+ * the evidence.
+ *
+ * Returns `{ level: null }` if no completed review exists for that attempt.
  */
 export function getVerifiedLevelFromReviews(
   reviews: Array<{
     attempt_id?: string;
     status: string;
-    skill_reviews?: Array<{ verified_level?: number | null }>;
+    skill_reviews?: Array<{ skill_id?: string; verified_level?: number | null }>;
   }>,
   attemptId: string | null | undefined,
+  attempt?: Pick<AssessmentAttempt, "skill_scores"> | null,
 ): { level: number | null } {
   if (!attemptId) return { level: null };
   const review = reviews.find(
     (r) => r.attempt_id === attemptId && r.status === "completed",
   );
   if (!review) return { level: null };
+
+  const capBySkill = new Map<string, number>();
+  (attempt?.skill_scores ?? []).forEach((s) => {
+    capBySkill.set(s.skill_id, applySkillErrorCap(s));
+  });
+
   const lvls = (review.skill_reviews ?? [])
-    .map((sr) => sr.verified_level)
+    .map((sr) => {
+      if (typeof sr.verified_level !== "number") return null;
+      const cap = sr.skill_id ? capBySkill.get(sr.skill_id) : undefined;
+      return typeof cap === "number" ? Math.min(sr.verified_level, cap) : sr.verified_level;
+    })
     .filter((l): l is number => typeof l === "number");
   if (lvls.length === 0) return { level: null };
   return { level: Math.round(lvls.reduce((a, b) => a + b, 0) / lvls.length) };

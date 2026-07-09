@@ -417,7 +417,7 @@ export default function AssessmentsPage() {
 
                     <TableCell className="align-top">
                       {(() => {
-                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id);
+                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id, attempt);
                         if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
                           <Badge className="text-[11px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">

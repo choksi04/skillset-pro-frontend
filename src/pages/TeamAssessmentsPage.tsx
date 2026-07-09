@@ -34,6 +34,7 @@ import {
   Search,
   ArrowRight,
   UserCheck,
+  UserCog,
   HelpCircle,
   Clock,
   Layers,
@@ -44,6 +45,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
+import SearchableSelect from "@/components/ui/searchable-select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 
 const PAGE_SIZE = 10;
@@ -84,7 +94,7 @@ export default function TeamAssessmentsPage() {
   const { fetchQuestionCounts } = useQuestionStore();
   const { fetchSkills } = useSkillStore();
   const { fetchDomains, domains } = useDomainStore();
-  const { fetchReviews, reviews } = useReviewStore();
+  const { fetchReviews, reviews, reassignReviewer } = useReviewStore();
   const { templates, fetchTemplates } = useTemplateStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
   const { currentRole, user } = useAuth();
@@ -98,6 +108,10 @@ export default function TeamAssessmentsPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [reminderPending, setReminderPending] = useState<Record<string, boolean>>({});
+  const [reassignFor, setReassignFor] = useState<{ reviewId: string; employeeName: string } | null>(null);
+  const [reassignTo, setReassignTo] = useState<string>("");
+  const [reassignSaving, setReassignSaving] = useState(false);
+  const [reviewerOptions, setReviewerOptions] = useState<{ value: string; label: string }[]>([]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -272,6 +286,41 @@ export default function TeamAssessmentsPage() {
       setTimeout(() => setReminderPending((p) => ({ ...p, [a.id]: false })), 1500);
     }
   };
+
+  const openReassign = async (reviewId: string, employeeName: string) => {
+    if (!user?.tenant_id) return;
+    setReassignFor({ reviewId, employeeName });
+    setReassignTo("");
+    if (reviewerOptions.length === 0) {
+      const { data } = await supabase
+        .from("users")
+        .select("id, full_name, role")
+        .eq("tenant_id", user.tenant_id)
+        .eq("status", "active")
+        .in("role", ["admin", "manager"]);
+      const opts = (data ?? []).map((u: any) => ({
+        value: u.id,
+        label: `${u.full_name} (${u.role})`,
+      }));
+      setReviewerOptions(opts);
+    }
+  };
+
+  const confirmReassign = async () => {
+    if (!reassignFor || !reassignTo) return;
+    setReassignSaving(true);
+    try {
+      await reassignReviewer(reassignFor.reviewId, reassignTo);
+      toast.success(`Reviewer updated for ${reassignFor.employeeName}`);
+      setReassignFor(null);
+    } catch (err: any) {
+      toast.error(`Failed to reassign: ${err?.message ?? "Unknown error"}`);
+    } finally {
+      setReassignSaving(false);
+    }
+  };
+
+
 
   return (
     <div className="space-y-6">
@@ -581,7 +630,7 @@ export default function TeamAssessmentsPage() {
 
                     <TableCell className="align-top">
                       {(() => {
-                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id);
+                        const { level } = getVerifiedLevelFromReviews(assessmentReviews, attempt?.id, attempt);
                         if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
                           <Badge className="text-[11px] h-5 px-2 bg-success/10 text-success border-success/20 hover:bg-success/15">
@@ -591,7 +640,33 @@ export default function TeamAssessmentsPage() {
                       })()}
                     </TableCell>
 
-                    <TableCell className="align-top text-right">{actionEl}</TableCell>
+                    <TableCell className="align-top text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {currentRole === "admin" &&
+                          (() => {
+                            const openReview = assessmentReviews.find(
+                              (r) => r.status !== "completed",
+                            );
+                            if (!openReview) return null;
+                            return (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-xs"
+                                title="Change reviewer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReassign(openReview.id, getName(a.employee_id));
+                                }}
+                              >
+                                <UserCog size={13} />
+                                Reassign
+                              </Button>
+                            );
+                          })()}
+                        {actionEl}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -654,6 +729,35 @@ export default function TeamAssessmentsPage() {
       )}
 
       <AssignTemplateDialog open={assignOpen} onOpenChange={setAssignOpen} template={null} showTemplatePicker />
+
+      <Dialog open={!!reassignFor} onOpenChange={(o) => !o && setReassignFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change reviewer</DialogTitle>
+            <DialogDescription>
+              Select a new reviewer for {reassignFor?.employeeName}'s assessment. The new
+              reviewer will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <SearchableSelect
+              options={reviewerOptions}
+              value={reassignTo}
+              onValueChange={setReassignTo}
+              placeholder="Select reviewer..."
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignFor(null)} disabled={reassignSaving}>
+              Cancel
+            </Button>
+            <Button onClick={confirmReassign} disabled={!reassignTo || reassignSaving}>
+              {reassignSaving ? "Saving..." : "Reassign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -422,6 +422,7 @@ export default function SkillRegistryDetailPage() {
         category: skill?.skill_category || 'Uncategorized',
         score: item.self_score,
         comment: item.comment ?? '',
+        tags: skill?.tags ?? [],
       };
     })
     .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
@@ -620,6 +621,19 @@ export default function SkillRegistryDetailPage() {
                     <div className="col-span-4">
                       <p className="text-sm font-medium text-foreground">{row.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{row.category}</p>
+                      {row.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {row.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5"
+                            >
+                              <Tag size={9} />
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="col-span-3 space-y-1.5">
                       <p className="text-sm text-foreground">
