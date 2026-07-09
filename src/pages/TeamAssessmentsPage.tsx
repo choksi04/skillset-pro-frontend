@@ -729,6 +729,35 @@ export default function TeamAssessmentsPage() {
       )}
 
       <AssignTemplateDialog open={assignOpen} onOpenChange={setAssignOpen} template={null} showTemplatePicker />
+
+      <Dialog open={!!reassignFor} onOpenChange={(o) => !o && setReassignFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change reviewer</DialogTitle>
+            <DialogDescription>
+              Select a new reviewer for {reassignFor?.employeeName}'s assessment. The new
+              reviewer will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <SearchableSelect
+              options={reviewerOptions}
+              value={reassignTo}
+              onValueChange={setReassignTo}
+              placeholder="Select reviewer..."
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignFor(null)} disabled={reassignSaving}>
+              Cancel
+            </Button>
+            <Button onClick={confirmReassign} disabled={!reassignTo || reassignSaving}>
+              {reassignSaving ? "Saving..." : "Reassign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
