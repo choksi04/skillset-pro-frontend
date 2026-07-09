@@ -1534,6 +1534,8 @@ export type Database = {
     }
     Functions: {
       get_question_counts: { Args: never; Returns: Json }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
