@@ -1,11 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const EXPECTED_TENANT_ID = "ea6c052c-f910-4b0a-a2a0-9e5179c0e9fb";
+const EXPECTED_CLIENT_ID = Deno.env.get("AZURE_AD_CLIENT_ID") ?? "";
+const VALID_ISSUERS = new Set([
+  `https://login.microsoftonline.com/${EXPECTED_TENANT_ID}/v2.0`,
+  `https://sts.windows.net/${EXPECTED_TENANT_ID}/`,
+]);
+
+const JWKS = createRemoteJWKSet(
+  new URL(`https://login.microsoftonline.com/${EXPECTED_TENANT_ID}/discovery/v2.0/keys`),
+);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -14,52 +26,53 @@ serve(async (req) => {
 
   try {
     const { idToken } = await req.json();
-    if (!idToken) {
+    if (!idToken || typeof idToken !== "string") {
       return new Response(
         JSON.stringify({ error: "Missing idToken" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Decode JWT payload (validation is done by MSAL on the client; here we extract claims)
-    const parts = idToken.split(".");
-    if (parts.length !== 3) {
+    // Cryptographically verify signature, issuer, audience, and expiry against Microsoft JWKS
+    let payload: Record<string, any>;
+    try {
+      const verifyOpts: Record<string, any> = {
+        algorithms: ["RS256"],
+      };
+      if (EXPECTED_CLIENT_ID) verifyOpts.audience = EXPECTED_CLIENT_ID;
+
+      const result = await jwtVerify(idToken, JWKS, verifyOpts);
+      payload = result.payload as Record<string, any>;
+    } catch (verifyErr) {
+      console.warn("Azure token verification failed:", (verifyErr as Error)?.message);
       return new Response(
-        JSON.stringify({ error: "Invalid token format" }),
+        JSON.stringify({ error: "Invalid or unverifiable token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-
-    // Validate issuer
-    const expectedTenantId = "ea6c052c-f910-4b0a-a2a0-9e5179c0e9fb";
-    const validIssuers = [
-      `https://login.microsoftonline.com/${expectedTenantId}/v2.0`,
-      `https://sts.windows.net/${expectedTenantId}/`,
-    ];
-    if (!validIssuers.includes(payload.iss)) {
+    // Explicit issuer allow-list (defense in depth on top of jose verification)
+    if (typeof payload.iss !== "string" || !VALID_ISSUERS.has(payload.iss)) {
       return new Response(
         JSON.stringify({ error: "Invalid token issuer" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate expiry
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    // Tenant check (tid claim)
+    if (payload.tid && payload.tid !== EXPECTED_TENANT_ID) {
       return new Response(
-        JSON.stringify({ error: "Token expired" }),
+        JSON.stringify({ error: "Invalid token tenant" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Extract email and name
     const email = (
       payload.preferred_username ||
       payload.email ||
       payload.upn ||
       ""
-    ).toLowerCase().trim();
+    ).toString().toLowerCase().trim();
 
     const fullName = payload.name || payload.given_name || email.split("@")[0] || "New User";
 
@@ -70,7 +83,6 @@ serve(async (req) => {
       );
     }
 
-    // Look up user in DB
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
