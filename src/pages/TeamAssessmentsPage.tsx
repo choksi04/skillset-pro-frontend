@@ -640,7 +640,33 @@ export default function TeamAssessmentsPage() {
                       })()}
                     </TableCell>
 
-                    <TableCell className="align-top text-right">{actionEl}</TableCell>
+                    <TableCell className="align-top text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {currentRole === "admin" &&
+                          (() => {
+                            const openReview = assessmentReviews.find(
+                              (r) => r.status !== "completed",
+                            );
+                            if (!openReview) return null;
+                            return (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-xs"
+                                title="Change reviewer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReassign(openReview.id, getName(a.employee_id));
+                                }}
+                              >
+                                <UserCog size={13} />
+                                Reassign
+                              </Button>
+                            );
+                          })()}
+                        {actionEl}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })
