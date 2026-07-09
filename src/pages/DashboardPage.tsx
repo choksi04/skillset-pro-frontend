@@ -1,11 +1,8 @@
-import { useAuth } from '@/contexts/AuthContext';
 import { DashboardNotice } from '@/components/dashboard/shared/DashboardNotice';
 import { Construction } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-
   return (
     <div data-tour="dashboard" className="space-y-4">
       <DashboardNotice />
@@ -24,11 +21,6 @@ export default function DashboardPage() {
                 Assessments, Skill Library, Domains, and more.
               </p>
             </div>
-            {user && (
-              <p className="text-xs text-muted-foreground">
-                Signed in as <span className="font-medium text-foreground">{user.full_name}</span>
-              </p>
-            )}
           </CardContent>
         </Card>
       </div>
