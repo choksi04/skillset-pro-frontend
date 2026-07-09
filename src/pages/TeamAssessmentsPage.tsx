@@ -34,6 +34,7 @@ import {
   Search,
   ArrowRight,
   UserCheck,
+  UserCog,
   HelpCircle,
   Clock,
   Layers,
@@ -44,6 +45,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 
 const PAGE_SIZE = 10;
