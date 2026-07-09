@@ -342,17 +342,14 @@ export const useAttemptStore = create<AttemptStore>((set, get) => ({
     );
 
     try {
-      const answersPayload = attempt.answers.map((ans) => {
-        const q = questionMap.get(ans.question_id);
-        return {
-          question_id: ans.question_id, answer_text: ans.answer_text,
-          question_text: q?.question_text ?? '', question_type: q?.question_type ?? 'scenario',
-          evaluation_guidelines: q?.evaluation_guidelines ?? '',
-          skill_id: assessmentQuestions.find((aq) => aq.question_id === ans.question_id)?.skill_id ?? '',
-        };
-      });
+      const answersPayload = attempt.answers.map((ans) => ({
+        question_id: ans.question_id,
+        answer_text: ans.answer_text,
+      }));
 
+      const callerId = typeof window !== 'undefined' ? localStorage.getItem('siap_user_id') : null;
       const { data: evalData, error: evalError } = await supabase.functions.invoke('evaluate-assessment', {
+        headers: callerId ? { 'x-siap-user-id': callerId } : undefined,
         body: { attempt_id: attemptId, answers: answersPayload },
       });
 
