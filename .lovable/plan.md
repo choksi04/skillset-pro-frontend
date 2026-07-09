@@ -1,99 +1,49 @@
+# Plan: Adaptive Assessment UI Refresh + Review Before Submit
 
-# Plan: Queued Follow-ups
+Bring `AdaptiveRunner.tsx` up to the same modern look-and-feel we shipped for `FixedRunner.tsx`, minus the side navigator (adaptive is sequential — users can't skip/jump). Add a "Review your answers" screen shown after the last question, before final submission.
 
-Four independent items, ordered by user impact. Each can ship on its own.
+## Scope
 
----
+Only `src/components/assessment/AdaptiveRunner.tsx`. No changes to adaptive engine logic, scoring, or streak rules.
 
-## 1. Reviewer Reassignment on Team Assessments
+## 1. Visual refresh (parity with FixedRunner)
 
-**Goal:** Let an admin/manager change who reviews a submitted assessment without touching the database.
+Reuse the same tokens/components already used in `FixedRunner`:
+- Modernized header: assessment title, chip-style timer, progress ring showing answered / total-expected (best-effort — adaptive length is dynamic, so show "Question N" plus current skill/level chips instead of a fixed total when unknown).
+- Card-based question surface, consistent typography, spacing, and button styles.
+- Reactive buttons with `Loader2` spinner + disabled state during submit/next transitions (matches the pattern added in the last FixedRunner pass).
+- Sticky footer with primary action (`Submit answer` → `Next` → finally `Review answers`).
 
-**Where:**
-- `src/pages/TeamAssessmentsPage.tsx` — add a "Change Reviewer" action in the row menu.
-- `src/components/assessment/ManagerReviewPanel.tsx` — add a "Reassign" control in the header (visible while review is pending).
+Explicitly **omit**:
+- Question navigator sidebar.
+- Skip button / filter chips.
+Adaptive flow stays strictly linear.
 
-**Behavior:**
-- Opens a small dialog with a `SearchableSelect` of eligible reviewers (users with role `manager` or `admin`, excluding the assessment owner).
-- On confirm, updates `assessments.reviewer_id` (or the equivalent field — will verify during build), writes an audit entry, and creates a notification for the new reviewer.
-- Confirmation prompt if a review has already started, warning that in-progress notes stay with the record.
+## 2. Review-before-submit step
 
-**Access:** Admin anywhere; Manager only within their domain.
+After the adaptive engine signals the attempt is complete (no more questions to serve), instead of auto-finalizing:
 
----
+1. Show a **Review** screen listing every question the user answered in order:
+   - Skill + level chip
+   - Question prompt (collapsed, expandable)
+   - The user's submitted answer (MCQ: selected option(s); Coding/Scenario: their text, read-only)
+   - No correctness indicators (adaptive scoring/AI eval happens on final submit — keep it neutral)
+2. Actions on the review screen:
+   - `Submit assessment` (primary) — triggers the existing finalize path.
+   - `Back` — returns to the last question view (read-only; answers cannot be changed since adaptive already consumed them). If changing answers is out of scope for adaptive, Back only closes the review overlay.
+3. Loading state on `Submit assessment` with spinner; disable while in-flight.
 
-## 2. Auto-Demote Manager When Domain-Lead Status Is Lost
+Answers are already persisted per question by the adaptive engine, so the review screen is a pure read from the in-memory attempt state — no new store methods required.
 
-**Goal:** Keep the `manager` role in sync with domain-lead assignments so an ex-lead doesn't retain elevated access.
+## 3. Technical notes
 
-**Where:**
-- `src/pages/DomainDetailPage.tsx` — when the current lead is replaced/removed, if that user isn't a lead of any other domain, demote them to `employee`.
-- `src/pages/UsersPage.tsx` — when an admin edits a user and tries to demote a current domain lead, block with a clear message ("Reassign the domain lead first").
-- `src/contexts/AuthContext.tsx` — on session refresh, if the stored role is `manager` but the user leads no domain, refresh from DB to auto-correct.
+- Keep component self-contained; no changes to `adaptiveEngineStore.ts`.
+- Extract small subcomponents inside the file (`AdaptiveHeader`, `AdaptiveReview`) to keep it readable.
+- Timer, exit confirmation, and auto-pause-on-unload behavior copied from FixedRunner's latest version.
+- Typecheck after edit.
 
-**Behavior:**
-- All role changes go through a single helper (new `src/lib/roleSync.ts`) so promote/demote logic lives in one place.
-- Toast + audit entry on every auto-change.
-- Admins are never auto-demoted.
+## Out of scope
 
----
-
-## 3. Verified-Level Error Cap (>50% wrong → cap level)
-
-**Goal:** Prevent the verified/achieved level from exceeding what the raw performance justifies, regardless of manager overrides landing higher than the evidence.
-
-**Where:**
-- `src/lib/assessmentStatus.ts` — extend `getAchievedLevelFromAttempt` and `getVerifiedLevelFromReviews`.
-
-**Rule:**
-- Compute error rate per skill = incorrect answers / total answered (skipped counts as incorrect for this rule).
-- If error rate > 50%, cap the achieved level at `max(L1, self_rated_level - 1)` for that skill.
-- Verified level is then `min(managerAdjusted, cappedAchieved)` — manager can only *reduce*, not inflate past the cap.
-- Applies only to fixed assessments (adaptive already respects streaks); flagged via the existing `assessment.mode` field.
-
-**Surfaces affected:** `AssessmentsPage`, `TeamAssessmentsPage`, `AssessmentDetailPage`, `SkillRegistryDetailPage` — all read through the shared helper, so no per-page logic changes.
-
----
-
-## 4. Skill Tags in Registry Detail Views
-
-**Goal:** Show the free-text skill tags on the read-only registry views so reviewers see the same context as authors.
-
-**Where:**
-- `src/pages/SkillRegistryDetailPage.tsx` — employee's submitted breakdown.
-- `src/pages/TeamRegistryDetailPage.tsx` — manager's review view.
-
-**Behavior:**
-- Render tags as small pill badges under the skill name in each row of the skill table.
-- Pull from the existing `skills.tags` field already fetched via `skillStore`; no new query.
-- No edit affordance on these pages — display only.
-
----
-
-## Verification per item
-
-- **Reviewer reassign:** open a submitted team assessment, reassign to another manager, confirm the new reviewer sees it in their queue and the old one doesn't.
-- **Auto-demote:** replace a domain lead, refresh the demoted user's session, confirm role is `employee` and Team pages are gated off.
-- **Error cap:** query an existing attempt with >50% wrong on a skill, confirm achieved/verified level is capped.
-- **Registry tags:** open both registry detail views, confirm tags render for skills that have them and nothing renders for skills that don't.
-
----
-
-## Technical notes
-
-- No schema changes required — all four items work off existing columns.
-- All new/changed dropdowns use `SearchableSelect` per project convention.
-- Every role or reviewer change writes an audit row via the existing `src/lib/audit.ts` helper.
-- Error-cap logic is centralized in `assessmentStatus.ts` so future surfaces stay consistent.
-
----
-
-## Order of implementation
-
-I'll ship in this order unless you'd prefer otherwise:
-1. Skill tags in registry (smallest, pure UI)
-2. Verified-level error cap (isolated helper logic)
-3. Reviewer reassignment (new UI + mutation)
-4. Manager auto-demote (touches auth + multiple pages)
-
-Want me to reshuffle, drop any, or expand one before you approve?
+- Editing answers from the review screen (adaptive engine treats each answer as final input to the next question selection).
+- Any change to how adaptive picks questions, streaks, or level progression.
+- Changes to `AssessmentDetailPage` shell.
