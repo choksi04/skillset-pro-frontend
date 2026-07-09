@@ -287,6 +287,41 @@ export default function TeamAssessmentsPage() {
     }
   };
 
+  const openReassign = async (reviewId: string, employeeName: string) => {
+    if (!user?.tenant_id) return;
+    setReassignFor({ reviewId, employeeName });
+    setReassignTo("");
+    if (reviewerOptions.length === 0) {
+      const { data } = await supabase
+        .from("users")
+        .select("id, full_name, role")
+        .eq("tenant_id", user.tenant_id)
+        .eq("status", "active")
+        .in("role", ["admin", "manager"]);
+      const opts = (data ?? []).map((u: any) => ({
+        value: u.id,
+        label: `${u.full_name} (${u.role})`,
+      }));
+      setReviewerOptions(opts);
+    }
+  };
+
+  const confirmReassign = async () => {
+    if (!reassignFor || !reassignTo) return;
+    setReassignSaving(true);
+    try {
+      await reassignReviewer(reassignFor.reviewId, reassignTo);
+      toast.success(`Reviewer updated for ${reassignFor.employeeName}`);
+      setReassignFor(null);
+    } catch (err: any) {
+      toast.error(`Failed to reassign: ${err?.message ?? "Unknown error"}`);
+    } finally {
+      setReassignSaving(false);
+    }
+  };
+
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
