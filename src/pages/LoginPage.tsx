@@ -153,8 +153,6 @@ export default function LoginPage() {
           </div>
 
           {/* Preview-only demo login — hidden on production custom domain */}
-          {/*
-          
           {typeof window !== "undefined" && window.location.hostname !== "skillset.1rivet.com" && (
             <div className="space-y-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
@@ -169,11 +167,10 @@ export default function LoginPage() {
                   window.location.href = "/";
                 }}
               >
-                Sign in as Admin{" "}
+                Sign in as Admin
               </Button>
             </div>
           )}
-          /*} 
 
           {/* Footer */}
           <p className="text-center text-xs text-muted-foreground">
