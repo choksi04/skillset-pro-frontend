@@ -335,6 +335,18 @@ export default function TeamRegistryDetailPage() {
                   <div className="px-5 pt-4 pb-3">
                     <p className="text-sm font-semibold text-card-foreground">{skill.skill_name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{catName}</p>
+                    {(skill.tags || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {skill.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 border-t border-border">
