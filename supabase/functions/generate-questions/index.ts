@@ -82,11 +82,11 @@ Rules:
 - For coding: include clear problem statements with example input/output
 - For scenarios: create realistic workplace situations requiring analysis`;
 
-    const userPrompt = `Generate exactly ${count} ${questionType} question(s) for the skill "${skillName}"${topicName ? ` (topic: "${topicName}")` : ""} at the "${competencyLevel}" level.
+    const userPrompt = `Generate exactly ${safeCount} ${questionType} question(s) for the skill "${skillName}"${topicName ? ` (topic: "${topicName}")` : ""} at the "${competencyLevel}" level.
 
 ${formatInstructions}
 
-Return a JSON array of ${count} question object(s). Only return the JSON array, no other text.`;
+Return a JSON array of ${safeCount} question object(s). Only return the JSON array, no other text.`;
 
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
