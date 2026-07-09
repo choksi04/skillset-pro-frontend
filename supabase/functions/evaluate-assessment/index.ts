@@ -1,12 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-siap-user-id",
 };
 
-interface AnswerPayload {
+interface ClientAnswer {
+  question_id: string;
+  answer_text: string;
+}
+
+interface TrustedAnswer {
   question_id: string;
   answer_text: string;
   question_text: string;
@@ -29,60 +35,41 @@ interface EvaluationResult {
   confidence: number;
 }
 
-/**
- * Evaluate MCQ by parsing correctIndex from question_text JSON.
- * User answer is a letter (A/B/C/D) converted to index 0-3.
- */
-function evaluateMCQ(answer: AnswerPayload): EvaluationResult {
+function evaluateMCQ(answer: TrustedAnswer): EvaluationResult {
   let correctIndex: number | null = null;
   let options: string[] | null = null;
 
-  // Primary: parse question_text JSON for correctIndex + options
   try {
     const parsed = JSON.parse(answer.question_text);
-    if (typeof parsed.correctIndex === 'number') {
-      correctIndex = parsed.correctIndex;
-    }
-    if (Array.isArray(parsed.options)) {
-      options = parsed.options as string[];
-    }
-  } catch { /* not JSON, fall through */ }
+    if (typeof parsed.correctIndex === 'number') correctIndex = parsed.correctIndex;
+    if (Array.isArray(parsed.options)) options = parsed.options as string[];
+  } catch { /* not JSON */ }
 
-  // Fallback: try evaluation_guidelines for "correctIndex: N" or "Correct answer: X"
   if (correctIndex === null && answer.evaluation_guidelines) {
     const idxMatch = answer.evaluation_guidelines.match(/correctIndex[:\s]*(\d)/i);
     if (idxMatch) {
       correctIndex = parseInt(idxMatch[1], 10);
     } else {
       const letterMatch = answer.evaluation_guidelines.match(/correct\s*(?:answer)?[:\s]*([A-D])/i);
-      if (letterMatch) {
-        correctIndex = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
-      }
+      if (letterMatch) correctIndex = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
     }
   }
 
-  // Convert user answer letter to index
-  const userText = answer.answer_text.trim().toUpperCase();
+  const userText = (answer.answer_text ?? '').trim().toUpperCase();
   let userIndex: number | null = null;
-  if (/^[A-D]$/.test(userText)) {
-    userIndex = userText.charCodeAt(0) - 65;
-  } else {
-    // Try parsing as number (0-3)
+  if (/^[A-D]$/.test(userText)) userIndex = userText.charCodeAt(0) - 65;
+  else {
     const num = parseInt(userText, 10);
-    if (!isNaN(num) && num >= 0 && num <= 3) {
-      userIndex = num;
-    }
+    if (!isNaN(num) && num >= 0 && num <= 3) userIndex = num;
   }
 
   if (correctIndex === null) {
-    // Cannot determine correct answer — return 0 with explanation
     return {
       question_id: answer.question_id,
       score: 0,
       feedback: 'Could not determine the correct answer from question data. Please review manually.',
       dimensions: [
         { dimension: 'Correctness', score: 0, comment: 'Correct answer index not found in question data.' },
-        { dimension: 'Knowledge', score: 0, comment: 'Unable to evaluate.' },
       ],
       confidence: 0.1,
     };
@@ -113,29 +100,114 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { attempt_id, answers } = await req.json() as { attempt_id: string; answers: AnswerPayload[] };
+    const body = await req.json();
+    const attempt_id: string = body?.attempt_id;
+    const clientAnswers: ClientAnswer[] = Array.isArray(body?.answers) ? body.answers : [];
 
-    if (!answers || !Array.isArray(answers)) {
-      return new Response(JSON.stringify({ error: "Invalid answers payload" }), {
+    if (!attempt_id || typeof attempt_id !== 'string') {
+      return new Response(JSON.stringify({ error: "Missing attempt_id" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Authorization: caller must own the attempt OR be an admin/manager
+    const callerUserId = req.headers.get("x-siap-user-id");
+    if (!callerUserId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const evaluations: EvaluationResult[] = [];
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    // Split into MCQ (auto-eval) and non-MCQ (AI eval)
-    const mcqAnswers = answers.filter((a) => a.question_type === 'mcq');
-    const aiAnswers = answers.filter((a) => a.question_type !== 'mcq');
-
-    // Auto-evaluate MCQs
-    for (const mcq of mcqAnswers) {
-      evaluations.push(evaluateMCQ(mcq));
+    const { data: caller } = await supabaseAdmin
+      .from("users")
+      .select("id, role, status")
+      .eq("id", callerUserId)
+      .maybeSingle();
+    if (!caller || caller.status !== "active") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // AI evaluate scenario/coding questions in batch
+    // Load attempt and verify ownership
+    const { data: attempt, error: attemptErr } = await supabaseAdmin
+      .from("assessment_attempts")
+      .select("id, assessment_id, employee_id")
+      .eq("id", attempt_id)
+      .maybeSingle();
+    if (attemptErr || !attempt) {
+      return new Response(JSON.stringify({ error: "Attempt not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const isOwner = attempt.employee_id === callerUserId;
+    const isPrivileged = caller.role === "admin" || caller.role === "manager";
+    if (!isOwner && !isPrivileged) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Load the trusted assessment_questions + questions from the DB by attempt's assessment
+    const { data: aqRows, error: aqErr } = await supabaseAdmin
+      .from("assessment_questions")
+      .select("question_id, skill_id")
+      .eq("assessment_id", attempt.assessment_id);
+    if (aqErr || !aqRows) {
+      return new Response(JSON.stringify({ error: "Failed to load assessment questions" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const allowedQuestionIds = new Set(aqRows.map((r) => r.question_id));
+    const skillByQuestion = new Map(aqRows.map((r) => [r.question_id, r.skill_id]));
+
+    const filteredClientAnswers = clientAnswers.filter(
+      (a) => a && typeof a.question_id === 'string' && allowedQuestionIds.has(a.question_id),
+    );
+    const answerByQid = new Map(
+      filteredClientAnswers.map((a) => [a.question_id, String(a.answer_text ?? '')]),
+    );
+
+    if (filteredClientAnswers.length === 0) {
+      return new Response(JSON.stringify({ evaluations: [], attempt_id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: questionRows, error: qErr } = await supabaseAdmin
+      .from("questions")
+      .select("id, question_text, question_type, evaluation_guidelines")
+      .in("id", [...answerByQid.keys()]);
+    if (qErr || !questionRows) {
+      return new Response(JSON.stringify({ error: "Failed to load questions" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Build trusted answer payload from DB data only
+    const trustedAnswers: TrustedAnswer[] = questionRows.map((q: any) => ({
+      question_id: q.id,
+      answer_text: answerByQid.get(q.id) ?? '',
+      question_text: q.question_text ?? '',
+      question_type: q.question_type ?? 'scenario',
+      evaluation_guidelines: q.evaluation_guidelines ?? '',
+      skill_id: skillByQuestion.get(q.id) ?? '',
+    }));
+
+    const evaluations: EvaluationResult[] = [];
+    const mcqAnswers = trustedAnswers.filter((a) => a.question_type === 'mcq');
+    const aiAnswers = trustedAnswers.filter((a) => a.question_type !== 'mcq');
+
+    for (const mcq of mcqAnswers) evaluations.push(evaluateMCQ(mcq));
+
     if (aiAnswers.length > 0) {
       const systemPrompt = `You are an expert technical assessment evaluator. Evaluate each answer with rigorous accuracy and provide step-by-step reasoning.
 
@@ -218,7 +290,6 @@ Employee Answer: ${a.answer_text || '(no answer provided)'}`;
 
       const aiResult = await response.json();
       const rawContent = aiResult.choices?.[0]?.message?.content ?? "[]";
-
       let jsonStr = rawContent.trim();
       const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (fenceMatch) jsonStr = fenceMatch[1].trim();
