@@ -189,8 +189,13 @@ export default function LoginPage() {
             </div>
           )}
 
-
+          {/* Footer */}
+          <p className="text-center text-xs text-muted-foreground">
+            Don't have an account? Contact your administrator.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
+
