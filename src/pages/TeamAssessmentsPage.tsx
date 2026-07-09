@@ -108,6 +108,10 @@ export default function TeamAssessmentsPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [reminderPending, setReminderPending] = useState<Record<string, boolean>>({});
+  const [reassignFor, setReassignFor] = useState<{ reviewId: string; employeeName: string } | null>(null);
+  const [reassignTo, setReassignTo] = useState<string>("");
+  const [reassignSaving, setReassignSaving] = useState(false);
+  const [reviewerOptions, setReviewerOptions] = useState<{ value: string; label: string }[]>([]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
