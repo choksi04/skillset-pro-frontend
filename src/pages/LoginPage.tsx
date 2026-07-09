@@ -2,13 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import {
-  Brain,
-  AlertCircle,
-  ShieldCheck,
-  Target,
-  BarChart3,
-} from "lucide-react";
+import { Brain, AlertCircle, ShieldCheck, Target, BarChart3 } from "lucide-react";
 
 import rivetLogo from "@/assets/1rivet-logo.svg";
 
@@ -30,15 +24,7 @@ function MicrosoftIcon({ className }: { className?: string }) {
   );
 }
 
-function FeatureRow({
-  icon: Icon,
-  title,
-  desc,
-}: {
-  icon: typeof ShieldCheck;
-  title: string;
-  desc: string;
-}) {
+function FeatureRow({ icon: Icon, title, desc }: { icon: typeof ShieldCheck; title: string; desc: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -66,9 +52,6 @@ export default function LoginPage() {
     if (!result.success) setError(result.error ?? "Sign-in failed.");
     setAzureLoading(false);
   };
-
-
-
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
@@ -184,7 +167,7 @@ export default function LoginPage() {
                   window.location.href = "/";
                 }}
               >
-                Sign in as Admin (Rukshar)
+                Sign in as Admin{" "}
               </Button>
             </div>
           )}
@@ -198,4 +181,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
