@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useQuestionStore } from '@/stores/questionStore';
@@ -15,18 +15,13 @@ const setupSteps = [
 ] as const;
 
 export default function SetupProgress() {
-  const { skills, initialized: skillsInit, fetchSkills } = useSkillStore();
-  const { domains, mappings, initialized: domainsInit, fetchDomains } = useDomainStore();
-  const { counts: questionCounts, fetchQuestionCounts } = useQuestionStore();
-  const { templates, initialized: templatesInit, fetchTemplates } = useTemplateStore();
-
-  useEffect(() => {
-    if (!skillsInit) fetchSkills();
-    if (!domainsInit) fetchDomains();
-    // Only need the count, not the full 7000-row question preload.
-    fetchQuestionCounts();
-    if (!templatesInit) fetchTemplates();
-  }, [skillsInit, domainsInit, templatesInit, fetchSkills, fetchDomains, fetchQuestionCounts, fetchTemplates]);
+  // Read-only: do NOT trigger any fetches from the sidebar. This widget only
+  // reflects data that other pages have already loaded, so visiting the
+  // Dashboard makes zero API calls on its behalf.
+  const { skills, initialized: skillsInit } = useSkillStore();
+  const { domains, mappings, initialized: domainsInit } = useDomainStore();
+  const { counts: questionCounts } = useQuestionStore();
+  const { templates, initialized: templatesInit } = useTemplateStore();
 
   const allLoaded = skillsInit && domainsInit && templatesInit;
 
@@ -37,7 +32,6 @@ export default function SetupProgress() {
     questions: questionCounts.total > 0,
     template: templates.some((t) => t.status === 'active'),
   }), [skills, domains, mappings, questionCounts.total, templates]);
-
 
   const done = Object.values(completion).filter(Boolean).length;
   const total = setupSteps.length;
