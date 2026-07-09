@@ -275,7 +275,9 @@ export default function QuestionBankPage() {
     const trimmedContext = aiContext.trim();
 
     try {
+      const callerId = typeof window !== 'undefined' ? localStorage.getItem('siap_user_id') : null;
       const { data, error } = await supabase.functions.invoke('generate-questions', {
+        headers: callerId ? { 'x-siap-user-id': callerId } : undefined,
         body: {
           skillName: skill?.skill_name ?? 'Unknown',
           topicName: topic || undefined,
