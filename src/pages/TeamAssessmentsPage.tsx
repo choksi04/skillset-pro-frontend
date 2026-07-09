@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import SearchableSelect from "@/components/ui/searchable-select";
 import {
   Dialog,
   DialogContent,
