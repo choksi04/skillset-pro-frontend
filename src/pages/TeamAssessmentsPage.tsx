@@ -675,6 +675,22 @@ export default function TeamAssessmentsPage() {
                             );
                           })()}
                         {actionEl}
+                        {(currentRole === "admin" || currentRole === "manager") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs text-destructive hover:text-destructive"
+                            title="Revoke assessment"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRevokeReason("");
+                              setRevokeFor({ assessmentId: a.id, employeeName: getName(a.employee_id) });
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            Revoke
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
