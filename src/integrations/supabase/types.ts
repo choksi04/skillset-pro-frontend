@@ -85,6 +85,7 @@ export type Database = {
           max_attempts: number
           modified_at: string | null
           modified_by: string | null
+          revoke_reason: string | null
           status: string
           template_id: string
           tenant_id: string
@@ -103,6 +104,7 @@ export type Database = {
           max_attempts?: number
           modified_at?: string | null
           modified_by?: string | null
+          revoke_reason?: string | null
           status?: string
           template_id: string
           tenant_id?: string
@@ -121,6 +123,7 @@ export type Database = {
           max_attempts?: number
           modified_at?: string | null
           modified_by?: string | null
+          revoke_reason?: string | null
           status?: string
           template_id?: string
           tenant_id?: string

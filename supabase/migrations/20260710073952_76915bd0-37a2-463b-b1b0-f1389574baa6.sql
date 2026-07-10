@@ -1,0 +1,1 @@
+ALTER TABLE public.assessment_assignments ADD COLUMN IF NOT EXISTS revoke_reason TEXT;
