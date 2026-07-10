@@ -109,16 +109,25 @@ export default function AdaptiveRunner({
     if (initRef.current) return;
     initRef.current = true;
     (async () => {
-      const { state, reason } = await initAdaptiveAttempt(assessment.id);
-      if (!state) {
-        toast.error(reason ?? 'Failed to initialize adaptive assessment');
+      try {
+        const { state, reason } = await initAdaptiveAttempt(assessment.id);
+        if (!state) {
+          const msg = reason ?? 'Failed to initialize adaptive assessment';
+          setInitError(msg);
+          toast.error(msg);
+          setLoading(false);
+          return;
+        }
+        const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
+        setProgress({ asked: 0, total });
+        await loadNext();
+      } catch (err: any) {
+        const msg = err?.message || 'Unexpected error while starting the assessment';
+        setInitError(msg);
+        toast.error(msg);
+      } finally {
         setLoading(false);
-        return;
       }
-      const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
-      setProgress({ asked: 0, total });
-      await loadNext();
-      setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
