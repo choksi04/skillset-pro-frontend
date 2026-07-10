@@ -149,6 +149,7 @@ export default function AdaptiveRunner({
         return;
       }
       setCurrentQuestion(question);
+      ensureTopic(question.topic_id);
       setCurrentSkillId(skillState.skill_id);
       setCurrentLevel(skillState.currentLevel);
       setSelectedOption('');
