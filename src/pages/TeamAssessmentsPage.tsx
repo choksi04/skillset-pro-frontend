@@ -138,6 +138,7 @@ export default function TeamAssessmentsPage() {
     fetchReviews();
     fetchTemplates();
     fetchLevels();
+    fetchAssignments();
 
   }, []);
 
