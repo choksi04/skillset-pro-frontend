@@ -1,40 +1,24 @@
 ## Problem
 
-On `Domains > [Domain] > Skills`, after selecting skills via **Manage Skills** and saving, the newly-mapped skills sometimes do not appear in the tab, even though:
-- Mappings are correctly persisted in the database (`domain_skill_mappings` has the rows).
-- The tab counter `Skills (N)` shows a non-zero count.
+`Generate Questions with AI` in Question Bank is returning "Edge Function returned a non-2xx status code" — most likely low AI credits on the gateway. We want to hide this feature from users for now while keeping AI evaluation of assessment answers working (that runs from `evaluate-assessment`, unaffected).
 
-## Root cause
+## Change
 
-`DomainDetailPage.tsx` groups mapped skills by the legacy **denormalized name** field `skill.skill_category` (lines 88–101):
+Hide the entire "Generate Questions with AI" panel in `src/pages/QuestionBankPage.tsx` behind a disabled flag. No logic removed — flip one condition back later to re-enable.
 
-```ts
-const cat = skill.skill_category || 'Uncategorized';
-if (!map.has(cat)) map.set(cat, []);
-```
+- Line 385–386: wrap the `<Collapsible>` block with `{false && canEdit && (...)}` (leave the JSX intact so re-enabling is a one-line change).
 
-This is inconsistent with the rest of the app, which was migrated to use `category_id` as the source of truth (see `DomainSkillManager.tsx` — it groups by `s.category_id` and resolves the display name from `categories`). For skills where `skill_category` is empty or stale (common after category renames or migrations), the grouping still works but any downstream mismatch (empty string category, category deleted, name drift) can produce entries that render as blank/uncategorized rows or silently drop when a search filter is applied. It also diverges from the picker the user just used, causing perceived "missing" skills.
-
-Additionally, the empty-state branches only handle `currentMappings.length === 0` and `mappedByCategory.size === 0 && skillSearch` — if `skills` hasn't finished loading yet on first mount (race between `fetchDomains()` and `fetchSkills()`), the map is empty with no search, falling through to render nothing between the header and an empty body.
-
-## Fix
-
-Align `DomainDetailPage.tsx` Skills tab with the rest of the app:
-
-1. **Group by `category_id`** (source of truth), resolving display name from `categories` via a `Map<id, name>`. Uncategorized skills (blank `category_id`) get a stable `__uncategorised__` bucket labeled "Uncategorized".
-2. **Update `mappedByCategory`** to key by `category_id` and carry `{ name, skills }` — same shape used in `DomainSkillManager`.
-3. **Search filter** matches on skill name or resolved category name (not the stale denormalized field).
-4. **Loading state**: when `currentMappings.length > 0` but the `skills` store hasn't loaded yet, render a small skeleton instead of an empty container.
-
-No changes to `domainStore`, `DomainSkillManager`, or the database — mappings are already correct in DB.
-
-## Files touched
-
-- `src/pages/DomainDetailPage.tsx` — rewrite `mappedByCategory` memo + tab body rendering to group by `category_id`, add a loading skeleton for the not-yet-loaded case.
+Nothing else touched:
+- `evaluate-assessment` edge function stays live (AI evaluation of answers continues to work).
+- `generate-questions` edge function stays deployed but no UI entry point calls it.
+- "AI Generated" filter and existing AI-generated question badges remain visible for historical questions.
 
 ## Verification
 
-- Open a domain with existing mappings (e.g. Business Analyst → 43 mappings). All 43 skills render grouped under their current category names.
-- Add a new skill via **Manage Skills** and save. It appears immediately in the Skills tab under the correct category.
-- Rename a category in Skill Library; the domain's Skills tab shows the new name without any skills disappearing.
-- Search by category name or skill name filters correctly; clearing the search restores the full list.
+- Load `/questions` as an admin: no "Generate Questions with AI" collapsible card renders between the stats and the filter bar.
+- Existing questions still list; filters, create, edit, bulk upload all work.
+- Complete an assessment → AI evaluation still scores answers.
+
+## Re-enable later
+
+Change `{false && canEdit && (` back to `{canEdit && (` on line 386 once credits are topped up.
