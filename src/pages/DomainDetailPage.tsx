@@ -88,18 +88,19 @@ export default function DomainDetailPage() {
 
   const mappedByCategory = useMemo(() => {
     const q = skillSearch.toLowerCase();
-    const map = new Map<string, Array<typeof skills[0] & { mappingId: string }>>();
+    const catNameById = new Map(categories.map((c) => [c.id, c.name]));
+    const map = new Map<string, { name: string; skills: Array<typeof skills[0] & { mappingId: string }> }>();
     currentMappings.forEach((m) => {
       const skill = skills.find((s) => s.id === m.skill_id);
-      if (skill) {
-        if (q && !skill.skill_name.toLowerCase().includes(q) && !(skill.skill_category || '').toLowerCase().includes(q)) return;
-        const cat = skill.skill_category || 'Uncategorized';
-        if (!map.has(cat)) map.set(cat, []);
-        map.get(cat)!.push({ ...skill, mappingId: m.id });
-      }
+      if (!skill) return;
+      const catId = skill.category_id || '__uncategorised__';
+      const catName = catNameById.get(skill.category_id) || 'Uncategorized';
+      if (q && !skill.skill_name.toLowerCase().includes(q) && !catName.toLowerCase().includes(q)) return;
+      if (!map.has(catId)) map.set(catId, { name: catName, skills: [] });
+      map.get(catId)!.skills.push({ ...skill, mappingId: m.id });
     });
     return map;
-  }, [currentMappings, skills, skillSearch]);
+  }, [currentMappings, skills, categories, skillSearch]);
 
   const domainLead = useMemo(() => {
     if (!domain?.domain_lead_id) return null;
