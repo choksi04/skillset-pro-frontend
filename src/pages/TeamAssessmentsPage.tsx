@@ -56,6 +56,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
+import { useAssignmentStore } from "@/stores/assignmentStore";
+import { Textarea } from "@/components/ui/textarea";
 
 const PAGE_SIZE = 10;
 
