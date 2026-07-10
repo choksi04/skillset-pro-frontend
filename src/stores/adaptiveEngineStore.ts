@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from '@/lib/audit';
-import { CompetencyLevel as CompetencyLevelConfig, getLevelToIdMap } from './competencyLevelStore';
+// (competency level map is built inline below — no need for the helper)
 import { Question } from './questionStore';
 import { useAttemptStore, AssessmentAttempt, AnswerEntry, SkillScore } from './attemptStore';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
