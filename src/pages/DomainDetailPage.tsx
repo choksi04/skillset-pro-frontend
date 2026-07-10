@@ -514,7 +514,7 @@ export default function DomainDetailPage() {
               <div className="text-center py-10 text-sm text-muted-foreground">No matching skills.</div>
             ) : (
               <div className="p-4 space-y-4">
-                {Array.from(mappedByCategory.entries()).map(([catName, catSkills]) => (
+                {Array.from(mappedByCategory.entries()).map(([catId, { name: catName, skills: catSkills }]) => (
                   <div key={catName}>
                     <div className="flex items-center gap-2 mb-2">
                       <FolderOpen size={14} className="text-primary shrink-0" />
