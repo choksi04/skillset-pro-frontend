@@ -1,53 +1,58 @@
-## Root cause: false "Cannot start" error
 
-The adaptive assessment `686c1590…` is fully configured — 5 skills, 45–50 published MCQs each, all 5 competency levels active, adaptive_state already initialized in DB. The error is a **bug in the code**, not a config problem.
+## Scope
 
-In `src/stores/adaptiveEngineStore.ts` → `loadCompetencyLevelMap()`:
+Hard-delete all skill registry and assessment transactional data for these 5 employees only. Users themselves and all master data (skills, categories, domains, templates, questions, competency levels, domain assignments) remain untouched.
 
-```ts
-supabase.from('competency_levels').select('id, level, name').eq('status', 'active')...
-```
+| Name | User ID |
+|---|---|
+| Keval Kiniyara | `user-1777007498020` |
+| Kishan Mistry | `95152a0a-dee7-4510-9485-eebbb6dd3266` |
+| Purvesh Desai | `5b54cc8b-75c0-481b-a477-e10c640c5c28` |
+| Chiranjiv Rathod | `5b4b8351-782f-4b31-9805-9b423e1ca659` |
+| Akash Prajapati | `c55fef0f-8faa-40bc-b3a5-8a763e88df2c` |
 
-The select list omits `status`. The rows are then mapped into `CompetencyLevelConfig` objects where `status: s.status` becomes `undefined`. `getLevelToIdMap()` then does `filter(l => l.status === 'active')`, which drops every row → the map is empty → `getNextQuestion` throws:
+## Current footprint
 
-> "No active competency levels configured (Settings → Competency Levels)."
+- skill_registries: 5, registry_reviews: 3
+- assessments: 23, assignments: 23, attempts: 19, manager_reviews: 10
+- official_skill_entries: 18, notifications: 48
+- skill_registry_submissions / skill_self_ratings / reassessment_requests: 0
 
-That thrown message is caught by `AdaptiveRunner`'s init effect, dumped into `initError`, and rendered under the static "Cannot start this adaptive assessment" panel with the three troubleshooting bullets (which are shown **unconditionally**, so they look like the diagnosis even when they aren't).
+## Deletion order (children first, scoped to these 5 users)
 
-### Fix (adaptive bug)
+Executed in a single SQL block. Every WHERE clause is scoped by `employee_id IN (…5 IDs…)` (or its parent's id resolved from that filter), so no other user's data is touched.
 
-In `src/stores/adaptiveEngineStore.ts` → `loadCompetencyLevelMap()`:
+**Assessment side**
+1. `ai_evaluations` where `attempt_id` ∈ attempts of these employees
+2. `attempt_answers` where `attempt_id` ∈ …
+3. `attempt_skill_scores` where `attempt_id` ∈ …
+4. `assessment_attempts` where `employee_id IN (...)`
+5. `manager_reviews` where `assessment_id` ∈ assessments of these employees
+6. `assessment_questions` where `assessment_id` ∈ …
+7. `assessments` where `employee_id IN (...)`
+8. `assessment_assignments` where `employee_id IN (...)`
+9. `reassessment_requests` where `employee_id IN (...)`
 
-- Include `status` (and the other fields it maps) in the `.select(...)`:
-  `select('id, tenant_id, level, name, label, description, score_range_min, score_range_max, min_questions, status')`.
-- Because the query already filters `.eq('status','active')`, drop the redundant re-filter — just build `levelToId` / `idToLevel` from the returned rows directly. This removes the class of bug entirely.
-- Keep the "No active competency levels" throw, but guard it so it only fires when the DB actually returns zero rows.
+**Registry side**
+10. `registry_review_items` where `review_id` ∈ registry_reviews of these employees' registries
+11. `registry_reviews` where `registry_id` ∈ skill_registries of these employees
+12. `review_skill_entries` where `employee_id IN (...)`
+13. `official_skill_entries` where `employee_id IN (...)`
+14. `skill_registry_items` where `registry_id` ∈ skill_registries of these employees
+15. `skill_registries` where `employee_id IN (...)`
+16. `skill_self_ratings` where `submission_id` ∈ submissions of these employees (currently 0)
+17. `skill_registry_submissions` where `employee_id IN (...)`
 
-No schema change. No other call sites affected — the map shape stays the same.
+**Notifications**
+18. `notifications` where `target_user_id IN (...)` — only their own notifications (48 rows).
 
-### Verification
+## Preserved
 
-- Reopen the failing URL — adaptive runner loads the first question instead of the error card.
-- Confirm the same code path for a fresh adaptive assessment (`initAdaptiveAttempt` → `getNextQuestion`) picks a question at the expected level.
+- `users` rows (accounts stay active)
+- `employee_domain_assignments` (domain mapping — master-ish, kept)
+- All skills, categories, topics, domains, templates, questions, competency levels
+- All other users' registries, assessments, notifications
 
----
+## Verification
 
-## Revoke button — move to Assessment Templates settings
-
-Current placement is wrong: revoke is exposed as a row action on **Team Assessments** and on the **Assessment Detail** page. You asked for it inside **Assessment Templates → assignments sheet**.
-
-### Change
-
-- `src/pages/TeamAssessmentsPage.tsx` — remove the "Revoke" row action, its confirm dialog, `revokeFor` / `revokeReason` state, and the `revokeAssessment` import. Team Assessments becomes read-only for lifecycle actions again.
-- `src/components/templates/TemplateAssignmentsSheet.tsx` — this sheet is opened from the Assessment Templates settings page and already lists every assignment for a template. Replace its current `revokeAssignment` call (which only works for `new` rows) with the new `revokeAssessment(assignmentId's assessment_id, reason)` so it handles in-progress / evaluated / verified rows too. Add:
-  - A "Revoke" button per row for any status other than `revoked`.
-  - A confirm dialog with a required reason textarea (same copy as the current one).
-  - Success toast + refresh of the sheet's assignment list.
-- `src/pages/AssessmentDetailPage.tsx` — leave the revoke button here for now (it's the natural place when an admin has already drilled into a specific assessment). If you want it removed too, say so and I'll strip it in the same pass.
-
-No store or DB changes — `revokeAssessment` in `assignmentStore.ts` already does the full soft-delete cascade.
-
-### Verification
-
-- Team Assessments list shows no revoke action.
-- Settings → Assessment Templates → open a template → Assignments sheet → each active row shows a Revoke button; clicking it, entering a reason, and confirming soft-deletes the assignment + assessment + attempts and lets the same template be re-assigned to the same employee.
+After the delete, re-run the same COUNT query for these 5 user IDs — every counter must be 0.
