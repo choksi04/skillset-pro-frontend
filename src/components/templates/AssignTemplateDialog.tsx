@@ -49,6 +49,7 @@ export default function AssignTemplateDialog({
   const [users, setUsers] = useState<UserLite[]>([]);
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [preflight, setPreflight] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null });
 
   const template = useMemo(() => {
     if (initialTemplate && !showTemplatePicker) return initialTemplate;
