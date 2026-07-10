@@ -290,6 +290,9 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const skill = ordered[0];
 
     const { levelToId } = await loadCompetencyLevelMap();
+    if (Object.keys(levelToId).length === 0) {
+      throw new Error('No active competency levels configured (Settings → Competency Levels).');
+    }
     const order = fallbackLevelOrder(skill.currentLevel);
 
     let chosen: { row: any; level: number; fallback: boolean } | null = null;
