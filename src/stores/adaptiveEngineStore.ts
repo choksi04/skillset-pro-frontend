@@ -333,13 +333,17 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const targetLevelId = levelToId[chosen.level] ?? levelToId[skill.currentLevel] ?? null;
 
     if (targetLevelId) {
-      await supabase.from('assessment_questions').insert({
+      const { error: insertErr } = await supabase.from('assessment_questions').insert({
         assessment_id: assessmentId,
         question_id: chosen.row.id,
         skill_id: skill.skill_id,
         target_level: targetLevelId,
         created_by: userId,
       });
+      if (insertErr) {
+        console.error('adaptive: failed to persist assessment_questions row', insertErr);
+        throw new Error(`Could not save the next question: ${insertErr.message}`);
+      }
 
       useAssessmentStore.setState((s) => ({
         assessments: s.assessments.map((a) => {
