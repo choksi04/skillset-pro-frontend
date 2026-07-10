@@ -263,6 +263,13 @@ export default function AssignTemplateDialog({
             </div>
           )}
 
+          {template && template.status === 'active' && preflight.error && (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-2.5">
+              <AlertCircle size={14} className="text-destructive mt-0.5 shrink-0" />
+              <p className="text-xs text-destructive">{preflight.error}</p>
+            </div>
+          )}
+
           {template && template.status === 'active' && (
             <Tabs value={mode} onValueChange={(v) => setMode(v as 'domain' | 'users')}>
               <TabsList className="grid grid-cols-2 w-full">
