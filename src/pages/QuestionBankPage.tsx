@@ -382,8 +382,8 @@ export default function QuestionBankPage() {
         </TooltipProvider>
       </div>
 
-      {/* AI Generation Section */}
-      {canEdit && (
+      {/* AI Generation Section — temporarily disabled (AI credits). Flip `false` to re-enable. */}
+      {false && canEdit && (
         <Collapsible open={aiOpen} onOpenChange={setAiOpen}>
           <div className="rounded-xl border border-primary/20 bg-primary/5 overflow-hidden">
             <CollapsibleTrigger asChild>
