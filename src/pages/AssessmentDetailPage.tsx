@@ -81,7 +81,7 @@ export default function AssessmentDetailPage() {
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { templates, fetchTemplates } = useTemplateStore();
-  const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
+  const { assignments, fetchAssignments, getAssignmentByAssessmentId, revokeAssessment } = useAssignmentStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
