@@ -517,7 +517,17 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                     </div>
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
+              const topicName = q?.topic_id ? topicMap[q.topic_id] : undefined;
+              return (
+                <li key={aq.question_id} className="p-5 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${answered ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+                        {topicName && <Badge variant="outline" className="text-xs">{topicName}</Badge>}
                         <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
                         {q && <Badge variant="outline" className="text-xs">{questionTypeLabels[q.question_type]}</Badge>}
                         {flagged && <Badge className="text-xs bg-warning/15 text-warning border-warning/30 hover:bg-warning/15"><Flag size={10} className="mr-1" /> Flagged</Badge>}
