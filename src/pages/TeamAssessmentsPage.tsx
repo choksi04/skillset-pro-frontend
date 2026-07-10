@@ -102,6 +102,12 @@ export default function TeamAssessmentsPage() {
   const { levels, fetchLevels } = useCompetencyLevelStore();
   const { currentRole, user } = useAuth();
   const navigate = useNavigate();
+  const { revokeAssessment, fetchAssignments } = useAssignmentStore();
+
+  const [revokeFor, setRevokeFor] = useState<{ assessmentId: string; employeeName: string } | null>(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [revoking, setRevoking] = useState(false);
+
 
   const [userMeta, setUserMeta] = useState<
     Record<string, { full_name: string; designation: string | null; domain_id: string | null }>
