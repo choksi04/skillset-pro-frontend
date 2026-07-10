@@ -133,18 +133,24 @@ export default function AdaptiveRunner({
   }, []);
 
   async function loadNext() {
-    const { question, skillState } = await getNextQuestion(attemptId, assessment.id);
-    if (!question || !skillState) {
-      // No more questions — open review instead of auto-finalizing.
-      setCurrentQuestion(null);
-      setReviewOpen(true);
-      return;
+    try {
+      const { question, skillState } = await getNextQuestion(attemptId, assessment.id);
+      if (!question || !skillState) {
+        // No more questions — open review instead of auto-finalizing.
+        setCurrentQuestion(null);
+        setReviewOpen(true);
+        return;
+      }
+      setCurrentQuestion(question);
+      setCurrentSkillId(skillState.skill_id);
+      setCurrentLevel(skillState.currentLevel);
+      setSelectedOption('');
+      startedAtRef.current = Date.now();
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load the next question';
+      setInitError(msg);
+      toast.error(msg);
     }
-    setCurrentQuestion(question);
-    setCurrentSkillId(skillState.skill_id);
-    setCurrentLevel(skillState.currentLevel);
-    setSelectedOption('');
-    startedAtRef.current = Date.now();
   }
 
   async function finalize() {
