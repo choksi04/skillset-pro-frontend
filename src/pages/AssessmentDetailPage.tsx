@@ -851,6 +851,41 @@ export default function AssessmentDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Confirm Revoke Dialog */}
+      <AlertDialog open={confirmRevoke} onOpenChange={(o) => { if (!revoking) setConfirmRevoke(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this assessment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This soft-deletes the assessment, its attempts, and the assignment record so the
+              template can be assigned again to this employee. Answers and reviews stay in the
+              database for audit purposes but will no longer be visible in listings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-foreground">Reason <span className="text-destructive">*</span></label>
+            <Textarea
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="Why is this assessment being revoked? (e.g. wrong template, buggy questions, stuck in progress)"
+              rows={3}
+              disabled={revoking}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleRevoke(); }}
+              disabled={revoking || !revokeReason.trim()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {revoking ? "Revoking…" : "Revoke Assessment"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       {/* Add Question Dialog */}
       <AddQuestionDialog
         open={addQuestionOpen}
