@@ -42,7 +42,8 @@ export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { domains, mappings, fetchDomains, updateDomain, removeMapping, checkDomainDeletable, deleteDomain } = useDomainStore();
-  const { skills, fetchSkills, initialized } = useSkillStore();
+  const { skills, categories, fetchSkills, initialized: skillsInitialized } = useSkillStore();
+  const initialized = skillsInitialized;
   const { currentRole, user: authUser, refreshUser } = useAuth();
   const isAdmin = currentRole === 'admin';
 
