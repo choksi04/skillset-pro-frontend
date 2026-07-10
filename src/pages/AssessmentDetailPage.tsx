@@ -157,6 +157,7 @@ export default function AssessmentDetailPage() {
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === "admin" || user?.role === "manager";
   const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
+  const canRevoke = !isOwner && isAdmin && !!assessment;
   const isPendingEval =
     attempt?.status === "submitted" && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === "evaluated" || attempt?.status === "reviewed";
