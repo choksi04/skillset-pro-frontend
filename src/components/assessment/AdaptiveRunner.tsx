@@ -249,6 +249,20 @@ export default function AdaptiveRunner({
     );
   }
 
+  if (initError) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 max-w-2xl">
+        <h3 className="text-sm font-semibold text-destructive mb-1">Cannot start this adaptive assessment</h3>
+        <p className="text-sm text-foreground/80 mb-3">{initError}</p>
+        <ul className="text-xs text-muted-foreground list-disc ml-5 space-y-1">
+          <li>Confirm the template has skills selected (Pick Skills mode) or the employee's domain has mapped skills.</li>
+          <li>Ensure at least one <strong>published MCQ</strong> exists for each selected skill.</li>
+          <li>Verify competency levels (L1–L5) are active in Settings.</li>
+        </ul>
+      </div>
+    );
+  }
+
   if (finished) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
