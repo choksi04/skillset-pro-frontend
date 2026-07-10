@@ -784,6 +784,55 @@ export default function TeamAssessmentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!revokeFor} onOpenChange={(o) => { if (!o && !revoking) { setRevokeFor(null); setRevokeReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Revoke assessment?</DialogTitle>
+            <DialogDescription>
+              This soft-deletes {revokeFor?.employeeName}'s assessment, its attempts, and the
+              assignment record so the template can be assigned again. Answers stay in the
+              database for audit but disappear from listings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-foreground">Reason <span className="text-destructive">*</span></label>
+            <Textarea
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="Why is this assessment being revoked?"
+              rows={3}
+              disabled={revoking}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRevokeFor(null); setRevokeReason(""); }} disabled={revoking}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={revoking || !revokeReason.trim()}
+              onClick={async () => {
+                if (!revokeFor) return;
+                setRevoking(true);
+                try {
+                  await revokeAssessment(revokeFor.assessmentId, revokeReason.trim());
+                  toast.success("Assessment revoked");
+                  setRevokeFor(null);
+                  setRevokeReason("");
+                  await fetchAssessments({ force: true } as any);
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to revoke");
+                } finally {
+                  setRevoking(false);
+                }
+              }}
+            >
+              {revoking ? "Revoking…" : "Revoke Assessment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
