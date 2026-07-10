@@ -83,6 +83,7 @@ export default function AdaptiveRunner({
   const { levels, fetchLevels } = useCompetencyLevelStore();
 
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [currentSkillId, setCurrentSkillId] = useState<string>('');
   const [currentLevel, setCurrentLevel] = useState<number>(3);
