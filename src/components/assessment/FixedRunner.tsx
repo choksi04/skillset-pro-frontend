@@ -692,6 +692,9 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                     <span className="text-xs font-semibold text-muted-foreground">Question {currentIdx + 1} / {currentQuestions.length}</span>
                     <span className="text-muted-foreground/50">•</span>
                     <Badge variant="secondary" className="text-xs">{skillMap.get(currentAQ.skill_id)?.skill_name ?? 'Skill'}</Badge>
+                    {currentQuestion.topic_id && topicMap[currentQuestion.topic_id] && (
+                      <Badge variant="outline" className="text-xs">{topicMap[currentQuestion.topic_id]}</Badge>
+                    )}
                     <Badge variant="outline" className="text-xs">{dynamicLabels[currentAQ.target_level] || currentAQ.target_level}</Badge>
                     <Badge variant="outline" className="text-xs">{questionTypeLabels[currentQuestion.question_type]}</Badge>
                     <div className="ml-auto flex items-center gap-1.5">
