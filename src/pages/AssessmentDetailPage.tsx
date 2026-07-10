@@ -610,6 +610,19 @@ export default function AssessmentDetailPage() {
             <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} /> Regenerate Assessment
           </Button>
         )}
+
+        {/* Admin/Manager: Revoke assessment at any stage */}
+        {canRevoke && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setRevokeReason(""); setConfirmRevoke(true); }}
+            className="gap-1.5 text-destructive hover:text-destructive"
+            disabled={revoking}
+          >
+            {revoking ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Revoke Assessment
+          </Button>
+        )}
       </div>
 
       {/* Result Summary — terminal attempts only */}
