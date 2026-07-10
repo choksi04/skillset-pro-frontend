@@ -484,7 +484,11 @@ export default function AssessmentDetailPage() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Skills</p>
-            <p className="text-2xl font-bold text-foreground">{assessment.skill_ids.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {assessment.is_adaptive
+                ? (((attempt as any)?.adaptive_state?.skills?.length) ?? assessment.skill_ids.length)
+                : assessment.skill_ids.length}
+            </p>
           </CardContent>
         </Card>
       </div>

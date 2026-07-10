@@ -49,6 +49,7 @@ export default function AssignTemplateDialog({
   const [users, setUsers] = useState<UserLite[]>([]);
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [preflight, setPreflight] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null });
 
   const template = useMemo(() => {
     if (initialTemplate && !showTemplatePicker) return initialTemplate;
@@ -134,12 +135,50 @@ export default function AssignTemplateDialog({
   const newCount = pickedUsers.size - duplicates.size;
   const skippedCount = overrideDuplicates ? 0 : duplicates.size;
 
+  // Preflight for adaptive + custom-skill templates: warn if template has no
+  // skills or none of them have published MCQs — the runner would otherwise
+  // fail to load any question for the employee.
+  useEffect(() => {
+    if (!template || template.type !== 'adaptive' || template.skill_selection_mode !== 'custom') {
+      setPreflight({ loading: false, error: null });
+      return;
+    }
+    let cancelled = false;
+    setPreflight({ loading: true, error: null });
+    (async () => {
+      const { data: tplSkills } = await supabase
+        .from('assessment_template_skills')
+        .select('skill_id')
+        .eq('template_id', template.id);
+      const skillIds = (tplSkills || []).map((r: any) => r.skill_id);
+      if (skillIds.length === 0) {
+        if (!cancelled) setPreflight({ loading: false, error: 'This template has no skills selected. Edit it and pick skills before assigning.' });
+        return;
+      }
+      const { data: mcqs } = await supabase
+        .from('questions')
+        .select('skill_id')
+        .in('skill_id', skillIds)
+        .eq('question_type', 'mcq')
+        .eq('status', 'published')
+        .is('deleted_on', null);
+      const withMcq = new Set((mcqs || []).map((q: any) => q.skill_id));
+      if (withMcq.size === 0) {
+        if (!cancelled) setPreflight({ loading: false, error: 'None of the selected skills have published MCQs. Add MCQs in Question Bank before assigning.' });
+        return;
+      }
+      if (!cancelled) setPreflight({ loading: false, error: null });
+    })();
+    return () => { cancelled = true; };
+  }, [template?.id]);
+
   const blocker = useMemo(() => {
     if (!template) return 'Select a template';
     if (template.status !== 'active') return 'Template must be activated before assigning';
+    if (preflight.error) return preflight.error;
     if (pickedUsers.size === 0) return 'Pick at least one employee';
     return null;
-  }, [template, pickedUsers]);
+  }, [template, pickedUsers, preflight.error]);
 
   const handleAssign = async () => {
     if (!template || blocker) return;
@@ -221,6 +260,13 @@ export default function AssignTemplateDialog({
             <div className="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 p-2.5">
               <AlertCircle size={14} className="text-warning mt-0.5 shrink-0" />
               <p className="text-xs text-warning">This template is in draft. Activate it before you can assign.</p>
+            </div>
+          )}
+
+          {template && template.status === 'active' && preflight.error && (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-2.5">
+              <AlertCircle size={14} className="text-destructive mt-0.5 shrink-0" />
+              <p className="text-xs text-destructive">{preflight.error}</p>
             </div>
           )}
 

@@ -83,6 +83,7 @@ export default function AdaptiveRunner({
   const { levels, fetchLevels } = useCompetencyLevelStore();
 
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [currentSkillId, setCurrentSkillId] = useState<string>('');
   const [currentLevel, setCurrentLevel] = useState<number>(3);
@@ -108,33 +109,48 @@ export default function AdaptiveRunner({
     if (initRef.current) return;
     initRef.current = true;
     (async () => {
-      const { state, reason } = await initAdaptiveAttempt(assessment.id);
-      if (!state) {
-        toast.error(reason ?? 'Failed to initialize adaptive assessment');
+      try {
+        const { state, reason } = await initAdaptiveAttempt(assessment.id);
+        if (!state) {
+          const msg = reason ?? 'Failed to initialize adaptive assessment';
+          setInitError(msg);
+          toast.error(msg);
+          setLoading(false);
+          return;
+        }
+        const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
+        setProgress({ asked: 0, total });
+        await loadNext();
+      } catch (err: any) {
+        const msg = err?.message || 'Unexpected error while starting the assessment';
+        setInitError(msg);
+        toast.error(msg);
+      } finally {
         setLoading(false);
-        return;
       }
-      const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
-      setProgress({ asked: 0, total });
-      await loadNext();
-      setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadNext() {
-    const { question, skillState } = await getNextQuestion(attemptId, assessment.id);
-    if (!question || !skillState) {
-      // No more questions — open review instead of auto-finalizing.
-      setCurrentQuestion(null);
-      setReviewOpen(true);
-      return;
+    try {
+      const { question, skillState } = await getNextQuestion(attemptId, assessment.id);
+      if (!question || !skillState) {
+        // No more questions — open review instead of auto-finalizing.
+        setCurrentQuestion(null);
+        setReviewOpen(true);
+        return;
+      }
+      setCurrentQuestion(question);
+      setCurrentSkillId(skillState.skill_id);
+      setCurrentLevel(skillState.currentLevel);
+      setSelectedOption('');
+      startedAtRef.current = Date.now();
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load the next question';
+      setInitError(msg);
+      toast.error(msg);
     }
-    setCurrentQuestion(question);
-    setCurrentSkillId(skillState.skill_id);
-    setCurrentLevel(skillState.currentLevel);
-    setSelectedOption('');
-    startedAtRef.current = Date.now();
   }
 
   async function finalize() {
@@ -235,6 +251,20 @@ export default function AdaptiveRunner({
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
         <Loader2 size={14} className="animate-spin mr-2" />
         Preparing your adaptive assessment…
+      </div>
+    );
+  }
+
+  if (initError) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 max-w-2xl">
+        <h3 className="text-sm font-semibold text-destructive mb-1">Cannot start this adaptive assessment</h3>
+        <p className="text-sm text-foreground/80 mb-3">{initError}</p>
+        <ul className="text-xs text-muted-foreground list-disc ml-5 space-y-1">
+          <li>Confirm the template has skills selected (Pick Skills mode) or the employee's domain has mapped skills.</li>
+          <li>Ensure at least one <strong>published MCQ</strong> exists for each selected skill.</li>
+          <li>Verify competency levels (L1–L5) are active in Settings.</li>
+        </ul>
       </div>
     );
   }
