@@ -351,6 +351,27 @@ export default function AssessmentDetailPage() {
     }
   };
 
+  const handleRevoke = async () => {
+    if (!assessment) return;
+    const reason = revokeReason.trim();
+    if (!reason) {
+      toast.error("Please provide a reason for revoking this assessment.");
+      return;
+    }
+    setRevoking(true);
+    try {
+      await revokeAssessment(assessment.id, reason);
+      toast.success("Assessment revoked. It can now be re-assigned.");
+      setConfirmRevoke(false);
+      navigate(backPath);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to revoke assessment");
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+
   const handleReattempt = async () => {
     setConfirmReattempt(false);
     await handleStartRunner(true);
