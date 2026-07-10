@@ -119,22 +119,20 @@ async function loadCompetencyLevelMap(): Promise<{
   levelToId: Record<number, string>;
   idToLevel: Record<string, number>;
 }> {
-  const { data } = await supabase.from('competency_levels').select('id, level, name').eq('status', 'active').order('level');
-  const levels: CompetencyLevelConfig[] = (data || []).map((s: any) => ({
-    id: s.id,
-    tenant_id: s.tenant_id,
-    level: s.level,
-    name: s.name,
-    label: s.label,
-    description: s.description || '',
-    score_range_min: s.score_range_min,
-    score_range_max: s.score_range_max,
-    min_questions: s.min_questions,
-    status: s.status,
-  }));
-  const levelToId = getLevelToIdMap(levels);
+  // Query already filters to active rows — build the maps directly from the
+  // returned rows without re-filtering by a `status` field we didn't need to select.
+  const { data } = await supabase
+    .from('competency_levels')
+    .select('id, level')
+    .eq('status', 'active')
+    .order('level');
+  const rows = (data || []) as { id: string; level: number }[];
+  const levelToId: Record<number, string> = {};
   const idToLevel: Record<string, number> = {};
-  for (const l of levels.filter((x) => x.status === 'active')) idToLevel[l.id] = l.level;
+  for (const r of rows) {
+    levelToId[r.level] = r.id;
+    idToLevel[r.id] = r.level;
+  }
   return { levelToId, idToLevel };
 }
 
