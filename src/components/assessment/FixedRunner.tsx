@@ -140,6 +140,27 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
 
+  const [topicMap, setTopicMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = Array.from(new Set(
+      (assessment.assessment_questions ?? [])
+        .map((aq) => questionMap.get(aq.question_id)?.topic_id)
+        .filter((v): v is string => !!v)
+    ));
+    const missing = ids.filter((id) => !(id in topicMap));
+    if (missing.length === 0) return;
+    (async () => {
+      const { data } = await supabase.from('skill_topics').select('id, name').in('id', missing);
+      if (data?.length) {
+        setTopicMap((prev) => {
+          const next = { ...prev };
+          for (const t of data as any[]) next[t.id] = t.name;
+          return next;
+        });
+      }
+    })();
+  }, [questionMap, assessment.assessment_questions]);
+
   const currentQuestions = assessment.assessment_questions;
 
   const initialAttempt = getAttemptForAssessment(assessment.id);
