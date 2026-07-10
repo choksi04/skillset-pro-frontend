@@ -57,7 +57,8 @@ interface AssignmentStore {
     domain_id?: string | null;
     overrideDuplicates?: boolean;
   }) => Promise<CreateAssignmentResult>;
-  revokeAssignment: (id: string) => Promise<void>;
+  revokeAssignment: (id: string, reason?: string) => Promise<void>;
+  revokeAssessment: (assessmentId: string, reason: string) => Promise<void>;
   updateStatusForAssessment: (assessmentId: string, status: AssignmentStatus) => Promise<void>;
 }
 
