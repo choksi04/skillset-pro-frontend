@@ -350,6 +350,9 @@ export default function AdaptiveRunner({
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+                          {entry.question.topic_id && topicMap[entry.question.topic_id] && (
+                            <Badge variant="outline" className="text-xs">{topicMap[entry.question.topic_id]}</Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
                         </div>
                         <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-2">{mcq.body}</p>
