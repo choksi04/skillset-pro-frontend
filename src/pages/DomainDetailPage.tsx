@@ -510,8 +510,15 @@ export default function DomainDetailPage() {
                 <p>No skills mapped yet.</p>
                 {canManage && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
               </div>
+            ) : !skillsInitialized ? (
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-32 w-full" />
+              </div>
             ) : mappedByCategory.size === 0 && skillSearch ? (
               <div className="text-center py-10 text-sm text-muted-foreground">No matching skills.</div>
+            ) : mappedByCategory.size === 0 ? (
+              <div className="text-center py-10 text-sm text-muted-foreground">Skills data unavailable. Try refreshing.</div>
             ) : (
               <div className="p-4 space-y-4">
                 {Array.from(mappedByCategory.entries()).map(([catId, { name: catName, skills: catSkills }]) => (
