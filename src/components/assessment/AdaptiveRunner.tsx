@@ -98,6 +98,13 @@ export default function AdaptiveRunner({
   const initRef = useRef(false);
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
+  const [topicMap, setTopicMap] = useState<Record<string, string>>({});
+
+  async function ensureTopic(topicId: string | null | undefined) {
+    if (!topicId || topicMap[topicId]) return;
+    const { data } = await supabase.from('skill_topics').select('id, name').eq('id', topicId).maybeSingle();
+    if (data) setTopicMap((prev) => ({ ...prev, [data.id]: data.name }));
+  }
 
   useEffect(() => {
     fetchSkills();
@@ -142,6 +149,7 @@ export default function AdaptiveRunner({
         return;
       }
       setCurrentQuestion(question);
+      ensureTopic(question.topic_id);
       setCurrentSkillId(skillState.skill_id);
       setCurrentLevel(skillState.currentLevel);
       setSelectedOption('');
@@ -342,6 +350,9 @@ export default function AdaptiveRunner({
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+                          {entry.question.topic_id && topicMap[entry.question.topic_id] && (
+                            <Badge variant="outline" className="text-xs">{topicMap[entry.question.topic_id]}</Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
                         </div>
                         <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-2">{mcq.body}</p>
@@ -407,6 +418,9 @@ export default function AdaptiveRunner({
         <div className="max-w-2xl space-y-5">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+            {currentQuestion.topic_id && topicMap[currentQuestion.topic_id] && (
+              <Badge variant="outline" className="text-xs">{topicMap[currentQuestion.topic_id]}</Badge>
+            )}
             <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
           </div>
 

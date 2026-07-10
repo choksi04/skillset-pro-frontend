@@ -140,6 +140,27 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
   const questionMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
 
+  const [topicMap, setTopicMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = Array.from(new Set(
+      (assessment.assessment_questions ?? [])
+        .map((aq) => questionMap.get(aq.question_id)?.topic_id)
+        .filter((v): v is string => !!v)
+    ));
+    const missing = ids.filter((id) => !(id in topicMap));
+    if (missing.length === 0) return;
+    (async () => {
+      const { data } = await supabase.from('skill_topics').select('id, name').in('id', missing);
+      if (data?.length) {
+        setTopicMap((prev) => {
+          const next = { ...prev };
+          for (const t of data as any[]) next[t.id] = t.name;
+          return next;
+        });
+      }
+    })();
+  }, [questionMap, assessment.assessment_questions]);
+
   const currentQuestions = assessment.assessment_questions;
 
   const initialAttempt = getAttemptForAssessment(assessment.id);
@@ -488,6 +509,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
               } else if (q) {
                 body = parseScenarioQuestion(q.question_text);
               }
+              const topicName = q?.topic_id ? topicMap[q.topic_id] : undefined;
               return (
                 <li key={aq.question_id} className="p-5 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start gap-4">
@@ -497,6 +519,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="secondary" className="text-xs">{skillName}</Badge>
+                        {topicName && <Badge variant="outline" className="text-xs">{topicName}</Badge>}
                         <Badge variant="outline" className="text-xs">{levelLabel}</Badge>
                         {q && <Badge variant="outline" className="text-xs">{questionTypeLabels[q.question_type]}</Badge>}
                         {flagged && <Badge className="text-xs bg-warning/15 text-warning border-warning/30 hover:bg-warning/15"><Flag size={10} className="mr-1" /> Flagged</Badge>}
@@ -669,6 +692,9 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
                     <span className="text-xs font-semibold text-muted-foreground">Question {currentIdx + 1} / {currentQuestions.length}</span>
                     <span className="text-muted-foreground/50">•</span>
                     <Badge variant="secondary" className="text-xs">{skillMap.get(currentAQ.skill_id)?.skill_name ?? 'Skill'}</Badge>
+                    {currentQuestion.topic_id && topicMap[currentQuestion.topic_id] && (
+                      <Badge variant="outline" className="text-xs">{topicMap[currentQuestion.topic_id]}</Badge>
+                    )}
                     <Badge variant="outline" className="text-xs">{dynamicLabels[currentAQ.target_level] || currentAQ.target_level}</Badge>
                     <Badge variant="outline" className="text-xs">{questionTypeLabels[currentQuestion.question_type]}</Badge>
                     <div className="ml-auto flex items-center gap-1.5">
