@@ -509,14 +509,6 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
               } else if (q) {
                 body = parseScenarioQuestion(q.question_text);
               }
-              return (
-                <li key={aq.question_id} className="p-5 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${answered ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
               const topicName = q?.topic_id ? topicMap[q.topic_id] : undefined;
               return (
                 <li key={aq.question_id} className="p-5 hover:bg-muted/30 transition-colors">
