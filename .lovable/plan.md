@@ -1,33 +1,40 @@
-# Kill remaining API calls on the Dashboard
+## Problem
+
+On `Domains > [Domain] > Skills`, after selecting skills via **Manage Skills** and saving, the newly-mapped skills sometimes do not appear in the tab, even though:
+- Mappings are correctly persisted in the database (`domain_skill_mappings` has the rows).
+- The tab counter `Skills (N)` shows a non-zero count.
 
 ## Root cause
 
-`DashboardPage.tsx` is already static — it makes no calls. The requests you see (`skills`, `skill_categories`, `domains`, `domain_skill_mappings`, `get_question_counts`, `assessment_templates`, `users`, `notifications`, `analytics`) come from the shared **app shell**, not the dashboard body:
+`DomainDetailPage.tsx` groups mapped skills by the legacy **denormalized name** field `skill.skill_category` (lines 88–101):
 
-| Request | Source |
-|---|---|
-| `skills`, `skill_categories`, `domains`, `domain_skill_mappings`, `get_question_counts`, `assessment_templates` | `src/components/layout/SetupProgress.tsx` (rendered inside `AppSidebar` for admins only) |
-| `users` | `AuthContext` — resolves the signed-in user |
-| `notifications` | Header bell (`NotificationDropdown`) |
-| `analytics` | Lovable preview telemetry ping (not an app API call) |
+```ts
+const cat = skill.skill_category || 'Uncategorized';
+if (!map.has(cat)) map.set(cat, []);
+```
 
-The heavy ones are all from `SetupProgress`. `AuthContext` and `NotificationDropdown` are required on every page (user identity + bell badge) and are lightweight single-row / small-list reads, so they stay.
+This is inconsistent with the rest of the app, which was migrated to use `category_id` as the source of truth (see `DomainSkillManager.tsx` — it groups by `s.category_id` and resolves the display name from `categories`). For skills where `skill_category` is empty or stale (common after category renames or migrations), the grouping still works but any downstream mismatch (empty string category, category deleted, name drift) can produce entries that render as blank/uncategorized rows or silently drop when a search filter is applied. It also diverges from the picker the user just used, causing perceived "missing" skills.
 
-## Changes
+Additionally, the empty-state branches only handle `currentMappings.length === 0` and `mappedByCategory.size === 0 && skillSearch` — if `skills` hasn't finished loading yet on first mount (race between `fetchDomains()` and `fetchSkills()`), the map is empty with no search, falling through to render nothing between the header and an empty body.
 
-**`src/components/layout/SetupProgress.tsx`** — stop fetching on mount. Instead:
+## Fix
 
-1. Remove the `useEffect` that calls `fetchSkills / fetchDomains / fetchQuestionCounts / fetchTemplates`.
-2. Only compute progress from data **already loaded** by other pages (skills, domains, templates, question counts). On a fresh dashboard visit nothing is loaded → the widget renders nothing (it already returns `null` until initialized).
-3. Add a one-time lazy trigger: fire the fetches only when the admin actually navigates to Skills / Domains / Templates / Question Bank (those pages already load their own data), so `SetupProgress` naturally lights up after any admin visits any operations page.
+Align `DomainDetailPage.tsx` Skills tab with the rest of the app:
 
-Net effect on `/dashboard`:
-- No `skills`, `skill_categories`, `domains`, `domain_skill_mappings`, `get_question_counts`, `assessment_templates` calls.
-- Only `users` (auth) and `notifications` (bell) remain, plus the Lovable `analytics` ping.
+1. **Group by `category_id`** (source of truth), resolving display name from `categories` via a `Map<id, name>`. Uncategorized skills (blank `category_id`) get a stable `__uncategorised__` bucket labeled "Uncategorized".
+2. **Update `mappedByCategory`** to key by `category_id` and carry `{ name, skills }` — same shape used in `DomainSkillManager`.
+3. **Search filter** matches on skill name or resolved category name (not the stale denormalized field).
+4. **Loading state**: when `currentMappings.length > 0` but the `skills` store hasn't loaded yet, render a small skeleton instead of an empty container.
 
-## Out of scope
+No changes to `domainStore`, `DomainSkillManager`, or the database — mappings are already correct in DB.
 
-- `AuthContext` `users` lookup and `NotificationDropdown` `notifications` query — required app-wide, not dashboard-specific.
-- `/~api/analytics` — Lovable preview instrumentation, not something we control from app code.
+## Files touched
 
-Confirm and I'll implement.
+- `src/pages/DomainDetailPage.tsx` — rewrite `mappedByCategory` memo + tab body rendering to group by `category_id`, add a loading skeleton for the not-yet-loaded case.
+
+## Verification
+
+- Open a domain with existing mappings (e.g. Business Analyst → 43 mappings). All 43 skills render grouped under their current category names.
+- Add a new skill via **Manage Skills** and save. It appears immediately in the Skills tab under the correct category.
+- Rename a category in Skill Library; the domain's Skills tab shows the new name without any skills disappearing.
+- Search by category name or skill name filters correctly; clearing the search restores the full list.

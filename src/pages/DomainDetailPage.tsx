@@ -42,7 +42,8 @@ export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { domains, mappings, fetchDomains, updateDomain, removeMapping, checkDomainDeletable, deleteDomain } = useDomainStore();
-  const { skills, fetchSkills, initialized } = useSkillStore();
+  const { skills, categories, fetchSkills, initialized: skillsInitialized } = useSkillStore();
+  const initialized = skillsInitialized;
   const { currentRole, user: authUser, refreshUser } = useAuth();
   const isAdmin = currentRole === 'admin';
 
@@ -87,18 +88,19 @@ export default function DomainDetailPage() {
 
   const mappedByCategory = useMemo(() => {
     const q = skillSearch.toLowerCase();
-    const map = new Map<string, Array<typeof skills[0] & { mappingId: string }>>();
+    const catNameById = new Map(categories.map((c) => [c.id, c.name]));
+    const map = new Map<string, { name: string; skills: Array<typeof skills[0] & { mappingId: string }> }>();
     currentMappings.forEach((m) => {
       const skill = skills.find((s) => s.id === m.skill_id);
-      if (skill) {
-        if (q && !skill.skill_name.toLowerCase().includes(q) && !(skill.skill_category || '').toLowerCase().includes(q)) return;
-        const cat = skill.skill_category || 'Uncategorized';
-        if (!map.has(cat)) map.set(cat, []);
-        map.get(cat)!.push({ ...skill, mappingId: m.id });
-      }
+      if (!skill) return;
+      const catId = skill.category_id || '__uncategorised__';
+      const catName = catNameById.get(skill.category_id) || 'Uncategorized';
+      if (q && !skill.skill_name.toLowerCase().includes(q) && !catName.toLowerCase().includes(q)) return;
+      if (!map.has(catId)) map.set(catId, { name: catName, skills: [] });
+      map.get(catId)!.skills.push({ ...skill, mappingId: m.id });
     });
     return map;
-  }, [currentMappings, skills, skillSearch]);
+  }, [currentMappings, skills, categories, skillSearch]);
 
   const domainLead = useMemo(() => {
     if (!domain?.domain_lead_id) return null;
@@ -508,12 +510,19 @@ export default function DomainDetailPage() {
                 <p>No skills mapped yet.</p>
                 {canManage && <p className="mt-1">Click "Manage Skills" to start mapping.</p>}
               </div>
+            ) : !skillsInitialized ? (
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-32 w-full" />
+              </div>
             ) : mappedByCategory.size === 0 && skillSearch ? (
               <div className="text-center py-10 text-sm text-muted-foreground">No matching skills.</div>
+            ) : mappedByCategory.size === 0 ? (
+              <div className="text-center py-10 text-sm text-muted-foreground">Skills data unavailable. Try refreshing.</div>
             ) : (
               <div className="p-4 space-y-4">
-                {Array.from(mappedByCategory.entries()).map(([catName, catSkills]) => (
-                  <div key={catName}>
+                {Array.from(mappedByCategory.entries()).map(([catId, { name: catName, skills: catSkills }]) => (
+                  <div key={catId}>
                     <div className="flex items-center gap-2 mb-2">
                       <FolderOpen size={14} className="text-primary shrink-0" />
                       <h3 className="text-sm font-semibold text-card-foreground">{catName}</h3>
