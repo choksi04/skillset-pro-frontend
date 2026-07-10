@@ -57,7 +57,8 @@ interface AssignmentStore {
     domain_id?: string | null;
     overrideDuplicates?: boolean;
   }) => Promise<CreateAssignmentResult>;
-  revokeAssignment: (id: string) => Promise<void>;
+  revokeAssignment: (id: string, reason?: string) => Promise<void>;
+  revokeAssessment: (assessmentId: string, reason: string) => Promise<void>;
   updateStatusForAssessment: (assessmentId: string, status: AssignmentStatus) => Promise<void>;
 }
 
@@ -437,18 +438,59 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     return result;
   },
 
-  revokeAssignment: async (id) => {
+  revokeAssignment: async (id, reason) => {
     const userId = getCurrentUserId();
     const now = new Date().toISOString();
+    const assignment = get().assignments.find((a) => a.id === id);
+
+    // If an assessment has already been generated, soft-delete it and its attempts too.
+    if (assignment?.assessment_id) {
+      try {
+        // Soft-delete attempts for this assessment
+        await supabase
+          .from('assessment_attempts')
+          .update({ deleted_on: now, deleted_by: userId, modified_at: now, modified_by: userId })
+          .eq('assessment_id', assignment.assessment_id)
+          .is('deleted_on', null);
+        // Soft-delete the assessment itself
+        await useAssessmentStore.getState().softDeleteAssessment(assignment.assessment_id);
+      } catch (e) {
+        console.error('Failed to soft-delete linked assessment during revoke:', e);
+      }
+    }
+
     const { error } = await supabase
       .from('assessment_assignments')
-      .update({ deleted_on: now, deleted_by: userId, modified_at: now, modified_by: userId })
+      .update({
+        deleted_on: now,
+        deleted_by: userId,
+        modified_at: now,
+        modified_by: userId,
+        revoke_reason: reason ?? null,
+      })
       .eq('id', id);
     if (error) {
       console.error('Failed to revoke assignment:', error);
       throw error;
     }
     set((state) => ({ assignments: state.assignments.filter((a) => a.id !== id) }));
+  },
+
+  revokeAssessment: async (assessmentId, reason) => {
+    const assignment = get().getAssignmentByAssessmentId(assessmentId);
+    if (assignment) {
+      await get().revokeAssignment(assignment.id, reason);
+      return;
+    }
+    // No assignment link — soft-delete just the assessment + its attempts.
+    const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+    await supabase
+      .from('assessment_attempts')
+      .update({ deleted_on: now, deleted_by: userId, modified_at: now, modified_by: userId })
+      .eq('assessment_id', assessmentId)
+      .is('deleted_on', null);
+    await useAssessmentStore.getState().softDeleteAssessment(assessmentId);
   },
 
   updateStatusForAssessment: async (assessmentId, status) => {

@@ -1,63 +1,69 @@
-# Adaptive assessment — "questions don't load" fix
 
-## What I found from the DB
+# Revoke Assessment — Plan
 
-For the currently-failing template `.Net Skill Assessment Test 2` (`0fee3693…`):
+## Goal
+Let Admins/Managers revoke any assessment (new, in-progress, completed, or buggy) so a fresh one can be assigned from the same template. Existing "revoke" only works on `new` assignments via the Template sheet — extend it to any state and expose it from the assessment detail + team list.
 
-- All 5 template skills exist and have **45–50 published MCQs** each.
-- All 3 in-progress attempts have `adaptive_state.initialized = true` with **5 skills**.
-- 2 of 3 attempts have **zero** `assessment_questions` rows → the runner never successfully pulled the first question.
+## Behavior
 
-So init works. The "Skills: 0" on the detail card is cosmetic (`assessment.skill_ids` stays empty until the first question is persisted). The real failure is downstream — either `getNextQuestion` throws, or the runner never mounts (adaptive path not wired on the detail page's "Resume" button, or an error is swallowed).
+- **Who can revoke:** Admin always; Manager only for their team members. Employees cannot.
+- **What gets revoked:**
+  - `assessment_assignments` → `status = 'revoked'`, soft-deleted (`deleted_on`, `deleted_by`).
+  - `assessments` → soft-deleted (`deleted_on`).
+  - `assessment_attempts` for that assessment → soft-deleted (so list pages/scoring stop seeing them).
+  - `attempt_answers`, `ai_evaluations`, `attempt_skill_scores`, `assessment_questions`, `manager_reviews` → left in place (already scoped by attempt/assessment id and hidden once parent is soft-deleted; no need to touch, keeps audit trail).
+  - `notifications` referencing the assessment → left in place but the action link will 404 gracefully (existing behavior for deleted assessments).
+- **After revoke:** the template's "already assigned" guard clears (revoked/soft-deleted rows are excluded from `ACTIVE_STATUSES` filter), so Admin can immediately re-assign the same template to the same employee.
+- **Confirmation:** blocking `AlertDialog` — "Revoke this assessment? The employee will lose all progress and answers. This cannot be undone." with a required reason textarea (stored on the assignment as `revoke_reason`).
+- **Audit:** reason + `deleted_by` + `deleted_on` captured on the assignment row; assessment/attempt keep `deleted_by`.
 
-## Root causes that can silently block "next question"
+## DB change
 
-From `adaptiveEngineStore.getNextQuestion`:
+One migration:
+- Add `revoke_reason TEXT` to `assessment_assignments`.
+- Extend the `status` check/enum to include `'revoked'` (currently: new, in_progress, evaluated, verified) — inspect current constraint, drop & recreate with `'revoked'` added.
 
-1. `loadCompetencyLevelMap()` returns an empty `levelToId` → every level lookup fails and each skill is immediately marked `done` → the recursion returns `null` question with no toast.
-2. `assessment_questions` insert fails (e.g., missing `tenant_id`, RLS, or a unique constraint from a leftover row) → error swallowed by the caller.
-3. `AdaptiveRunner` `initAdaptiveAttempt` returns `{ state: null, reason }` — the runner shows a toast, but the detail page still shows "Resume Assessment" so the user thinks nothing happened.
-4. `AssessmentDetailPage` may still route in-progress adaptive attempts through `FixedRunner` (which reads `assessment.assessment_questions` — empty for a fresh adaptive attempt → "no questions" screen).
+## Code changes
 
-## Plan
+- **`src/stores/assignmentStore.ts`**
+  - Add `revokeAssessment(assignmentId, reason)` that:
+    1. Loads the assignment, resolves `assessment_id`.
+    2. Soft-deletes `assessment_attempts` for that assessment.
+    3. Soft-deletes the `assessments` row.
+    4. Updates the assignment: `status='revoked'`, `deleted_on/by`, `revoke_reason`.
+    5. Updates local zustand state and calls `assessmentStore.softDeleteAssessment` equivalent to keep caches consistent.
+  - Keep the existing `revokeAssignment` for the "not-yet-started" path (only removes the assignment) — or fold both into one. Simpler: single `revokeAssessment` handling both cases (skip attempt/assessment cleanup when no `assessment_id`).
+  - Ensure `ACTIVE_STATUSES` excludes `'revoked'` (it already excludes anything not in the list — verify).
 
-### 1. Diagnose the live assessment (no code)
+- **`src/pages/AssessmentDetailPage.tsx`**
+  - Add a red "Revoke assessment" button in the header (admin/manager only, hidden for the assessment owner unless admin). Opens confirm dialog with reason textarea. On success → toast + navigate back to `/team-assessments`.
 
-Query `competency_levels` (active + level→id map) and inspect the exact adaptive attempt row from the browser to confirm which of #1–#4 is hitting. Report which case.
+- **`src/pages/TeamAssessmentsPage.tsx`**
+  - Add "Revoke" row action in the actions menu for every non-revoked row.
 
-### 2. Surface the real reason in the UI
+- **`src/components/templates/TemplateAssignmentsSheet.tsx`**
+  - Route its existing Revoke button through the new `revokeAssessment` so it works for started attempts too. Update the visible label/tooltip: "Revoke (loses progress)" when `assessment_id` is set.
 
-`src/components/assessment/AdaptiveRunner.tsx`
-- Replace the generic `toast.error('Failed to initialize…')` with the actual `reason` string on-screen: render an inline error card ("This adaptive assessment can't start: <reason>. Contact your admin.") instead of an invisible toast.
-- Add a matching inline error when `getNextQuestion` returns `null` on the very first call (before any answer) — currently it silently opens the empty Review panel.
+- **`src/stores/assessmentStore.ts` / `attemptStore.ts`**
+  - No API changes needed; the soft-delete already filters via `deleted_on IS NULL`. Verify `fetchAttemptsForAssessment` filters on `deleted_on` — add the filter if missing so revoked attempts stop appearing.
 
-`src/pages/AssessmentDetailPage.tsx`
-- Fix the "Skills: 0" header for adaptive attempts: read skill count from `attempt.adaptive_state.skills.length` when `is_adaptive` and no `assessment_questions` yet.
-- Ensure the "Resume Assessment" button for `is_adaptive=true` mounts `AdaptiveRunner`, not `FixedRunner`. (Verify — if already correct, no change.)
+## Cross-impact checks
 
-### 3. Harden `getNextQuestion`
+1. **Re-assign flow** — `assignTemplate` guard uses `ACTIVE_STATUSES.includes(a.status)`; `'revoked'` isn't in it, so re-assignment succeeds. ✓
+2. **Skill Registry** — reads assessment scores only from non-deleted attempts; revoke hides prior scores, so the employee's registry status reverts to "in progress / not assessed" for that skill until the new attempt completes. Confirm no store fetches ignore `deleted_on`.
+3. **Manager Review queue** — filters by assessment `status` and non-deleted; revoked assessment disappears from the queue. ✓
+4. **Notifications** — old notification links to a soft-deleted assessment. `AssessmentDetailPage` already renders NotFound when the row is missing. ✓
+5. **Analytics/HR dashboard** — currently disabled (under construction), no impact.
+6. **Audit** — reason + user captured; assessment_questions/answers rows remain in DB (not visible via app due to soft-delete filters) so audit history is preserved.
+7. **Duplicate revokes** — action disabled if `status === 'revoked'` or `deleted_on IS NOT NULL`.
 
-`src/stores/adaptiveEngineStore.ts`
-- If `loadCompetencyLevelMap()` returns empty, throw with a clear message instead of silently marking every skill `done`.
-- Wrap the `assessment_questions` insert with `.select().maybeSingle()` and surface the error to the caller (return `{ error }` on the shape) so `AdaptiveRunner` can display it.
-- Ensure the insert includes `tenant_id` (fetched from the assessment row) to avoid NOT-NULL failures.
+## Verification
 
-### 4. Preflight validation on template assign
-
-`src/components/templates/AssignTemplateDialog.tsx` (or the assignment store)
-- Before creating assessments, for each target employee resolve the same candidate skills the engine would use, and check:
-  - `assessment_template_skills` (custom mode) is non-empty, **or** `domain_skill_mappings` fallback is non-empty.
-  - At least one candidate skill has a published MCQ (`question_type='mcq'`, `status='published'`, `deleted_on IS NULL`).
-  - `competency_levels` has at least one active level.
-- Block the assign with a specific toast: "Template has 0 skills / 0 MCQs — cannot assign."
-
-### 5. Verification
-
-- Manual: assign the same template again, resume, first MCQ renders. Then temporarily disable an MCQ to force the empty-pool path and confirm the inline error reads clearly.
-- SQL spot-check: after Resume, `assessment_questions` has one row.
+- Manual: revoke a `new` assignment → template can be re-assigned. Revoke an `in_progress` assessment → detail page 404s for employee, assignment row shows revoked, re-assign works, new attempt starts clean. Revoke a `completed` assessment → registry no longer shows that score, re-assign works.
+- SQL: after revoke, `SELECT * FROM assessments WHERE id=… ` has `deleted_on` set; attempts too; assignment shows `status='revoked'`.
+- Regression: ensure `AssessmentsPage` (My Assessments) and `TeamAssessmentsPage` don't list revoked rows.
 
 ## Out of scope
-
-- Changing adaptive scoring/level logic.
-- Rewriting the runner UI.
-- Backfilling old broken attempts (once fix ships, admin can re-assign).
+- Undo/restore of revoked assessments.
+- Bulk revoke.
+- Re-using the same assignment row (we create a new assignment on re-assign — cleaner audit).

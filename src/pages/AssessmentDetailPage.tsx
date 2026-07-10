@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
@@ -80,7 +81,7 @@ export default function AssessmentDetailPage() {
   const { reviews, fetchReviews } = useReviewStore();
   const { submissions, fetchRegistry, markAssessmentGenerated } = useRegistryStore();
   const { templates, fetchTemplates } = useTemplateStore();
-  const { assignments, fetchAssignments, getAssignmentByAssessmentId } = useAssignmentStore();
+  const { assignments, fetchAssignments, getAssignmentByAssessmentId, revokeAssessment } = useAssignmentStore();
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
@@ -92,6 +93,9 @@ export default function AssessmentDetailPage() {
   const [runnerActive, setRunnerActive] = useState(false);
   const [startingRunner, setStartingRunner] = useState(false);
   const [confirmReattempt, setConfirmReattempt] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [revoking, setRevoking] = useState(false);
 
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
 
@@ -153,6 +157,7 @@ export default function AssessmentDetailPage() {
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === "admin" || user?.role === "manager";
   const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
+  const canRevoke = !isOwner && isAdmin && !!assessment;
   const isPendingEval =
     attempt?.status === "submitted" && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === "evaluated" || attempt?.status === "reviewed";
@@ -345,6 +350,27 @@ export default function AssessmentDetailPage() {
       setStartingRunner(false);
     }
   };
+
+  const handleRevoke = async () => {
+    if (!assessment) return;
+    const reason = revokeReason.trim();
+    if (!reason) {
+      toast.error("Please provide a reason for revoking this assessment.");
+      return;
+    }
+    setRevoking(true);
+    try {
+      await revokeAssessment(assessment.id, reason);
+      toast.success("Assessment revoked. It can now be re-assigned.");
+      setConfirmRevoke(false);
+      navigate(backPath);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to revoke assessment");
+    } finally {
+      setRevoking(false);
+    }
+  };
+
 
   const handleReattempt = async () => {
     setConfirmReattempt(false);
@@ -584,6 +610,19 @@ export default function AssessmentDetailPage() {
             <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} /> Regenerate Assessment
           </Button>
         )}
+
+        {/* Admin/Manager: Revoke assessment at any stage */}
+        {canRevoke && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setRevokeReason(""); setConfirmRevoke(true); }}
+            className="gap-1.5 text-destructive hover:text-destructive"
+            disabled={revoking}
+          >
+            {revoking ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Revoke Assessment
+          </Button>
+        )}
       </div>
 
       {/* Result Summary — terminal attempts only */}
@@ -811,6 +850,41 @@ export default function AssessmentDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirm Revoke Dialog */}
+      <AlertDialog open={confirmRevoke} onOpenChange={(o) => { if (!revoking) setConfirmRevoke(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this assessment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This soft-deletes the assessment, its attempts, and the assignment record so the
+              template can be assigned again to this employee. Answers and reviews stay in the
+              database for audit purposes but will no longer be visible in listings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-foreground">Reason <span className="text-destructive">*</span></label>
+            <Textarea
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="Why is this assessment being revoked? (e.g. wrong template, buggy questions, stuck in progress)"
+              rows={3}
+              disabled={revoking}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleRevoke(); }}
+              disabled={revoking || !revokeReason.trim()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {revoking ? "Revoking…" : "Revoke Assessment"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Add Question Dialog */}
       <AddQuestionDialog
