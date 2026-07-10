@@ -42,6 +42,7 @@ import {
   Bell,
   CheckCircle2,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
