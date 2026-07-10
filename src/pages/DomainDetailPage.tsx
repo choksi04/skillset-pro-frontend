@@ -515,7 +515,7 @@ export default function DomainDetailPage() {
             ) : (
               <div className="p-4 space-y-4">
                 {Array.from(mappedByCategory.entries()).map(([catId, { name: catName, skills: catSkills }]) => (
-                  <div key={catName}>
+                  <div key={catId}>
                     <div className="flex items-center gap-2 mb-2">
                       <FolderOpen size={14} className="text-primary shrink-0" />
                       <h3 className="text-sm font-semibold text-card-foreground">{catName}</h3>
