@@ -10,7 +10,8 @@ export type AssignmentStatus =
   | 'in_progress'
   | 'submitted'
   | 'evaluated'
-  | 'verified';
+  | 'verified'
+  | 'revoked';
 
 export const assignmentStatusConfig: Record<AssignmentStatus, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-muted text-muted-foreground' },
@@ -18,6 +19,7 @@ export const assignmentStatusConfig: Record<AssignmentStatus, { label: string; c
   submitted: { label: 'Submitted', color: 'bg-primary/15 text-primary border-primary/20' },
   evaluated: { label: 'Evaluated', color: 'bg-success/15 text-success border-success/20' },
   verified: { label: 'Verified', color: 'bg-success/15 text-success border-success/20' },
+  revoked: { label: 'Revoked', color: 'bg-destructive/15 text-destructive border-destructive/20' },
 };
 
 export interface AssessmentAssignment {
