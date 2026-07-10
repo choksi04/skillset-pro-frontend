@@ -98,6 +98,13 @@ export default function AdaptiveRunner({
   const initRef = useRef(false);
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
+  const [topicMap, setTopicMap] = useState<Record<string, string>>({});
+
+  async function ensureTopic(topicId: string | null | undefined) {
+    if (!topicId || topicMap[topicId]) return;
+    const { data } = await supabase.from('skill_topics').select('id, name').eq('id', topicId).maybeSingle();
+    if (data) setTopicMap((prev) => ({ ...prev, [data.id]: data.name }));
+  }
 
   useEffect(() => {
     fetchSkills();
