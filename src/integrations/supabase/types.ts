@@ -891,7 +891,7 @@ export type Database = {
           modified_at: string | null
           modified_by: string | null
           review_id: string
-          self_rating: number
+          self_rating: number | null
           skill_id: string
           tenant_id: string
         }
@@ -910,7 +910,7 @@ export type Database = {
           modified_at?: string | null
           modified_by?: string | null
           review_id: string
-          self_rating: number
+          self_rating?: number | null
           skill_id: string
           tenant_id: string
         }
@@ -929,7 +929,7 @@ export type Database = {
           modified_at?: string | null
           modified_by?: string | null
           review_id?: string
-          self_rating?: number
+          self_rating?: number | null
           skill_id?: string
           tenant_id?: string
         }
@@ -1126,7 +1126,7 @@ export type Database = {
           manager_adjusted_level: number | null
           manager_comment: string | null
           review_id: string
-          self_rating: number
+          self_rating: number | null
           skill_id: string
           verified_level: number | null
         }
@@ -1138,7 +1138,7 @@ export type Database = {
           manager_adjusted_level?: number | null
           manager_comment?: string | null
           review_id: string
-          self_rating: number
+          self_rating?: number | null
           skill_id: string
           verified_level?: number | null
         }
@@ -1150,7 +1150,7 @@ export type Database = {
           manager_adjusted_level?: number | null
           manager_comment?: string | null
           review_id?: string
-          self_rating?: number
+          self_rating?: number | null
           skill_id?: string
           verified_level?: number | null
         }

@@ -4,7 +4,7 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useRegistryStore, RatingLevel } from '@/stores/registryStore';
+import { useRegistryStore } from '@/stores/registryStore';
 import { useCompetencyLevelStore, getFormattedLevelLabel, getShortLevelLabel, getLevelColorClass } from '@/stores/competencyLevelStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -71,7 +71,8 @@ function LevelBadge({ level }: { level: number }) {
 
 // ── Delta Indicator ──
 
-function DeltaIndicator({ self, final: fin }: { self: number; final: number }) {
+function DeltaIndicator({ self, final: fin }: { self: number | null; final: number }) {
+  if (self == null) return <span className="text-xs text-muted-foreground">—</span>;
   const diff = fin - self;
   if (diff === 0) return <span className="text-xs text-muted-foreground">—</span>;
   return (
@@ -90,7 +91,7 @@ function exportToCSV(entries: OfficialSkillEntry[], skillMap: Map<string, { skil
     e.tenant_id,
     skillMap.get(e.skill_id)?.skill_name ?? e.skill_id,
     e.skill_id,
-    `L${e.self_rating}`,
+    e.self_rating == null ? 'Not submitted' : `L${e.self_rating}`,
     `L${e.ai_level}`,
     `L${e.final_level}`,
     e.assessment_reference,
@@ -190,7 +191,11 @@ function RegistryTab({
                       <td className="py-2.5 px-4 text-xs text-foreground font-medium">{entry.employee_id}</td>
                       <td className="py-2.5 px-4 text-xs text-foreground">{skill?.skill_name ?? entry.skill_id}</td>
                       <td className="py-2.5 px-4 text-center">
-                        <Badge variant="outline" className="text-[10px]">L{entry.self_rating}</Badge>
+                        {entry.self_rating == null ? (
+                          <Badge variant="secondary" className="text-[10px]">Not submitted</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">L{entry.self_rating}</Badge>
+                        )}
                       </td>
                       <td className="py-2.5 px-4 text-center">
                         <Badge variant="outline" className="text-[10px]">L{entry.ai_level}</Badge>

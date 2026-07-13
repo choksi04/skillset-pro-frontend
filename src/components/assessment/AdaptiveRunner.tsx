@@ -3,10 +3,10 @@ import { Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAdaptiveEngineStore, gradeMCQ } from '@/stores/adaptiveEngineStore';
 import { useReviewStore } from '@/stores/reviewStore';
-import { useRegistryStore } from '@/stores/registryStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelByNumber } from '@/stores/competencyLevelStore';
 import { Question } from '@/stores/questionStore';
+import { getLatestSelfRatings } from '@/lib/selfRatings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -168,10 +168,7 @@ export default function AdaptiveRunner({
 
       // Auto-create manager review (mirror of the legacy flow in AssessmentExecPage)
       try {
-        const { submissions } = useRegistryStore.getState();
-        const submission = submissions.find((s) => s.employee_id === employeeId);
-        const selfRatings =
-          submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
+        const selfRatings = await getLatestSelfRatings(employeeId, assessment.domain_id);
 
         let reviewerId = '';
         const { data: domainRow } = await supabase

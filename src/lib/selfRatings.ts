@@ -7,12 +7,11 @@ export interface SelfRating {
 
 /**
  * Load the employee's latest self-ratings from `skill_registry_items`.
- * Prefers a registry scoped to `domainId` when provided, otherwise picks the
- * most recent non-deleted registry (submitted > draft, latest version first).
+ * Prefers a registry scoped to `domainId` when provided, and only uses the
+ * most recent submitted registry.
  *
- * Returns an empty array if no registry exists — callers should apply their
- * own fallback (e.g. domain skills at a default level) rather than assuming
- * every skill has a rating.
+ * Returns an empty array if no submitted registry exists — callers should not
+ * assume a default self-rating.
  */
 export async function getLatestSelfRatings(
   employeeId: string,
@@ -24,6 +23,7 @@ export async function getLatestSelfRatings(
     .from('skill_registries')
     .select('id, status, version_number, submitted_at, created_at')
     .eq('employee_id', employeeId)
+    .eq('status', 'submitted')
     .is('deleted_on', null);
 
   if (domainId) query = query.eq('domain_id', domainId);
@@ -31,14 +31,13 @@ export async function getLatestSelfRatings(
   const { data: regs, error } = await query;
   if (error || !regs || regs.length === 0) return [];
 
-  // Prefer submitted, then highest version_number, then latest created.
+  // Latest submitted version first.
   const sorted = [...regs].sort((a: any, b: any) => {
-    const sa = a.status === 'submitted' ? 1 : 0;
-    const sb = b.status === 'submitted' ? 1 : 0;
-    if (sa !== sb) return sb - sa;
     if ((b.version_number ?? 0) !== (a.version_number ?? 0)) {
       return (b.version_number ?? 0) - (a.version_number ?? 0);
     }
+    const submittedDiff = new Date(b.submitted_at ?? 0).getTime() - new Date(a.submitted_at ?? 0).getTime();
+    if (submittedDiff !== 0) return submittedDiff;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 

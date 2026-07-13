@@ -56,6 +56,7 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
   const [commentOpen, setCommentOpen] = useState(false);
 
   const isAdjusted = entry.verified_level !== entry.ai_calculated_level;
+  const selfRating = entry.self_rating;
 
   const handleLevelChange = (val: string) => {
     const level = Number(val);
@@ -75,7 +76,13 @@ function SkillReviewRow({ entry, skillName, reviewId, isCompleted }: { entry: Sk
     <>
       <tr className="border-b border-border hover:bg-muted/30 transition-colors">
         <td className="py-3 px-4"><span className="text-sm font-medium text-foreground">{skillName}</span></td>
-        <td className="py-3 px-4 text-center"><Badge variant="outline" className="text-xs">L{entry.self_rating} – {ratingLabels[entry.self_rating] ?? `Level ${entry.self_rating}`}</Badge></td>
+        <td className="py-3 px-4 text-center">
+          {selfRating == null ? (
+            <Badge variant="secondary" className="text-xs">Not submitted</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">L{selfRating} – {ratingLabels[selfRating] ?? `Level ${selfRating}`}</Badge>
+          )}
+        </td>
         <td className="py-3 px-4">
           <div className="flex flex-col items-center gap-1">
             <Badge className={`text-xs ${getLevelColorClass(entry.ai_calculated_level)}`}>L{entry.ai_calculated_level}</Badge>

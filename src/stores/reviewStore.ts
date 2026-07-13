@@ -6,7 +6,7 @@ import { getCurrentUserId } from '@/lib/audit';
 
 export interface SkillReviewEntry {
   skill_id: string;
-  self_rating: RatingLevel;
+  self_rating: RatingLevel | null;
   ai_calculated_level: number;
   ai_score: number;
   verified_level: number;
@@ -53,7 +53,7 @@ export interface OfficialSkillEntry {
   manager_comments: string;
   timestamp: string;
   cycle: string;
-  self_rating: RatingLevel;
+  self_rating: RatingLevel | null;
   ai_level: number;
   review_id: string;
 }
@@ -77,7 +77,7 @@ interface ReviewStore {
     domain_id: string;
     reviewer_id: string;
     skill_scores: SkillScore[];
-    self_ratings: { skill_id: string; rating: RatingLevel }[];
+    self_ratings: { skill_id: string; rating: number | null | undefined }[];
   }) => Promise<string>;
 
   setVerifiedLevel: (reviewId: string, skillId: string, level: number) => Promise<void>;
@@ -134,7 +134,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         status: r.status as any, created_at: r.created_at, updated_at: r.updated_at, completed_at: r.completed_at,
         skill_reviews: skillEntries.filter((se: any) => se.review_id === r.id).map((se: any) => ({
           skill_id: se.skill_id,
-          self_rating: se.self_rating as RatingLevel,
+          self_rating: se.self_rating == null ? null : se.self_rating as RatingLevel,
           ai_calculated_level: se.ai_calculated_level,
           ai_score: se.ai_score,
           verified_level: (se as any).verified_level ?? se.ai_calculated_level,
@@ -152,7 +152,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
         id: e.id, employee_id: e.employee_id, tenant_id: e.tenant_id, skill_id: e.skill_id,
         final_level: e.final_level, assessment_reference: e.assessment_reference,
         manager_comments: e.manager_comments || '', timestamp: e.created_at, cycle: e.cycle,
-        self_rating: e.self_rating as RatingLevel, ai_level: e.ai_level, review_id: e.review_id,
+        self_rating: e.self_rating == null ? null : e.self_rating as RatingLevel, ai_level: e.ai_level, review_id: e.review_id,
       }));
 
         set({ reviews, notifications, officialEntries, loading: false, initialized: true });
@@ -175,9 +175,10 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
     const userId = getCurrentUserId();
     const skillReviews: SkillReviewEntry[] = params.skill_scores.map((ss) => {
       const selfRating = params.self_ratings.find((r) => r.skill_id === ss.skill_id);
+      const submittedRating = selfRating?.rating == null ? null : Number(selfRating.rating) as RatingLevel;
       return {
         skill_id: ss.skill_id,
-        self_rating: (selfRating?.rating ?? 3) as RatingLevel,
+        self_rating: submittedRating,
         ai_calculated_level: ss.calculated_level,
         ai_score: ss.avg_score,
         verified_level: ss.calculated_level,
@@ -310,7 +311,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
           final_level: e.final_level, assessment_reference: e.assessment_reference,
           manager_comments: e.manager_comments, cycle: e.cycle, self_rating: e.self_rating,
           ai_level: e.ai_level, review_id: e.review_id, created_by: userId,
-        }))
+        } as any))
       );
     }
 
