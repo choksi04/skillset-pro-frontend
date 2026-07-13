@@ -6,9 +6,9 @@ import { useCompetencyLevelStore, getLevelLabelsByIdMap } from '@/stores/compete
 import { useSkillStore } from '@/stores/skillStore';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import { useReviewStore } from '@/stores/reviewStore';
-import { useRegistryStore } from '@/stores/registryStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getLatestSelfRatings } from '@/lib/selfRatings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -371,9 +371,7 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
 
     const updatedAttempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
     if (updatedAttempt && updatedAttempt.skill_scores.length > 0) {
-      const { submissions } = useRegistryStore.getState();
-      const submission = submissions.find((s) => s.employee_id === employeeId);
-      const selfRatings = submission?.ratings?.map((r) => ({ skill_id: r.skill_id, rating: r.rating })) ?? [];
+      const selfRatings = await getLatestSelfRatings(employeeId, assessment.domain_id);
 
       let reviewerId = '';
       const { data: domainRow } = await supabase.from('domains').select('domain_lead_id').eq('id', assessment.domain_id).single();
