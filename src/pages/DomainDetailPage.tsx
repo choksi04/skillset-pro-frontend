@@ -231,9 +231,15 @@ export default function DomainDetailPage() {
 
   const handleRemoveSkill = async () => {
     if (!removeSkillTarget) return;
-    await removeMapping(removeSkillTarget.mappingId);
-    toast.success(`Skill "${removeSkillTarget.skillName}" removed from domain.`);
-    setRemoveSkillTarget(null);
+    try {
+      await removeMapping(removeSkillTarget.mappingId);
+      await fetchDomains({ force: true });
+      toast.success(`Skill "${removeSkillTarget.skillName}" removed from domain.`);
+      setRemoveSkillTarget(null);
+    } catch (err) {
+      console.error('Failed to remove skill mapping:', err);
+      toast.error('Failed to remove skill from domain. Please try again.');
+    }
   };
 
   const handleOpenDelete = async () => {
