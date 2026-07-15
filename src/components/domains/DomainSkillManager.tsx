@@ -20,7 +20,7 @@ interface DomainSkillManagerProps {
 }
 
 export default function DomainSkillManager({ domainId, open, onOpenChange }: DomainSkillManagerProps) {
-  const { mappings, addMapping, removeMapping } = useDomainStore();
+  const { mappings, addMapping, removeMapping, fetchDomains } = useDomainStore();
   const { skills, categories } = useSkillStore();
   const { user } = useAuth();
 
@@ -125,10 +125,13 @@ export default function DomainSkillManager({ domainId, open, onOpenChange }: Dom
           await addMapping({ domain_id: domainId, skill_id: skillId, tenant_id: user?.tenant_id ?? 'tenant-001', skill_weight: 1 });
         }
       }
+      await fetchDomains({ force: true });
       toast.success('Skill mappings saved successfully.');
       onOpenChange(false);
     } catch (err) {
-      toast.error('Failed to save skill mappings.');
+      console.error('Failed to save skill mappings:', err);
+      await fetchDomains({ force: true });
+      toast.error('Some skill mappings could not be saved. Please try again.');
     } finally {
       setSaving(false);
     }
