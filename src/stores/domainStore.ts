@@ -123,10 +123,74 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
   addMapping: async (mapping) => {
     const id = `dsm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const userId = getCurrentUserId();
+    const now = new Date().toISOString();
+
+    const { data: existing, error: existingError } = await supabase
+      .from('domain_skill_mappings')
+      .select('id, domain_id, skill_id, tenant_id, skill_weight, created_at, deleted_on')
+      .eq('domain_id', mapping.domain_id)
+      .eq('skill_id', mapping.skill_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('Failed to check existing mapping:', existingError);
+      throw existingError;
+    }
+
+    if (existing && !(existing as any).deleted_on) {
+      set((state) => {
+        if (state.mappings.some((m) => m.id === (existing as any).id)) return state;
+        return {
+          mappings: [...state.mappings, {
+            id: (existing as any).id,
+            domain_id: (existing as any).domain_id,
+            skill_id: (existing as any).skill_id,
+            tenant_id: (existing as any).tenant_id,
+            skill_weight: Number((existing as any).skill_weight),
+            created_at: (existing as any).created_at,
+          }],
+        };
+      });
+      return;
+    }
+
+    if (existing && (existing as any).deleted_on) {
+      const { data, error } = await supabase
+        .from('domain_skill_mappings')
+        .update({
+          tenant_id: mapping.tenant_id,
+          skill_weight: mapping.skill_weight,
+          deleted_on: null,
+          deleted_by: null,
+          modified_by: userId,
+          modified_at: now,
+        })
+        .eq('id', (existing as any).id)
+        .select('id, domain_id, skill_id, tenant_id, skill_weight, created_at')
+        .single();
+      if (error) { console.error('Failed to restore mapping:', error); throw error; }
+      set((state) => ({
+        mappings: [
+          ...state.mappings.filter((m) => m.id !== (data as any).id),
+          {
+            id: (data as any).id,
+            domain_id: (data as any).domain_id,
+            skill_id: (data as any).skill_id,
+            tenant_id: (data as any).tenant_id,
+            skill_weight: Number((data as any).skill_weight),
+            created_at: (data as any).created_at,
+          },
+        ],
+      }));
+      return;
+    }
+
     const { data, error } = await supabase.from('domain_skill_mappings').insert({
       id, ...mapping, created_by: userId,
-    }).select().single();
-    if (error) { console.error('Failed to add mapping:', error); return; }
+    }).select('id, domain_id, skill_id, tenant_id, skill_weight, created_at').single();
+    if (error) { console.error('Failed to add mapping:', error); throw error; }
     set((state) => ({
       mappings: [...state.mappings, { id, ...mapping, created_at: (data as any).created_at }],
     }));
@@ -138,7 +202,7 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
     const { error } = await supabase.from('domain_skill_mappings').update({
       deleted_on: now, deleted_by: userId,
     }).eq('id', id);
-    if (error) { console.error('Failed to remove mapping:', error); return; }
+    if (error) { console.error('Failed to remove mapping:', error); throw error; }
     set((state) => ({ mappings: state.mappings.filter((m) => m.id !== id) }));
   },
 
