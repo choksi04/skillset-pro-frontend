@@ -130,6 +130,7 @@ export const useDomainStore = create<DomainStore>((set, get) => ({
       .select('id, domain_id, skill_id, tenant_id, skill_weight, created_at, deleted_on')
       .eq('domain_id', mapping.domain_id)
       .eq('skill_id', mapping.skill_id)
+      .order('deleted_on', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
