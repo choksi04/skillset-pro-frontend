@@ -1,56 +1,39 @@
-## Workstream 1 — Next atomic fix
+## Root cause (verified against the database)
 
-### What I re-verified in the current code
+The registries themselves are fine. I checked the data: the submitted registries in question have `rated = total_active_skills` (e.g. 21 of 21), so the correct status is **Review Pending** — which is exactly what the Employee view shows.
 
-The previous fix landed and is holding. `computeRegistryMetrics` is now consumed by all four views:
+The difference is in **how many registry items each view actually loads**:
 
-| File | Uses helper |
-|---|---|
-| `src/pages/SkillRegistryPage.tsx` (hero + history rows) | yes (lines 234, 384) |
-| `src/pages/SkillRegistryDetailPage.tsx` | yes (line 403) |
-| `src/pages/TeamRegistryPage.tsx` | yes (line 153) |
-| `src/pages/TeamRegistryDetailPage.tsx` | yes (line 136) |
+- **My Registry (Employee)** loads items for one employee's few registries → complete data → correct status.
+- **Team Registry (Manager)** and **All Registries (Admin)** call `fetchItemsForRegistries()` with hundreds of registry IDs in a single `.in(...)` query. There are **5,970 rows** in `skill_registry_items`, and the backend caps an unpaginated query at **1,000 rows**. Every registry beyond that cap comes back with zero or partial items, so `ratedCount < totalSkills` and the shared helper correctly (but on wrong data) derives **Incomplete**.
 
-### What is still unresolved in issues 17, 18, 21, 22
+A second, smaller contributor: `computeRegistryMetrics` returns `loading: true` while items are missing, but still returns a `status`, and the list pages render that badge immediately — so an unloaded registry briefly (or permanently) shows "Incomplete" instead of a placeholder.
 
-One registry view was left out and still computes its own numbers: **`src/pages/AllRegistriesPage.tsx`, "By Employees" view and the skill drill-down drawer.**
+## The atomic fix
 
-Verified in that file:
-- **Issue 18 (average)** — `selfAvg: avg(items.map(i => i.self_score))` (line 286) is a raw average over *every* registry item, with no filter to active domain-mapped skills and no `/5` scaling. The same employee therefore shows e.g. `3.0` here and a different value on Team Registry.
-- **Issue 17 / 21 (completion & rated count)** — `entryCount: items.length` (line 287) counts all stored items, including stale items for skills no longer active or no longer mapped to the domain. No completion denominator exists at all on this page.
-- **Issue 22 (status)** — `deriveRegistryStatus` is imported (line 18) but **never called**. Both status badges (line 520 employee rows, line 598 drawer) render a hand-rolled two-state expression: `reviewStatus === "approved" ? "approved" : "review_pending"`. A submitted-but-partially-rated registry shows **Review Pending** here and **Incomplete** on Team Registry — the exact issue-22 symptom, in the one place still not fixed.
+Two small changes, no new architecture, no file moves.
 
-Not in scope for this atomic fix (own tickets/workstreams): the dashboards (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) each call `deriveRegistryStatus` with their own inputs.
+1. **`src/stores/skillRegistryStore.ts` — paginate `fetchItemsForRegistries`**
+   - Chunk the registry IDs (e.g. 100 per request) and, within each chunk, page through results with `.range()` until fewer than the page size come back.
+   - Keep the existing cache/skip-already-fetched behaviour, the same grouping logic, and the same "empty array for registries with no items" fallback.
+   - This is the same pagination pattern already used elsewhere in the stores.
 
-### The fix (single, atomic)
+2. **Status badge respects the loading flag (display only)**
+   - In `src/pages/TeamRegistryPage.tsx` and `src/pages/AllRegistriesPage.tsx`, when `metrics.loading` is true, render the existing skeleton in the status cell (the numeric cells already do this) instead of a status badge.
+   - No change to `registryStatus.ts` or `registryMetrics.ts` rules — the derivation stays the single source of truth.
 
-Make `AllRegistriesPage.tsx` derive employee-level metrics and status from `computeRegistryMetrics`, exactly like the other four views. No layout change, no new components, no store or DB change.
+## Expected behavior after the fix
 
-1. Build a per-domain active-skill index in the page (reuse the already-imported `useDomainStore().mappings` + `useSkillStore().skills`, filtered to active/non-deleted) — same rule the other views apply.
-2. In the `employeeAggs` memo, replace the manual `selfAvg` and `entryCount` with a `computeRegistryMetrics({ registryStatus, items, domainSkillIds, maxLevel, reviewStatus })` call and carry `metrics` on the row.
-3. Employee table:
-   - "Avg" cell uses `metrics.avgOnFive` (same `/5` scale as Team Registry) and renders a dash when `null` instead of `0.0`.
-   - Skills-count cell uses `metrics.ratedCount` / `metrics.totalSkills`.
-   - Status badge switches to `metrics.status`, so Incomplete / Review Pending / Approved match Team Registry.
-4. Skill drill-down drawer: status badge uses that employee's `metrics.status` from the same map instead of the two-state expression.
-5. Remove the now-genuinely-unused local `avg()` helper only if nothing else references it (the skills view keeps its own `avgLevel`, which is a different metric — average level *across employees for one skill* — and is intentionally left untouched).
+A submitted, fully-rated registry shows **Review Pending** identically in My Registry, Team Registry, and All Registries. "Incomplete" appears only when the registry is genuinely submitted with unrated active domain skills (e.g. the one registry with 3 of 21 rated).
 
-Also update the CSV export for the employees view so exported values match what the table shows.
+## Manual test steps
 
-### Files changed
-- `src/pages/AllRegistriesPage.tsx` (only file)
+- **Employee:** open My Registry → submitted registry shows Review Pending (unchanged).
+- **Manager:** open Team Registry → the same employee row shows Review Pending, and `rated/total` matches the detail page.
+- **Admin:** open All Registries → same status and same `rated/total`; scroll/filter to employees far down the list (previously the ones broken by the row cap) and confirm they are no longer Incomplete.
+- Confirm the genuinely partial registry still shows Incomplete in all three views.
+- Hard-reload each page: status shows a skeleton first, never a wrong badge.
 
-### Manual test steps
-1. Open All Registries → By Employees. Note avg, skills count, and status for one employee.
-2. Open Team Registry, find the same employee — avg, completion, and status must match exactly.
-3. Find a submitted registry that is not fully rated — All Registries must now read **Incomplete**, not Review Pending.
-4. An employee with zero self-scores → avg shows a dash, not `0.0`.
-5. Filter by a domain containing a disabled skill → that skill is excluded from the denominator.
-6. Export the employees CSV → values equal the on-screen values.
+## Scope guard
 
-### Remaining work in Workstream 1 after this
-- Dashboard status/metric call sites (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) still compute their own inputs into `deriveRegistryStatus` — a separate atomic fix if you want them unified.
-- Optional: surface `staleItemCount` in the UI (currently computed and ignored everywhere).
-
-### Suggested next prompt
-"All Registries verified. Next atomic fix: unify the three dashboard status call sites onto `computeRegistryMetrics`." — or move to Workstream 2 (Issue 20, select-all in fixed-template question selection).
+Only the two list pages and the one store fetcher change. No refactors to unrelated code, no status-rule changes, no new files.
