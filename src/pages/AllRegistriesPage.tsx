@@ -15,7 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from "lucide-react";
-import { deriveRegistryStatus, type RegistryStatus } from "@/lib/registryStatus";
+import { type RegistryStatus } from "@/lib/registryStatus";
+import { computeRegistryMetrics } from "@/lib/registryMetrics";
+import { registryStatusConfig } from "@/lib/registryStatus";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 
 type ReviewStatus = "approved" | "pending";
