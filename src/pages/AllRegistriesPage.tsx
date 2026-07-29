@@ -219,6 +219,30 @@ export default function AllRegistriesPage() {
     return entries.filter((r) => r.domain_id === domainFilter);
   }, [latestPerEmployee, domainFilter]);
 
+  // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
+  // Keyed by registry id so both the employee view and the skill drawer show identical numbers.
+  const metricsByRegistry = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeRegistryMetrics>>();
+    filteredLatest.forEach((reg) => {
+      const domainSkillIds = mappings
+        .filter((m) => m.domain_id === reg.domain_id)
+        .map((m) => m.skill_id)
+        .filter((id) => skills.some((s) => s.id === id && s.status === "active"));
+      map.set(
+        reg.id,
+        computeRegistryMetrics({
+          registryStatus: reg.status as "draft" | "submitted",
+          items: allItems[reg.id],
+          domainSkillIds,
+          maxLevel,
+          reviewStatus: reviewStatuses[reg.id] ?? null,
+        }),
+      );
+    });
+    return map;
+  }, [filteredLatest, mappings, skills, allItems, maxLevel, reviewStatuses]);
+
+
   // Skills aggregation from latest approved registries (also collects employee drill-down list)
   const skillAggs = useMemo<SkillAgg[]>(() => {
     // skill_id -> employee_id -> { level, registryId }
