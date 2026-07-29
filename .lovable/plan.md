@@ -1,70 +1,56 @@
-## Workstream 1 — First atomic fix
+## Workstream 1 — Next atomic fix
 
-### What I verified in the code (current state)
+### What I re-verified in the current code
 
-The four issues (17, 18, 21, 22) all come from **one root cause: every registry view computes its own metrics with different rules**. Confirmed by reading the pages:
+The previous fix landed and is holding. `computeRegistryMetrics` is now consumed by all four views:
 
-| Rule | My Registry (`SkillRegistryPage.tsx`) | My Registry detail (`SkillRegistryDetailPage.tsx`) | Team Registry list (`TeamRegistryPage.tsx`) | Team Registry detail (`TeamRegistryDetailPage.tsx`) |
-|---|---|---|---|---|
-| Total skills (denominator) | mapped skills filtered to `status === 'active'` (line 107-109) | same (line 83-86) | **raw mapping count, no active filter** (line 144) | mapped ∩ active (line 109-112) |
-| Rated count | all items in the registry (line 240) | all items (line 404) | all items (line 146) | **only items whose skill is in the domain** (line 135) |
-| Average shown | **raw level average** `computeAvg`, e.g. 3.0 (line 54, 319) | scaled to /5 (line 406) | scaled to /5 (line 148-149) | scaled to /5 (line 138-140) |
-| Items still loading | not handled — renders 0 / 0% | not handled | not handled | not handled |
+| File | Uses helper |
+|---|---|
+| `src/pages/SkillRegistryPage.tsx` (hero + history rows) | yes (lines 234, 384) |
+| `src/pages/SkillRegistryDetailPage.tsx` | yes (line 403) |
+| `src/pages/TeamRegistryPage.tsx` | yes (line 153) |
+| `src/pages/TeamRegistryDetailPage.tsx` | yes (line 136) |
 
-Because `deriveRegistryStatus()` (in `src/lib/registryStatus.ts`) takes `ratedCount` and `totalSkills` as inputs, the different denominators also produce **different status badges** for the same registry — that is issue 22, and it is a symptom, not a separate bug.
+### What is still unresolved in issues 17, 18, 21, 22
 
-### The first (and only) fix in this step
+One registry view was left out and still computes its own numbers: **`src/pages/AllRegistriesPage.tsx`, "By Employees" view and the skill drill-down drawer.**
 
-Add a single shared metrics helper and make all four registry views consume it. No other behaviour, layout, store, or DB change.
+Verified in that file:
+- **Issue 18 (average)** — `selfAvg: avg(items.map(i => i.self_score))` (line 286) is a raw average over *every* registry item, with no filter to active domain-mapped skills and no `/5` scaling. The same employee therefore shows e.g. `3.0` here and a different value on Team Registry.
+- **Issue 17 / 21 (completion & rated count)** — `entryCount: items.length` (line 287) counts all stored items, including stale items for skills no longer active or no longer mapped to the domain. No completion denominator exists at all on this page.
+- **Issue 22 (status)** — `deriveRegistryStatus` is imported (line 18) but **never called**. Both status badges (line 520 employee rows, line 598 drawer) render a hand-rolled two-state expression: `reviewStatus === "approved" ? "approved" : "review_pending"`. A submitted-but-partially-rated registry shows **Review Pending** here and **Incomplete** on Team Registry — the exact issue-22 symptom, in the one place still not fixed.
 
-**New file: `src/lib/registryMetrics.ts`**
+Not in scope for this atomic fix (own tickets/workstreams): the dashboards (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) each call `deriveRegistryStatus` with their own inputs.
 
-```ts
-computeRegistryMetrics({
-  registry,            // SkillRegistry | null
-  items,               // SkillRegistryItem[] | undefined  (undefined = not loaded yet)
-  domainSkills,        // Skill[]  active skills mapped to the registry's domain
-  maxLevel,            // active competency level count
-}) => {
-  loading: boolean;        // true while items are undefined
-  totalSkills: number;     // active, non-deleted domain-mapped skills
-  ratedCount: number;      // items with a self_score AND skill in domainSkills
-  completionPct: number;
-  avgRaw: number | null;   // null when no ratings (never 0.0)
-  avgOnFive: number | null;
-  staleItemCount: number;  // rated items no longer mapped to the domain (reported, not counted)
-  status: RegistryStatus;  // via existing deriveRegistryStatus
-}
-```
+### The fix (single, atomic)
 
-Canonical rules baked in (matching what the plan doc recommends for the safe first pass):
-- Denominator = **current active domain-mapped skills**.
-- Numerator = rated items **restricted to that same skill set** (stale/out-of-domain items excluded from both, surfaced via `staleItemCount`).
-- Average = **null when there are no ratings** (no more `0.0`).
-- Status = existing `deriveRegistryStatus`, now always fed identical inputs.
+Make `AllRegistriesPage.tsx` derive employee-level metrics and status from `computeRegistryMetrics`, exactly like the other four views. No layout change, no new components, no store or DB change.
 
-**Edits (metric/display lines only):**
-- `src/pages/SkillRegistryPage.tsx` — hero card and version-history rows use the helper; hero average switches from raw to the same `/5` scale used everywhere else.
-- `src/pages/SkillRegistryDetailPage.tsx` — summary tiles and status badge use the helper.
-- `src/pages/TeamRegistryPage.tsx` — row builder uses the helper (fixes the missing active-skill filter, the main visible mismatch).
-- `src/pages/TeamRegistryDetailPage.tsx` — completion/employee-avg tiles use the helper (manager-avg logic untouched).
+1. Build a per-domain active-skill index in the page (reuse the already-imported `useDomainStore().mappings` + `useSkillStore().skills`, filtered to active/non-deleted) — same rule the other views apply.
+2. In the `employeeAggs` memo, replace the manual `selfAvg` and `entryCount` with a `computeRegistryMetrics({ registryStatus, items, domainSkillIds, maxLevel, reviewStatus })` call and carry `metrics` on the row.
+3. Employee table:
+   - "Avg" cell uses `metrics.avgOnFive` (same `/5` scale as Team Registry) and renders a dash when `null` instead of `0.0`.
+   - Skills-count cell uses `metrics.ratedCount` / `metrics.totalSkills`.
+   - Status badge switches to `metrics.status`, so Incomplete / Review Pending / Approved match Team Registry.
+4. Skill drill-down drawer: status badge uses that employee's `metrics.status` from the same map instead of the two-state expression.
+5. Remove the now-genuinely-unused local `avg()` helper only if nothing else references it (the skills view keeps its own `avgLevel`, which is a different metric — average level *across employees for one skill* — and is intentionally left untouched).
 
-While registry items are still loading, the count/percentage/average render a dash or skeleton instead of `0`, so numbers don't flicker into a wrong value on load.
+Also update the CSV export for the employees view so exported values match what the table shows.
 
-Not touched in this step: `AllRegistriesPage.tsx`, dashboards, CSV exports, review flows, stores, database.
+### Files changed
+- `src/pages/AllRegistriesPage.tsx` (only file)
 
-### Issues addressed
-- **17 (completion inconsistency)** — fully addressed for these four views.
-- **18 (average inconsistency)** — fully addressed for these four views.
-- **21 (rated-skill mismatch in My Registry)** — fully addressed (stale copied-draft items no longer inflate the count).
-- **22 (status differs)** — addressed as a consequence of identical inputs to status derivation.
+### Manual test steps
+1. Open All Registries → By Employees. Note avg, skills count, and status for one employee.
+2. Open Team Registry, find the same employee — avg, completion, and status must match exactly.
+3. Find a submitted registry that is not fully rated — All Registries must now read **Incomplete**, not Review Pending.
+4. An employee with zero self-scores → avg shows a dash, not `0.0`.
+5. Filter by a domain containing a disabled skill → that skill is excluded from the denominator.
+6. Export the employees CSV → values equal the on-screen values.
 
-### What you should manually test after implementation
-1. Open a user in Team Registry, note completion + avg + status, then open that same registry detail and My Registry for that user — all three must match.
-2. A registry in a domain that has an inactive/disabled skill mapped — total must exclude it everywhere.
-3. A partially rated registry — status should read Incomplete in both list and detail.
-4. A registry with zero ratings — average shows a dash, not 0.0.
-5. Reload each page and confirm counts don't flash a wrong number first.
+### Remaining work in Workstream 1 after this
+- Dashboard status/metric call sites (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) still compute their own inputs into `deriveRegistryStatus` — a separate atomic fix if you want them unified.
+- Optional: surface `staleItemCount` in the UI (currently computed and ignored everywhere).
 
-### Technical notes
-Helper is pure and unit-testable; pages keep their existing data-fetching (`useDomainStore`, `useSkillStore`, `fetchItemsForRegistries`) exactly as-is.
+### Suggested next prompt
+"All Registries verified. Next atomic fix: unify the three dashboard status call sites onto `computeRegistryMetrics`." — or move to Workstream 2 (Issue 20, select-all in fixed-template question selection).

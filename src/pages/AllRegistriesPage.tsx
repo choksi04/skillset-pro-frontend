@@ -15,7 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Search, Database, Users, BarChart3, ChevronRight } from "lucide-react";
-import { deriveRegistryStatus, type RegistryStatus } from "@/lib/registryStatus";
+import { type RegistryStatus } from "@/lib/registryStatus";
+import { computeRegistryMetrics } from "@/lib/registryMetrics";
+import { registryStatusConfig } from "@/lib/registryStatus";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 
 type ReviewStatus = "approved" | "pending";
@@ -27,6 +29,8 @@ interface SkillEmployee {
   level: number;
   registryId: string;
   reviewStatus: ReviewStatus;
+  /** Canonical registry status (shared helper) for this employee's latest registry. */
+  status: RegistryStatus;
 }
 
 interface SkillAgg {
@@ -43,18 +47,17 @@ interface EmployeeAgg {
   employee_id: string;
   employeeName: string;
   domainName: string;
-  selfAvg: number;
-  entryCount: number;
+  /** Average on the shared 0–5 display scale; null when nothing is rated. */
+  selfAvg: number | null;
+  ratedCount: number;
+  totalSkills: number;
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
+  status: RegistryStatus;
   topSkill: { name: string; level: number } | null;
   lowSkill: { name: string; level: number } | null;
 }
 
-function avg(values: number[]): number {
-  if (!values.length) return 0;
-  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
-}
 
 function exportSkillsCSV(rows: SkillAgg[]) {
   const header = ["Skill Name", "Category", "Employees", "L1", "L2", "L3", "L4", "L5", "Avg Level"];
@@ -85,12 +88,13 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
     ...rows.map((r) => [
       r.employeeName,
       r.domainName,
-      String(r.selfAvg),
-      String(r.entryCount),
+      r.selfAvg === null ? "—" : String(r.selfAvg),
+      `${r.ratedCount}/${r.totalSkills}`,
       fmt(r.topSkill),
       fmt(r.lowSkill),
-      r.reviewStatus === "approved" ? "Approved" : "Pending review",
+      registryStatusConfig[r.status].label,
     ]),
+
   ]
     .map((r) => r.map((c) => (c.includes(",") ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
     .join("\n");
@@ -118,6 +122,8 @@ export default function AllRegistriesPage() {
   } = useSkillRegistryStore();
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
+  const { levels, fetchLevels } = useCompetencyLevelStore();
+  const maxLevel = levels.length > 0 ? levels.length : 5;
 
   const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
@@ -133,6 +139,7 @@ export default function AllRegistriesPage() {
     fetchRegistries();
     if (!skillsInit) fetchSkills();
     fetchDomains();
+    fetchLevels();
   }, []);
 
   // Only use submitted registries for all-registries view
@@ -212,6 +219,30 @@ export default function AllRegistriesPage() {
     return entries.filter((r) => r.domain_id === domainFilter);
   }, [latestPerEmployee, domainFilter]);
 
+  // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
+  // Keyed by registry id so both the employee view and the skill drawer show identical numbers.
+  const metricsByRegistry = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeRegistryMetrics>>();
+    filteredLatest.forEach((reg) => {
+      const domainSkillIds = mappings
+        .filter((m) => m.domain_id === reg.domain_id)
+        .map((m) => m.skill_id)
+        .filter((id) => skills.some((s) => s.id === id && s.status === "active"));
+      map.set(
+        reg.id,
+        computeRegistryMetrics({
+          registryStatus: reg.status as "draft" | "submitted",
+          items: allItems[reg.id],
+          domainSkillIds,
+          maxLevel,
+          reviewStatus: reviewStatuses[reg.id] ?? null,
+        }),
+      );
+    });
+    return map;
+  }, [filteredLatest, mappings, skills, allItems, maxLevel, reviewStatuses]);
+
+
   // Skills aggregation from latest approved registries (also collects employee drill-down list)
   const skillAggs = useMemo<SkillAgg[]>(() => {
     // skill_id -> employee_id -> { level, registryId }
@@ -242,6 +273,7 @@ export default function AllRegistriesPage() {
           level,
           registryId,
           reviewStatus: getReviewStatus(registryId),
+          status: metricsByRegistry.get(registryId)?.status ?? "review_pending",
         });
       });
       employees.sort((a, b) => a.name.localeCompare(b.name));
@@ -256,7 +288,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses]);
+  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses, metricsByRegistry]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -269,6 +301,7 @@ export default function AllRegistriesPage() {
     return filteredLatest
       .map((reg) => {
         const items = allItems[reg.id] || [];
+        const metrics = metricsByRegistry.get(reg.id);
         const named = items
           .map((i) => ({ name: skillMap.get(i.skill_id)?.skill_name || i.skill_id, level: i.self_score }))
           .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
@@ -283,16 +316,19 @@ export default function AllRegistriesPage() {
           employee_id: reg.employee_id,
           employeeName: userNames[reg.employee_id] || reg.employee_id.slice(0, 8),
           domainName: domainMap.get(reg.domain_id) || "Unknown",
-          selfAvg: avg(items.map((i) => i.self_score)),
-          entryCount: items.length,
+          selfAvg: metrics?.avgOnFive ?? null,
+          ratedCount: metrics?.ratedCount ?? 0,
+          totalSkills: metrics?.totalSkills ?? 0,
           latestRegistryId: reg.id,
           reviewStatus: getReviewStatus(reg.id),
+          status: metrics?.status ?? "review_pending",
           topSkill,
           lowSkill,
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses]);
+  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
+
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
@@ -478,14 +514,20 @@ export default function AllRegistriesPage() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.selfAvg)))}`}
-                      >
-                        {row.selfAvg}
-                      </Badge>
+                      {row.selfAvg === null ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, Math.round(row.selfAvg))))}`}
+                        >
+                          {row.selfAvg}
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell className="text-center text-xs text-muted-foreground">
+                      {row.ratedCount}/{row.totalSkills}
+                    </TableCell>
                     <TableCell>
                       {row.topSkill ? (
                         <div className="flex items-center gap-2">
@@ -518,7 +560,7 @@ export default function AllRegistriesPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <RegistryStatusBadge
-                        status={row.reviewStatus === "approved" ? "approved" : "review_pending"}
+                        status={row.status}
                         size="sm"
                       />
                     </TableCell>
@@ -596,7 +638,7 @@ export default function AllRegistriesPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <RegistryStatusBadge
-                          status={emp.reviewStatus === "approved" ? "approved" : "review_pending"}
+                          status={emp.status}
                           size="sm"
                         />
                       </TableCell>
