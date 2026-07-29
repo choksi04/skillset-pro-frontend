@@ -273,6 +273,7 @@ export default function AllRegistriesPage() {
           level,
           registryId,
           reviewStatus: getReviewStatus(registryId),
+          status: metricsByRegistry.get(registryId)?.status ?? "review_pending",
         });
       });
       employees.sort((a, b) => a.name.localeCompare(b.name));
