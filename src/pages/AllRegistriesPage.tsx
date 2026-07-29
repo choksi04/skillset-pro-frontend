@@ -120,6 +120,8 @@ export default function AllRegistriesPage() {
     registries,
     fetchRegistries,
     fetchItems,
+    items,
+    fetchItemsForRegistries,
     loading: regsLoading,
     initialized: regsInit,
   } = useSkillRegistryStore();
@@ -134,7 +136,6 @@ export default function AllRegistriesPage() {
   const [search, setSearch] = useState("");
   const [domainFilter, setDomainFilter] = useState("all");
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const [allItems, setAllItems] = useState<Record<string, { skill_id: string; self_score: number }[]>>({});
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState("");
 
@@ -156,23 +157,11 @@ export default function AllRegistriesPage() {
 
   const getReviewStatus = (regId: string): ReviewStatus => reviewStatuses[regId] ?? "pending";
 
-  // Fetch items for all submitted registries
+  // Fetch items for all submitted registries via the shared store (chunked + paginated,
+  // and backfills empty arrays) so metrics never stay stuck in a loading state.
   useEffect(() => {
     const ids = submittedRegistries.map((r) => r.id);
-    if (ids.length === 0) return;
-    supabase
-      .from("skill_registry_items")
-      .select("registry_id, skill_id, self_score")
-      .in("registry_id", ids)
-      .then(({ data }) => {
-        if (!data) return;
-        const map: Record<string, { skill_id: string; self_score: number }[]> = {};
-        data.forEach((i: any) => {
-          if (!map[i.registry_id]) map[i.registry_id] = [];
-          map[i.registry_id].push({ skill_id: i.skill_id, self_score: i.self_score });
-        });
-        setAllItems(map);
-      });
+    if (ids.length > 0) fetchItemsForRegistries(ids);
   }, [submittedRegistries]);
 
   // Fetch user names
@@ -235,7 +224,7 @@ export default function AllRegistriesPage() {
         reg.id,
         computeRegistryMetrics({
           registryStatus: reg.status as "draft" | "submitted",
-          items: allItems[reg.id],
+          items: items.get(reg.id),
           domainSkillIds,
           maxLevel,
           reviewStatus: reviewStatuses[reg.id] ?? null,
@@ -243,7 +232,7 @@ export default function AllRegistriesPage() {
       );
     });
     return map;
-  }, [filteredLatest, mappings, skills, allItems, maxLevel, reviewStatuses]);
+  }, [filteredLatest, mappings, skills, items, maxLevel, reviewStatuses]);
 
 
   // Skills aggregation from latest approved registries (also collects employee drill-down list)
@@ -251,8 +240,8 @@ export default function AllRegistriesPage() {
     // skill_id -> employee_id -> { level, registryId }
     const map = new Map<string, Map<string, { level: number; registryId: string }>>();
     filteredLatest.forEach((reg) => {
-      const items = allItems[reg.id] || [];
-      items.forEach((item) => {
+      const regItems = items.get(reg.id) || [];
+      regItems.forEach((item) => {
         if (!map.has(item.skill_id)) map.set(item.skill_id, new Map());
         map.get(item.skill_id)!.set(reg.employee_id, { level: item.self_score, registryId: reg.id });
       });
@@ -291,7 +280,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses, metricsByRegistry]);
+  }, [filteredLatest, items, skillMap, userNames, domainMap, reviewStatuses, metricsByRegistry]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -303,9 +292,9 @@ export default function AllRegistriesPage() {
   const employeeAggs = useMemo<EmployeeAgg[]>(() => {
     return filteredLatest
       .map((reg) => {
-        const items = allItems[reg.id] || [];
+        const regItems = items.get(reg.id) || [];
         const metrics = metricsByRegistry.get(reg.id);
-        const named = items
+        const named = regItems
           .map((i) => ({ name: skillMap.get(i.skill_id)?.skill_name || i.skill_id, level: i.self_score }))
           .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
         const topSkill = named.length ? { name: named[0].name, level: named[0].level } : null;
@@ -332,7 +321,7 @@ export default function AllRegistriesPage() {
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
+  }, [filteredLatest, items, userNames, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
 
 
   const filteredEmployees = useMemo(() => {
