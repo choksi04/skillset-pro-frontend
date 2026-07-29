@@ -254,7 +254,7 @@ export default function TeamRegistryDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold text-foreground">{employee?.full_name || registry.employee_id}</h2>
-                <RegistryStatusBadge status={isApproved ? 'approved' : 'review_pending'} size="sm" />
+                <RegistryStatusBadge status={metrics.status} size="sm" />
               </div>
               <p className="text-xs text-muted-foreground">
                 {employee?.designation || "—"}
