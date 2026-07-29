@@ -359,7 +359,7 @@ export default function TeamRegistryPage() {
                   </TableCell>
 
                   {/* Status */}
-                  <TableCell className="py-4 px-5"><RegistryStatusBadge status={r.status} size="sm" /></TableCell>
+                  <TableCell className="py-4 px-5">{r.metricsLoading ? <Skeleton className="h-5 w-20 rounded-full" /> : <RegistryStatusBadge status={r.status} size="sm" />}</TableCell>
 
                   {/* Completion */}
                   <TableCell className="py-4 px-5">

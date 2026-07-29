@@ -51,6 +51,9 @@ interface EmployeeAgg {
   selfAvg: number | null;
   ratedCount: number;
   totalSkills: number;
+  /** True while this registry's items are still loading. */
+  metricsLoading: boolean;
+
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
   status: RegistryStatus;
@@ -319,11 +322,13 @@ export default function AllRegistriesPage() {
           selfAvg: metrics?.avgOnFive ?? null,
           ratedCount: metrics?.ratedCount ?? 0,
           totalSkills: metrics?.totalSkills ?? 0,
+          metricsLoading: metrics?.loading ?? true,
           latestRegistryId: reg.id,
           reviewStatus: getReviewStatus(reg.id),
           status: metrics?.status ?? "review_pending",
           topSkill,
           lowSkill,
+
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
@@ -559,11 +564,13 @@ export default function AllRegistriesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <RegistryStatusBadge
-                        status={row.status}
-                        size="sm"
-                      />
+                      {row.metricsLoading ? (
+                        <Skeleton className="h-5 w-24 rounded-full mx-auto" />
+                      ) : (
+                        <RegistryStatusBadge status={row.status} size="sm" />
+                      )}
                     </TableCell>
+
                   </TableRow>
                 ))}
               </TableBody>
