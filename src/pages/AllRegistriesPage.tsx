@@ -638,7 +638,7 @@ export default function AllRegistriesPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <RegistryStatusBadge
-                          status={emp.reviewStatus === "approved" ? "approved" : "review_pending"}
+                          status={emp.status}
                           size="sm"
                         />
                       </TableCell>
