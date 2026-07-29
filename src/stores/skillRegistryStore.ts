@@ -248,28 +248,46 @@ export const useSkillRegistryStore = create<SkillRegistryStore>((set, get) => ({
     const uncached = ids.filter((id) => !get().items.has(id));
     if (uncached.length === 0) return;
 
-    const { data, error } = await supabase
-      .from('skill_registry_items')
-      .select('id, registry_id, skill_id, self_score, comment')
-      .in('registry_id', uncached);
+    const grouped = new Map<string, SkillRegistryItem[]>();
+    const ID_CHUNK = 100;
+    const PAGE_SIZE = 1000;
 
-    if (error) {
-      console.error('Failed to batch fetch registry items:', error);
-      return;
+    for (let c = 0; c < uncached.length; c += ID_CHUNK) {
+      const chunk = uncached.slice(c, c + ID_CHUNK);
+      // PostgREST caps unpaginated results at 1000 rows — page through explicitly
+      // so large teams don't silently lose registry items (which would make a
+      // fully-rated registry look "Incomplete").
+      let from = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('skill_registry_items')
+          .select('id, registry_id, skill_id, self_score, comment')
+          .in('registry_id', chunk)
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) {
+          console.error('Failed to batch fetch registry items:', error);
+          return;
+        }
+
+        (data || []).forEach((i: any) => {
+          const item: SkillRegistryItem = {
+            id: i.id,
+            registry_id: i.registry_id,
+            skill_id: i.skill_id,
+            self_score: i.self_score,
+            comment: i.comment,
+          };
+          if (!grouped.has(i.registry_id)) grouped.set(i.registry_id, []);
+          grouped.get(i.registry_id)!.push(item);
+        });
+
+        if (!data || data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
     }
 
-    const grouped = new Map<string, SkillRegistryItem[]>();
-    (data || []).forEach((i: any) => {
-      const item: SkillRegistryItem = {
-        id: i.id,
-        registry_id: i.registry_id,
-        skill_id: i.skill_id,
-        self_score: i.self_score,
-        comment: i.comment,
-      };
-      if (!grouped.has(i.registry_id)) grouped.set(i.registry_id, []);
-      grouped.get(i.registry_id)!.push(item);
-    });
 
     // Also set empty arrays for registries with no items
     uncached.forEach((id) => {
