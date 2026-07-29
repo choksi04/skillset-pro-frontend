@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
+import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore } from '@/stores/competencyLevelStore';
 import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +59,7 @@ export default function TeamRegistryPage() {
   const navigate = useNavigate();
   const { registries, fetchRegistries, items, fetchItemsForRegistries, initialized } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
+  const { skills, fetchSkills } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
   const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
@@ -72,6 +74,7 @@ export default function TeamRegistryPage() {
   useEffect(() => {
     fetchRegistries();
     fetchDomains();
+    fetchSkills();
     fetchLevels();
   }, []);
 
@@ -362,13 +365,17 @@ export default function TeamRegistryPage() {
                   <TableCell className="py-4 px-5">
                     <div className="space-y-1.5 max-w-[220px]">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{r.ratedCount} / {r.totalSkills} Rated</span>
-                        <span className="font-semibold text-foreground">{r.completionPct}%</span>
+                        <span className="text-muted-foreground">
+                          {r.metricsLoading ? '—' : `${r.ratedCount} / ${r.totalSkills} Rated`}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {r.metricsLoading ? '' : `${r.completionPct}%`}
+                        </span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
                         <div
                           className={`h-full transition-all ${r.completionPct >= 100 ? 'bg-success' : 'bg-primary'}`}
-                          style={{ width: `${Math.max(0, Math.min(100, r.completionPct))}%` }}
+                          style={{ width: `${r.metricsLoading ? 0 : Math.max(0, Math.min(100, r.completionPct))}%` }}
                         />
                       </div>
                     </div>
@@ -376,7 +383,7 @@ export default function TeamRegistryPage() {
 
                   {/* Avg Rating */}
                   <TableCell className="py-4 px-5">
-                    {r.hasRatings ? (
+                    {!r.metricsLoading && r.avgOnFive !== null ? (
                       <div className="flex items-center gap-1.5">
                         <Star size={14} className="text-warning fill-warning" />
                         <span className="text-sm font-semibold text-foreground">{r.avgOnFive.toFixed(1)}</span>
