@@ -139,6 +139,7 @@ export default function AllRegistriesPage() {
     fetchRegistries();
     if (!skillsInit) fetchSkills();
     fetchDomains();
+    fetchLevels();
   }, []);
 
   // Only use submitted registries for all-registries view
