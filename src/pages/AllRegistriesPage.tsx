@@ -514,14 +514,20 @@ export default function AllRegistriesPage() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, row.selfAvg)))}`}
-                      >
-                        {row.selfAvg}
-                      </Badge>
+                      {row.selfAvg === null ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] ${getLevelColorClass(Math.max(1, Math.min(5, Math.round(row.selfAvg))))}`}
+                        >
+                          {row.selfAvg}
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-center text-xs text-muted-foreground">{row.entryCount}</TableCell>
+                    <TableCell className="text-center text-xs text-muted-foreground">
+                      {row.ratedCount}/{row.totalSkills}
+                    </TableCell>
                     <TableCell>
                       {row.topSkill ? (
                         <div className="flex items-center gap-2">
