@@ -292,7 +292,7 @@ export function EmployeeDashboard() {
         <StatCard
           label="My Registry"
           value={
-            loading ? (
+            loading || statusLoading ? (
               <Skeleton className="h-7 w-24" />
             ) : (
               <RegistryStatusBadge status={status} />
