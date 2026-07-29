@@ -19,7 +19,8 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
-import { deriveRegistryStatus } from '@/lib/registryStatus';
+import type { RegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
