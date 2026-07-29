@@ -1,39 +1,55 @@
-## Root cause (verified against the database)
+## Workstream 1 — next atomic fix
 
-The registries themselves are fine. I checked the data: the submitted registries in question have `rated = total_active_skills` (e.g. 21 of 21), so the correct status is **Review Pending** — which is exactly what the Employee view shows.
+### Root cause (verified)
 
-The difference is in **how many registry items each view actually loads**:
+Two different rules were in play for the same registry record:
 
-- **My Registry (Employee)** loads items for one employee's few registries → complete data → correct status.
-- **Team Registry (Manager)** and **All Registries (Admin)** call `fetchItemsForRegistries()` with hundreds of registry IDs in a single `.in(...)` query. There are **5,970 rows** in `skill_registry_items`, and the backend caps an unpaginated query at **1,000 rows**. Every registry beyond that cap comes back with zero or partial items, so `ratedCount < totalSkills` and the shared helper correctly (but on wrong data) derives **Incomplete**.
+- **Team Registry list** (`src/pages/TeamRegistryPage.tsx`, lines 153-161) derives status via `computeRegistryMetrics(...)` → `deriveRegistryStatus(...)`, using registry status, rated count vs active domain skills, and the latest review status.
+- **Team Registry detail** (`src/pages/TeamRegistryDetailPage.tsx`, line 256) hardcodes the badge:
+  `status={isApproved ? 'approved' : 'review_pending'}`. It never renders Draft or Incomplete.
 
-A second, smaller contributor: `computeRegistryMetrics` returns `loading: true` while items are missing, but still returns a `status`, and the list pages render that badge immediately — so an unloaded registry briefly (or permanently) shows "Incomplete" instead of a placeholder.
+Database check confirms the data pattern behind the report: several employees have a newer **draft** version stacked on an older **submitted** one (e.g. employee `15c5e6bc…` — v2 `draft`, v1 `submitted`; employee `0098a72a…` — v1 `draft`). Both views open the *same* latest record, so the list correctly shows Draft while the detail page unconditionally shows Review Pending.
 
-## The atomic fix
+So the list view is right; the **detail page** is the one bypassing the shared helper.
 
-Two small changes, no new architecture, no file moves.
+### Fix (single, minimal change)
 
-1. **`src/stores/skillRegistryStore.ts` — paginate `fetchItemsForRegistries`**
-   - Chunk the registry IDs (e.g. 100 per request) and, within each chunk, page through results with `.range()` until fewer than the page size come back.
-   - Keep the existing cache/skip-already-fetched behaviour, the same grouping logic, and the same "empty array for registries with no items" fallback.
-   - This is the same pagination pattern already used elsewhere in the stores.
+File: `src/pages/TeamRegistryDetailPage.tsx`
 
-2. **Status badge respects the loading flag (display only)**
-   - In `src/pages/TeamRegistryPage.tsx` and `src/pages/AllRegistriesPage.tsx`, when `metrics.loading` is true, render the existing skeleton in the status cell (the numeric cells already do this) instead of a status badge.
-   - No change to `registryStatus.ts` or `registryMetrics.ts` rules — the derivation stays the single source of truth.
+1. The page already calls `computeRegistryMetrics` (line 136) but ignores `metrics.status`. Pass the missing `reviewStatus` input into that call, derived from the already-loaded `review` object (`review?.status`), so the helper can distinguish `review_pending` from `approved`.
+2. Replace the hardcoded badge expression with `metrics.status`:
+   `<RegistryStatusBadge status={metrics.status} size="sm" />`.
 
-## Expected behavior after the fix
+No changes to stores, queries, metrics helper, review flow, or the list page.
 
-A submitted, fully-rated registry shows **Review Pending** identically in My Registry, Team Registry, and All Registries. "Incomplete" appears only when the registry is genuinely submitted with unrated active domain skills (e.g. the one registry with 3 of 21 rated).
+### Behavior after the fix
 
-## Manual test steps
+| Registry state | List badge | Detail badge |
+|---|---|---|
+| Latest version is draft | Draft | Draft (was: Review Pending) |
+| Submitted, partially rated | Incomplete | Incomplete (was: Review Pending) |
+| Submitted, fully rated, no approval | Review Pending | Review Pending |
+| Review approved/completed | Approved | Approved |
 
-- **Employee:** open My Registry → submitted registry shows Review Pending (unchanged).
-- **Manager:** open Team Registry → the same employee row shows Review Pending, and `rated/total` matches the detail page.
-- **Admin:** open All Registries → same status and same `rated/total`; scroll/filter to employees far down the list (previously the ones broken by the row cap) and confirm they are no longer Incomplete.
-- Confirm the genuinely partial registry still shows Incomplete in all three views.
-- Hard-reload each page: status shows a skeleton first, never a wrong badge.
+The "table must not show Draft for a submitted registry" case is already correct — the affected employees genuinely have a newer draft version; the detail page was the misleading one.
 
-## Scope guard
+### Issue coverage
 
-Only the two list pages and the one store fetcher change. No refactors to unrelated code, no status-rule changes, no new files.
+- **Issue 22 (status differs across views)** — completes the Team Registry list vs detail parity.
+- Issues 17, 18, 21 — unchanged, already handled by the shared metrics helper in earlier steps.
+
+### Remaining in Workstream 1
+
+- Unify dashboard status call sites (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) onto `computeRegistryMetrics`.
+- Verify `SkillRegistryDetailPage` (My Registry detail) badge also uses `metrics.status` rather than a local rule.
+
+### Manual test steps
+
+Admin:
+1. Open Team Registries. Note an employee whose row shows **Draft**.
+2. Click the row — detail header must now also show **Draft**, not Review Pending.
+3. Find a row showing **Review Pending**; detail must show **Review Pending**.
+4. Find an **Approved** row; detail must show **Approved** and the review inputs stay read-only.
+
+Manager (domain lead):
+5. Repeat 1-4 within the led domain; confirm no rows disappear and filters by status still match the badges shown.
