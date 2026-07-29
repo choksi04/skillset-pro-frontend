@@ -498,7 +498,7 @@ function FilteredInsightsRow2({
           items={items}
           reviewStatuses={reviewStatuses}
           employees={users.map((u) => ({ id: u.id, domain_id: u.domain_id }))}
-          totalSkillsByDomain={totalSkillsByDomain}
+          domainSkillIdsByDomain={domainSkillIdsByDomain}
           domainFilter={filters.domainId || undefined}
         />
         <ManagerActivity
