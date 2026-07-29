@@ -18,7 +18,8 @@ import {
 import SearchableSelect from '@/components/ui/searchable-select';
 import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { deriveRegistryStatus, registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
+import { registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatRelative(dateStr: string | null): string {
@@ -141,19 +142,20 @@ export default function TeamRegistryPage() {
     return Array.from(groupedByEmployee.entries()).map(([empId, regs]) => {
       const latest = regs[0];
       const domain = domains.find((d) => d.id === latest.domain_id);
-      const totalSkills = mappings.filter((m) => m.domain_id === latest.domain_id).length;
-      const ratedItems = items.get(latest.id) ?? [];
-      const ratedCount = ratedItems.length;
-      const completionPct = totalSkills > 0 ? Math.round((ratedCount / totalSkills) * 100) : 0;
-      const avgRaw = ratedCount > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedCount : 0;
-      const avgOnFive = maxLevel > 0 ? Math.round((avgRaw / maxLevel) * 5 * 10) / 10 : 0;
-
-      const status: RegistryStatus = deriveRegistryStatus({
+      // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
+      const domainSkillIds = mappings
+        .filter((m) => m.domain_id === latest.domain_id)
+        .map((m) => m.skill_id)
+        .filter((id) => skills.some((s) => s.id === id && s.status === 'active'));
+      const metrics = computeRegistryMetrics({
         registryStatus: latest.status as 'draft' | 'submitted',
-        ratedCount,
-        totalSkills,
+        items: items.get(latest.id),
+        domainSkillIds,
+        maxLevel,
         reviewStatus: reviewStatuses[latest.id] ?? null,
       });
+      const { totalSkills, ratedCount, completionPct, avgOnFive, loading: metricsLoading } = metrics;
+      const status: RegistryStatus = metrics.status;
 
       const updatedAt = latest.status === 'submitted'
         ? (latest.submitted_at ?? latest.modified_at ?? latest.created_at)
@@ -172,11 +174,12 @@ export default function TeamRegistryPage() {
         totalSkills,
         completionPct,
         avgOnFive,
+        metricsLoading,
         hasRatings: ratedCount > 0,
         updatedAt,
       };
     });
-  }, [groupedByEmployee, domains, mappings, items, userMeta, maxLevel, reviewStatuses]);
+  }, [groupedByEmployee, domains, mappings, skills, items, userMeta, maxLevel, reviewStatuses]);
 
   // Filter + search
   const filteredRows = useMemo(() => {
