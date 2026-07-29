@@ -88,12 +88,13 @@ function exportEmployeesCSV(rows: EmployeeAgg[]) {
     ...rows.map((r) => [
       r.employeeName,
       r.domainName,
-      String(r.selfAvg),
-      String(r.entryCount),
+      r.selfAvg === null ? "—" : String(r.selfAvg),
+      `${r.ratedCount}/${r.totalSkills}`,
       fmt(r.topSkill),
       fmt(r.lowSkill),
-      r.reviewStatus === "approved" ? "Approved" : "Pending review",
+      registryStatusConfig[r.status].label,
     ]),
+
   ]
     .map((r) => r.map((c) => (c.includes(",") ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
     .join("\n");
