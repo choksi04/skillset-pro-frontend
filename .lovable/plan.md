@@ -1,45 +1,70 @@
-## Root cause
+## Workstream 1 — First atomic fix
 
-The .NET domain is showing `Skills (0)`, but the save flow is hitting duplicate-key errors because old soft-deleted rows still exist in `domain_skill_mappings` for the same `.NET domain + skill` pairs.
+### What I verified in the code (current state)
 
-Current database constraint is:
+The four issues (17, 18, 21, 22) all come from **one root cause: every registry view computes its own metrics with different rules**. Confirmed by reading the pages:
 
-```text
-UNIQUE (domain_id, skill_id)
+| Rule | My Registry (`SkillRegistryPage.tsx`) | My Registry detail (`SkillRegistryDetailPage.tsx`) | Team Registry list (`TeamRegistryPage.tsx`) | Team Registry detail (`TeamRegistryDetailPage.tsx`) |
+|---|---|---|---|---|
+| Total skills (denominator) | mapped skills filtered to `status === 'active'` (line 107-109) | same (line 83-86) | **raw mapping count, no active filter** (line 144) | mapped ∩ active (line 109-112) |
+| Rated count | all items in the registry (line 240) | all items (line 404) | all items (line 146) | **only items whose skill is in the domain** (line 135) |
+| Average shown | **raw level average** `computeAvg`, e.g. 3.0 (line 54, 319) | scaled to /5 (line 406) | scaled to /5 (line 148-149) | scaled to /5 (line 138-140) |
+| Items still loading | not handled — renders 0 / 0% | not handled | not handled | not handled |
+
+Because `deriveRegistryStatus()` (in `src/lib/registryStatus.ts`) takes `ratedCount` and `totalSkills` as inputs, the different denominators also produce **different status badges** for the same registry — that is issue 22, and it is a symptom, not a separate bug.
+
+### The first (and only) fix in this step
+
+Add a single shared metrics helper and make all four registry views consume it. No other behaviour, layout, store, or DB change.
+
+**New file: `src/lib/registryMetrics.ts`**
+
+```ts
+computeRegistryMetrics({
+  registry,            // SkillRegistry | null
+  items,               // SkillRegistryItem[] | undefined  (undefined = not loaded yet)
+  domainSkills,        // Skill[]  active skills mapped to the registry's domain
+  maxLevel,            // active competency level count
+}) => {
+  loading: boolean;        // true while items are undefined
+  totalSkills: number;     // active, non-deleted domain-mapped skills
+  ratedCount: number;      // items with a self_score AND skill in domainSkills
+  completionPct: number;
+  avgRaw: number | null;   // null when no ratings (never 0.0)
+  avgOnFive: number | null;
+  staleItemCount: number;  // rated items no longer mapped to the domain (reported, not counted)
+  status: RegistryStatus;  // via existing deriveRegistryStatus
+}
 ```
 
-That constraint still blocks re-adding a skill even when the previous mapping was soft-deleted.
+Canonical rules baked in (matching what the plan doc recommends for the safe first pass):
+- Denominator = **current active domain-mapped skills**.
+- Numerator = rated items **restricted to that same skill set** (stale/out-of-domain items excluded from both, surfaced via `staleItemCount`).
+- Average = **null when there are no ratings** (no more `0.0`).
+- Status = existing `deriveRegistryStatus`, now always fed identical inputs.
 
-## Plan
+**Edits (metric/display lines only):**
+- `src/pages/SkillRegistryPage.tsx` — hero card and version-history rows use the helper; hero average switches from raw to the same `/5` scale used everywhere else.
+- `src/pages/SkillRegistryDetailPage.tsx` — summary tiles and status badge use the helper.
+- `src/pages/TeamRegistryPage.tsx` — row builder uses the helper (fixes the missing active-skill filter, the main visible mismatch).
+- `src/pages/TeamRegistryDetailPage.tsx` — completion/employee-avg tiles use the helper (manager-avg logic untouched).
 
-1. **Verify .NET domain mapping rows**
-   - Check `domain_skill_mappings` for domain `dom-1779952772407`.
-   - Separate:
-     - active mappings: `deleted_on IS NULL`
-     - stale soft-deleted mappings: `deleted_on IS NOT NULL`
+While registry items are still loading, the count/percentage/average render a dash or skeleton instead of `0`, so numbers don't flicker into a wrong value on load.
 
-2. **Hard-delete only stale mapping rows for .NET domain**
-   - Delete rows from `domain_skill_mappings` for the .NET domain where `deleted_on IS NOT NULL`.
-   - Do **not** hard-delete actual skills from the `skills` master table.
-   - Do **not** delete active mappings unless explicitly confirmed, because that would remove currently mapped skills from the domain.
+Not touched in this step: `AllRegistriesPage.tsx`, dashboards, CSV exports, review flows, stores, database.
 
-3. **Prevent the issue from happening again**
-   - Replace the current full unique constraint on `(domain_id, skill_id)` with a partial unique index:
+### Issues addressed
+- **17 (completion inconsistency)** — fully addressed for these four views.
+- **18 (average inconsistency)** — fully addressed for these four views.
+- **21 (rated-skill mismatch in My Registry)** — fully addressed (stale copied-draft items no longer inflate the count).
+- **22 (status differs)** — addressed as a consequence of identical inputs to status derivation.
 
-```sql
-UNIQUE (domain_id, skill_id) WHERE deleted_on IS NULL
-```
+### What you should manually test after implementation
+1. Open a user in Team Registry, note completion + avg + status, then open that same registry detail and My Registry for that user — all three must match.
+2. A registry in a domain that has an inactive/disabled skill mapped — total must exclude it everywhere.
+3. A partially rated registry — status should read Incomplete in both list and detail.
+4. A registry with zero ratings — average shows a dash, not 0.0.
+5. Reload each page and confirm counts don't flash a wrong number first.
 
-   - This allows historical soft-deleted mappings while still preventing duplicate active mappings.
-
-4. **Fix false success in the UI**
-   - Update `domainStore.addMapping` / `removeMapping` so backend errors are thrown instead of silently logged.
-   - Update `DomainSkillManager` so it only shows success when every selected mapping is actually saved.
-   - Show a clear error if any mapping fails.
-
-5. **Refresh after save**
-   - Force-refresh domain mappings after saving so Domain Detail > Skills immediately shows the saved skills.
-
-## Safety note
-
-I will treat “hard-delete the skills already mapped with .NET domain” as hard-delete stale rows from `domain_skill_mappings`, not deleting records from the master `skills` table, because deleting master skills would break questions, registry history, assessments, and reports.
+### Technical notes
+Helper is pure and unit-testable; pages keep their existing data-fetching (`useDomainStore`, `useSkillStore`, `fetchItemsForRegistries`) exactly as-is.
