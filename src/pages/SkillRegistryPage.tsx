@@ -403,7 +403,11 @@ export default function SkillRegistryPage() {
                       <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
                       <TableCell className="text-sm font-medium">{avg !== null ? avg.toFixed(1) : '—'}</TableCell>
                       <TableCell>
-                        <RegistryStatusBadge status={rowStatus} size="sm" />
+                        {rowMetrics.loading ? (
+                          <Skeleton className="h-5 w-24 rounded-full" />
+                        ) : (
+                          <RegistryStatusBadge status={rowStatus} size="sm" />
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/skill-registry/${reg.id}`); }}>
