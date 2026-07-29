@@ -300,7 +300,7 @@ export function ManagerDashboard() {
         }
         return;
       }
-      if (info.status === 'approved') return;
+      if (info.metricsLoading || info.status === 'approved') return;
       const ts = info.registry.modified_at ?? info.registry.created_at;
       const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
       if (days >= STUCK_DAYS) {
