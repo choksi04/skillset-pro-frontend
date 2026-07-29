@@ -11,6 +11,7 @@ import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
 import { computeRegistryMetrics } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -462,7 +463,11 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <RegistryStatusBadge status={metrics.status} />
+            {metrics.loading ? (
+              <Skeleton className="h-6 w-28 rounded-full" />
+            ) : (
+              <RegistryStatusBadge status={metrics.status} />
+            )}
             {!isLatest && (
               <Badge variant="outline" className="text-xs text-muted-foreground">
                 Version {registry.version_number}
