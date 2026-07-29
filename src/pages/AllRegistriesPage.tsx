@@ -51,6 +51,9 @@ interface EmployeeAgg {
   selfAvg: number | null;
   ratedCount: number;
   totalSkills: number;
+  /** True while this registry's items are still loading. */
+  metricsLoading: boolean;
+
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
   status: RegistryStatus;
