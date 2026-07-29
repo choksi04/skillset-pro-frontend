@@ -138,6 +138,7 @@ export default function TeamRegistryDetailPage() {
     items: itemsFromRatingsMap(ratings),
     domainSkillIds: activeDomainSkillIds,
     maxLevel,
+    reviewStatus: (review?.status as "pending" | "approved" | "completed" | undefined) ?? null,
   });
   const { totalSkills, ratedCount, completionPct } = metrics;
   const employeeAvgRaw = metrics.avgRaw ?? 0;
