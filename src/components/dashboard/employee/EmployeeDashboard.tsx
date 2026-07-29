@@ -28,7 +28,7 @@ import { useSkillStore } from '@/stores/skillStore';
 import { useRegistryReviewStore } from '@/stores/registryReviewStore';
 import { useAssignmentStore } from '@/stores/assignmentStore';
 import { useCompetencyLevelStore, getRatingLabels } from '@/stores/competencyLevelStore';
-import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
