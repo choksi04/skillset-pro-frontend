@@ -407,7 +407,7 @@ export default function SkillRegistryDetailPage() {
     maxLevel,
     reviewStatus: reviewStatuses[registry.id] ?? null,
   });
-  const { totalSkills, ratedCount, completionPct, avgOnFive } = metrics;
+  const { totalSkills, ratedCount: summaryRatedCount, completionPct, avgOnFive } = metrics;
 
   // Top / lowest rated skills (by self_score)
   const maxScore = ratedItems.length > 0 ? Math.max(...ratedItems.map((i) => i.self_score)) : 0;
@@ -518,7 +518,7 @@ export default function SkillRegistryDetailPage() {
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Completion</p>
             <p className="mt-1 text-xl font-semibold text-primary">
-              {completionPct}% <span className="text-sm font-medium text-primary/80">({ratedCount}/{totalSkills})</span>
+              {completionPct}% <span className="text-sm font-medium text-primary/80">({summaryRatedCount}/{totalSkills})</span>
             </p>
           </div>
           <div>
