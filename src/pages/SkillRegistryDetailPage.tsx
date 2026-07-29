@@ -462,7 +462,11 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <RegistryStatusBadge status={metrics.status} />
+            {metrics.loading ? (
+              <Skeleton className="h-6 w-28 rounded-full" />
+            ) : (
+              <RegistryStatusBadge status={metrics.status} />
+            )}
             {!isLatest && (
               <Badge variant="outline" className="text-xs text-muted-foreground">
                 Version {registry.version_number}
