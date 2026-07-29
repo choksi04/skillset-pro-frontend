@@ -113,7 +113,7 @@ export function DomainReadiness({
         total: teamMembers.length,
       };
     });
-  }, [domains, registries, items, reviewStatuses, employees, totalSkillsByDomain, domainFilter]);
+  }, [domains, registries, items, reviewStatuses, employees, domainSkillIdsByDomain, domainFilter]);
 
   return (
     <div className="space-y-3">
