@@ -269,7 +269,11 @@ export default function SkillRegistryPage() {
             {/* Title row */}
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-2xl font-bold text-foreground">{assignedDomain.name}</h3>
-              <RegistryStatusBadge status={featuredStatus} />
+              {metricsLoading ? (
+                <Skeleton className="h-6 w-28 rounded-full" />
+              ) : (
+                <RegistryStatusBadge status={featuredStatus} />
+              )}
             </div>
 
             {/* Meta row */}
