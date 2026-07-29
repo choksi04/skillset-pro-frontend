@@ -1,49 +1,56 @@
-## Verification result: the badge already uses `metrics.status` — the remaining defect is a loading flash
+## Verified current state (All Registries vs Team Registry)
 
-Read after the previous change:
-
-| Call site | Line | What it does today |
+| Concern | Team Registry (working) | All Registries (broken) |
 |---|---|---|
-| `SkillRegistryDetailPage.tsx` (submitted view) | 465 | `<RegistryStatusBadge status={metrics.status} />` — already the shared helper, denominator already filtered to active domain skills (line 86-89) |
-| `SkillRegistryPage.tsx` hero badge | 272 | `featuredStatus` = `featuredMetrics.status` — already the shared helper |
-| `SkillRegistryPage.tsx` version-history rows | 384-402 | `rowMetrics.status` from the shared helper |
+| Registry items source | `fetchItemsForRegistries(ids)` + `items` map from `skillRegistryStore` (chunks ids 100 at a time, pages with `.range()` at 1000 rows, and **writes an empty array for registries with no items**) — store lines 247-302 | Its own `supabase.from('skill_registry_items').select(...).in('registry_id', ids)` into local `allItems` state (`AllRegistriesPage.tsx` lines 160-176) — **no pagination, no empty-array backfill** |
+| Metrics | `computeRegistryMetrics({ items: items.get(id), ... })` | `computeRegistryMetrics({ items: allItems[reg.id], ... })` |
+| Status render | `metricsLoading ? Skeleton : <RegistryStatusBadge status={r.status} />` | same pattern (lines 567-570, 648) |
 
-So item "verify the detail badge uses metrics.status" is **confirmed already true**. What is *not* handled is the loading state:
+So the status *rule* is already shared and identical. The defect is in the **data feed**, confirmed by reading both files:
 
-- Detail page: `items: itemsLoaded ? allItems : undefined` (line 405). While items are still fetching, `metrics.loading` is `true` and `ratedCount` is `0`, so `deriveRegistryStatus` returns **`incomplete`** for a submitted registry. The badge renders that immediately — the rest of the page correctly guards with `!itemsLoaded` (lines 510, 607), but the badge does not. Result: a submitted registry briefly shows **Incomplete** before settling on **Review Pending**.
-- Landing page: `metricsLoading` is already computed (line 241) and used for the numeric tiles, but the hero badge (272) and the version rows (402) ignore it, producing the same transient wrong pill.
+1. The page-local query returns at most 1000 `skill_registry_items` rows in one unpaginated request. Every registry whose items fall past that cap gets `allItems[reg.id] === undefined`.
+2. `computeRegistryMetrics` treats `items === undefined` as `loading: true` (registryMetrics.ts line 55), so those rows render the Skeleton **forever** — nothing ever re-fetches.
+3. A submitted registry with zero items also never gets a key in `allItems`, so it is permanently "loading" too (the store version explicitly backfills `[]` for those).
+4. Where metrics do resolve but items were partially truncated, `ratedCount < totalSkills` → status resolves to **Incomplete** while Team Registry (fully paginated) resolves the same registry to **Review Pending** — the mismatch reported.
 
-This is the same class of bug already fixed on Team Registry / All Registries / dashboards, which render a `Skeleton` while `metrics.loading`.
+## Change (single atomic fix, All Registries only)
 
-### Changes (badge display only)
+**`src/pages/AllRegistriesPage.tsx`**
 
-1. **`src/pages/SkillRegistryDetailPage.tsx`**
-   - Replace line 465 with a `metrics.loading ? <Skeleton className="h-6 w-28 rounded-full" /> : <RegistryStatusBadge status={metrics.status} />`.
-   - Add the `Skeleton` import if not already present.
+- Pull `items` and `fetchItemsForRegistries` from `useSkillRegistryStore()` (already imported and used on this page for `registries`/`fetchRegistries`).
+- Replace the `useEffect` at lines 160-176 with a call to `fetchItemsForRegistries(submittedRegistries.map(r => r.id))` — exactly what Team Registry does at line 138.
+- Delete the local `allItems` state (line 137) and read items from the store map instead:
+  - `metricsByRegistry`: `items: items.get(reg.id)`
+  - `skillAggs` / `employeeAggs`: `const regItems = items.get(reg.id) ?? []`
+  - update the three `useMemo` dependency arrays from `allItems` to `items`.
+- Keep the existing Skeleton-while-`metricsLoading` rendering, the review-status fetch, the badge component, and all other logic untouched.
 
-2. **`src/pages/SkillRegistryPage.tsx`**
-   - Hero badge (272): render `<Skeleton className="h-6 w-28 rounded-full" />` when `metricsLoading`, otherwise the badge.
-   - Version-history row status cell (401-403): render `<Skeleton className="h-5 w-24 rounded-full" />` when `rowMetrics.loading`, otherwise the badge.
+Nothing else changes: no store changes, no Team Registry changes, no `registryMetrics.ts` / `registryStatus.ts` changes, no schema or query-rule changes.
 
-No changes to `registryMetrics.ts`, `registryStatus.ts`, stores, All Registries, dashboards, or any assessment/review flow.
+### Note (not changed in this step)
 
-### Behavior after the fix
+All Registries scopes to the **latest submitted** registry per employee; Team Registry uses the employee's latest registry overall. If someone has a newer *draft* on top of a submitted version, Team Registry will show Draft and All Registries will show Review Pending. Your stated expectation ("should not fall back to Draft when a valid submitted registry exists") matches the current All Registries behavior, so I am leaving it as-is and flagging it as a separate decision.
 
-- A submitted registry never flashes **Incomplete** or **Draft** on My Registry (landing hero, version history, or detail) — it shows a skeleton until items load, then **Review Pending** / **Approved**, matching Team Registry for the same record.
+## Behavior after the fix
 
-### Issue coverage
+- No All Registries row stays in the Skeleton/Loading state once registry data has loaded — every submitted registry receives either its item rows or an explicit empty list.
+- Completion (`x / y Rated`), average (/5), and the status pill for a given employee are computed from the same complete item set as Team Registry, so a registry showing **Review Pending** on Team Registry shows **Review Pending** on All Registries.
+- Truncation-induced false **Incomplete** disappears organization-wide (the same class of bug already fixed for Team Registry and the dashboards).
 
-- **Issue 22 (status differs across views)** — completes the My Registry side.
-- **Issues 17 / 18** — indirectly, since the same guarded metrics object feeds the counts and averages.
-- **Issue 21** — unchanged (rated-skill counts already run through the shared helper).
+## Issue coverage
 
-### Manual test steps (Employee)
+- **Issue 22** — completes the All Registries side of cross-view status consistency.
+- **Issues 17 / 18** — fully addressed on All Registries (completion counts and average ratings now come from the complete, shared-rule metric set), including the CSV export which reads the same values.
 
-1. Sign in as an employee with a submitted registry, hard-reload `/skill-registry`: the hero pill shows a skeleton, then **Review Pending** — never Incomplete.
-2. Open the version history row: same behavior on each row pill.
-3. Click into `/skill-registry/:id` and hard-reload: the header pill shows a skeleton until skills load, then matches the landing page and the manager's Team Registry row.
-4. Throttle the network (DevTools "Slow 3G") and repeat step 3 to make the skeleton window observable.
+## Manual test steps (Admin)
 
-### Remaining in Workstream 1
+1. Sign in as Admin, open **All Registries**, Employees view, filter = All domains. Wait for load: no row should keep a pill-shaped skeleton in the Status column.
+2. Pick an employee with a submitted registry — note their status, `rated / total`, and average.
+3. Open **Team Registry** (as the manager of that employee's domain, or the same employee's row) and compare: status label, rated/total, and average must match exactly.
+4. Scroll a large domain (one with enough employees that total registry items exceed 1000 rows) and confirm the bottom rows resolve too — this is where the old 1000-row cap used to bite.
+5. Export CSV and confirm the Status / Completion / Avg columns match what the table shows.
+6. Switch to the Skills view, open a skill drawer, and confirm each employee's status chip matches their row in the Employees view.
 
-- Verify All Registries uses the latest submitted version per employee, organization-wide, with `metrics.status`.
+## Suggested next prompt
+
+"I have reviewed the previous change. Continue with Workstream 1 only. Next atomic fix: decide and unify which registry version each view selects (latest overall vs latest submitted) across My Registry, Team Registry, and All Registries."
