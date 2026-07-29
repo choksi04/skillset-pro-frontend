@@ -288,7 +288,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses]);
+  }, [filteredLatest, allItems, skillMap, userNames, domainMap, reviewStatuses, metricsByRegistry]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -301,6 +301,7 @@ export default function AllRegistriesPage() {
     return filteredLatest
       .map((reg) => {
         const items = allItems[reg.id] || [];
+        const metrics = metricsByRegistry.get(reg.id);
         const named = items
           .map((i) => ({ name: skillMap.get(i.skill_id)?.skill_name || i.skill_id, level: i.self_score }))
           .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
@@ -315,16 +316,19 @@ export default function AllRegistriesPage() {
           employee_id: reg.employee_id,
           employeeName: userNames[reg.employee_id] || reg.employee_id.slice(0, 8),
           domainName: domainMap.get(reg.domain_id) || "Unknown",
-          selfAvg: avg(items.map((i) => i.self_score)),
-          entryCount: items.length,
+          selfAvg: metrics?.avgOnFive ?? null,
+          ratedCount: metrics?.ratedCount ?? 0,
+          totalSkills: metrics?.totalSkills ?? 0,
           latestRegistryId: reg.id,
           reviewStatus: getReviewStatus(reg.id),
+          status: metrics?.status ?? "review_pending",
           topSkill,
           lowSkill,
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses]);
+  }, [filteredLatest, allItems, userNames, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
+
 
   const filteredEmployees = useMemo(() => {
     if (!search) return employeeAggs;
