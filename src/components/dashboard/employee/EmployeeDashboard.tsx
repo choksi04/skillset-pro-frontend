@@ -225,6 +225,8 @@ export function EmployeeDashboard() {
       description: 'Ask your admin or manager to assign you to a domain so you can build a registry.',
       icon: Sparkles,
     });
+  } else if (statusLoading) {
+    // metrics still loading — avoid a misleading Draft/Incomplete nudge
   } else if (status === 'not_started') {
     actionItems.push({
       id: 'start-registry',
