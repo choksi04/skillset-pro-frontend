@@ -460,11 +460,18 @@ function FilteredInsightsRow2({
   reviews: ReturnType<typeof useReviewStore.getState>['reviews'];
 }) {
   const { filters } = useAdminFilters();
-  const totalSkillsByDomain = useMemo(() => {
-    const m = new Map<string, number>();
-    mappings.forEach((mp) => m.set(mp.domain_id, (m.get(mp.domain_id) ?? 0) + 1));
+  // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
+  const domainSkillIdsByDomain = useMemo(() => {
+    const activeIds = new Set(skills.filter((s) => s.status === 'active').map((s) => s.id));
+    const m = new Map<string, string[]>();
+    mappings.forEach((mp) => {
+      if (!activeIds.has(mp.skill_id)) return;
+      const list = m.get(mp.domain_id) ?? [];
+      list.push(mp.skill_id);
+      m.set(mp.domain_id, list);
+    });
     return m;
-  }, [mappings]);
+  }, [mappings, skills]);
   const domainLeadByDomain = useMemo(() => {
     const m = new Map<string, string | null>();
     domains.forEach((d) => m.set(d.id, d.domain_lead_id));
@@ -491,7 +498,7 @@ function FilteredInsightsRow2({
           items={items}
           reviewStatuses={reviewStatuses}
           employees={users.map((u) => ({ id: u.id, domain_id: u.domain_id }))}
-          totalSkillsByDomain={totalSkillsByDomain}
+          domainSkillIdsByDomain={domainSkillIdsByDomain}
           domainFilter={filters.domainId || undefined}
         />
         <ManagerActivity

@@ -10,7 +10,7 @@ import { EmptyState } from '../shared/EmptyState';
 
 import type { SkillRegistry, SkillRegistryItem } from '@/stores/skillRegistryStore';
 import type { Domain } from '@/stores/domainStore';
-import { deriveRegistryStatus, type RegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 
 interface Props {
   loading: boolean;
@@ -20,8 +20,8 @@ interface Props {
   reviewStatuses: Record<string, string | undefined>;
   /** All active employees with their domain assignment. */
   employees: { id: string; domain_id: string | null }[];
-  /** Total skills mapped per domain (for completeness threshold). */
-  totalSkillsByDomain: Map<string, number>;
+  /** Active skills mapped per domain (shared metric rule). */
+  domainSkillIdsByDomain: Map<string, string[]>;
   /** Filter: optional domain to highlight. */
   domainFilter?: string;
 }
@@ -57,7 +57,7 @@ export function DomainReadiness({
   items,
   reviewStatuses,
   employees,
-  totalSkillsByDomain,
+  domainSkillIdsByDomain,
   domainFilter,
 }: Props) {
   const navigate = useNavigate();
@@ -73,7 +73,7 @@ export function DomainReadiness({
 
     return filtered.map<DomainBreakdown>((d) => {
       const teamMembers = employees.filter((e) => e.domain_id === d.id);
-      const totalSkills = totalSkillsByDomain.get(d.id) ?? 0;
+      const domainSkillIds = domainSkillIdsByDomain.get(d.id) ?? [];
 
       let approved = 0;
       let reviewPending = 0;
@@ -86,14 +86,17 @@ export function DomainReadiness({
           notStarted += 1;
           return;
         }
-        const its = items.get(reg.id) ?? [];
-        const ratedCount = its.filter((i) => i.self_score !== null && i.self_score !== undefined).length;
-        const status: RegistryStatus = deriveRegistryStatus({
-          registryStatus: reg.status,
-          ratedCount,
-          totalSkills,
-          reviewStatus: (reviewStatuses[reg.id] as 'pending' | 'approved' | 'completed' | undefined) ?? null,
+        // Shared metric rules (see src/lib/registryMetrics.ts).
+        const metrics = computeRegistryMetrics({
+          registryStatus: reg.status as 'draft' | 'submitted',
+          items: items.get(reg.id),
+          domainSkillIds,
+          maxLevel: 5,
+          reviewStatus:
+            (reviewStatuses[reg.id] as 'pending' | 'approved' | 'completed' | undefined) ?? null,
         });
+        if (metrics.loading) return; // don't bucket until items are loaded
+        const status = metrics.status;
         if (status === 'approved') approved += 1;
         else if (status === 'review_pending') reviewPending += 1;
         else if (status === 'not_started') notStarted += 1;
@@ -110,7 +113,7 @@ export function DomainReadiness({
         total: teamMembers.length,
       };
     });
-  }, [domains, registries, items, reviewStatuses, employees, totalSkillsByDomain, domainFilter]);
+  }, [domains, registries, items, reviewStatuses, employees, domainSkillIdsByDomain, domainFilter]);
 
   return (
     <div className="space-y-3">

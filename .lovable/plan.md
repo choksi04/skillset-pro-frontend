@@ -1,55 +1,61 @@
-## Workstream 1 — next atomic fix
+## Workstream 1 — next atomic fix: unify dashboard status call sites
 
-### Root cause (verified)
+### Current state (verified by reading the code)
 
-Two different rules were in play for the same registry record:
+Three dashboard call sites derive registry status themselves instead of using the shared metrics helper now used by Team Registry and the registry detail pages:
 
-- **Team Registry list** (`src/pages/TeamRegistryPage.tsx`, lines 153-161) derives status via `computeRegistryMetrics(...)` → `deriveRegistryStatus(...)`, using registry status, rated count vs active domain skills, and the latest review status.
-- **Team Registry detail** (`src/pages/TeamRegistryDetailPage.tsx`, line 256) hardcodes the badge:
-  `status={isApproved ? 'approved' : 'review_pending'}`. It never renders Draft or Incomplete.
+| Call site | Line(s) | How status is derived today |
+|---|---|---|
+| `EmployeeDashboard.tsx` | 100-117 | `deriveRegistryStatus` directly; denominator = **all** mappings for the user's domain (no active-skill filter); rated count = any non-null `self_score`, including `0` |
+| `ManagerDashboard.tsx` | 125-154 | `deriveRegistryStatus` directly; denominator = `mappings.filter(domain_id === managerDomain).length` (no active-skill filter); same loose rated count |
+| `DomainReadiness.tsx` | 89-101 | `deriveRegistryStatus` directly; denominator = `totalSkillsByDomain` prop, built in `AdminDashboard.tsx` (463-467) by counting **all** mappings per domain |
 
-Database check confirms the data pattern behind the report: several employees have a newer **draft** version stacked on an older **submitted** one (e.g. employee `15c5e6bc…` — v2 `draft`, v1 `submitted`; employee `0098a72a…` — v1 `draft`). Both views open the *same* latest record, so the list correctly shows Draft while the detail page unconditionally shows Review Pending.
+Team Registry (`TeamRegistryPage.tsx`, 148-161) instead uses `computeRegistryMetrics` with `domainSkillIds` filtered to skills whose `status === 'active'`, treats `self_score > 0` as rated, excludes stale items, and exposes a `loading` flag so nothing renders before items arrive.
 
-So the list view is right; the **detail page** is the one bypassing the shared helper.
+**Root cause in simple terms:** dashboards count *every* mapped skill (including inactive/unmapped-but-stale ones) as required, and count `0` scores as rated, and render before item data has loaded. That inflates the denominator, so a submitted registry can fall into the `ratedCount < totalSkills` branch and display **Incomplete** (or a stale **Draft**) while the registry pages correctly show **Review Pending**.
 
-### Fix (single, minimal change)
+Note: `/dashboard` currently renders the "under construction" card, so these three components are not mounted today. The fix is still applied so the widgets are correct when the dashboard is re-enabled.
 
-File: `src/pages/TeamRegistryDetailPage.tsx`
+### Changes
 
-1. The page already calls `computeRegistryMetrics` (line 136) but ignores `metrics.status`. Pass the missing `reviewStatus` input into that call, derived from the already-loaded `review` object (`review?.status`), so the helper can distinguish `review_pending` from `approved`.
-2. Replace the hardcoded badge expression with `metrics.status`:
-   `<RegistryStatusBadge status={metrics.status} size="sm" />`.
+1. **`src/components/dashboard/employee/EmployeeDashboard.tsx`**
+   - Filter `domainSkillIds` to active skills (`skills` is already in scope from `useSkillStore`).
+   - Replace the inline `deriveRegistryStatus` block with `computeRegistryMetrics({ registryStatus, items: items.get(currentRegistry.id), domainSkillIds, maxLevel, reviewStatus })` and use `metrics.status`.
+   - When `metrics.loading` is true, render a `Skeleton` in place of the `RegistryStatusBadge` (line 288) and skip status-driven action items, so no premature Draft/Incomplete appears.
 
-No changes to stores, queries, metrics helper, review flow, or the list page.
+2. **`src/components/dashboard/manager/ManagerDashboard.tsx`**
+   - Build `domainSkillIds` for the manager's domain filtered to active skills, and derive each member's status via `computeRegistryMetrics` inside `latestPerMember` (keeping the existing `{ registry, status }` shape so downstream action-list code is untouched).
+   - Skip a member's "stale registry" nudge while that member's metrics are still loading.
+
+3. **`src/components/dashboard/admin/DomainReadiness.tsx`**
+   - Accept `domainSkillIdsByDomain: Map<string, string[]>` in place of `totalSkillsByDomain` and derive each employee's bucket via `computeRegistryMetrics`, skipping rows whose metrics are still loading.
+
+4. **`src/components/dashboard/admin/AdminDashboard.tsx`**
+   - Replace the `totalSkillsByDomain` memo with `domainSkillIdsByDomain`, built from `mappings` filtered to active skills, and pass it to `DomainReadiness`.
+
+No other component, store, query, or helper changes. `registryMetrics.ts` / `registryStatus.ts` stay as-is.
 
 ### Behavior after the fix
 
-| Registry state | List badge | Detail badge |
-|---|---|---|
-| Latest version is draft | Draft | Draft (was: Review Pending) |
-| Submitted, partially rated | Incomplete | Incomplete (was: Review Pending) |
-| Submitted, fully rated, no approval | Review Pending | Review Pending |
-| Review approved/completed | Approved | Approved |
-
-The "table must not show Draft for a submitted registry" case is already correct — the affected employees genuinely have a newer draft version; the detail page was the misleading one.
+- A submitted, fully rated registry shows **Review Pending** on the employee, manager, and admin dashboards — never Draft or Incomplete.
+- Inactive skills mapped to a domain no longer inflate the required-skill count, so genuine completion matches the Team Registry row.
+- Dashboard status pills render a skeleton until registry items load, instead of flashing an incorrect status.
 
 ### Issue coverage
 
-- **Issue 22 (status differs across views)** — completes the Team Registry list vs detail parity.
-- Issues 17, 18, 21 — unchanged, already handled by the shared metrics helper in earlier steps.
+- **Issue 22 (status differs across views)** — extended to dashboards; completes the status-parity work.
+- **Issues 17 / 18 (completion + average inconsistency)** — partially, via the shared denominator on dashboards.
+- **Issue 21** — unchanged (My Registry detail, handled in a later step).
 
 ### Remaining in Workstream 1
 
-- Unify dashboard status call sites (`ManagerDashboard`, `DomainReadiness`, `EmployeeDashboard`) onto `computeRegistryMetrics`.
-- Verify `SkillRegistryDetailPage` (My Registry detail) badge also uses `metrics.status` rather than a local rule.
+1. Verify the My Registry detail badge uses `metrics.status`.
+2. Verify All Registries uses the latest submitted version per employee, organization-wide.
 
 ### Manual test steps
 
-Admin:
-1. Open Team Registries. Note an employee whose row shows **Draft**.
-2. Click the row — detail header must now also show **Draft**, not Review Pending.
-3. Find a row showing **Review Pending**; detail must show **Review Pending**.
-4. Find an **Approved** row; detail must show **Approved** and the review inputs stay read-only.
+Employee: `/dashboard` (once re-enabled) — after submitting a registry, the header pill must read Review Pending and match `/skill-registry`.
 
-Manager (domain lead):
-5. Repeat 1-4 within the led domain; confirm no rows disappear and filters by status still match the badges shown.
+Manager: dashboard team list — no member with a submitted registry shows Incomplete; each member's pill matches their row in `/team-registry`.
+
+Admin: Domain Readiness bars — the "approved / total" counts and the segment split match the status badges in `/team-registry` for the same domain; filtering by a domain keeps them consistent.

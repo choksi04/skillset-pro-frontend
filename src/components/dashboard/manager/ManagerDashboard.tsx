@@ -19,7 +19,8 @@ import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useCompetencyLevelStore, getLevelColorClass } from '@/stores/competencyLevelStore';
-import { deriveRegistryStatus } from '@/lib/registryStatus';
+import type { RegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -122,37 +123,48 @@ export function ManagerDashboard() {
     fetchReviewStatusesForRegistries(teamRegistries.map((r) => r.id));
   }, [teamRegistries, fetchItemsForRegistries, fetchReviewStatusesForRegistries]);
 
-  const totalDomainSkills = useMemo(
-    () => (managerDomain ? mappings.filter((m) => m.domain_id === managerDomain).length : 0),
-    [mappings, managerDomain],
+  // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
+  const domainSkillIds = useMemo(
+    () =>
+      managerDomain
+        ? mappings
+            .filter((m) => m.domain_id === managerDomain)
+            .map((m) => m.skill_id)
+            .filter((id) => skills.some((s) => s.id === id && s.status === 'active'))
+        : [],
+    [mappings, managerDomain, skills],
   );
+  const totalDomainSkills = domainSkillIds.length;
 
   const latestPerMember = useMemo(() => {
     const out: Record<
       string,
       {
         registry: (typeof registries)[number] | undefined;
-        status: ReturnType<typeof deriveRegistryStatus>;
+        status: RegistryStatus;
+        metricsLoading: boolean;
       }
     > = {};
     team.forEach((m) => {
       const mine = teamRegistries.filter((r) => r.employee_id === m.id);
       const latest = mine[0];
-      const its = latest ? items.get(latest.id) ?? [] : [];
-      const ratedCount = its.filter((i) => i.self_score !== null && i.self_score !== undefined)
-        .length;
+      const metrics = computeRegistryMetrics({
+        registryStatus: (latest?.status as 'draft' | 'submitted') ?? null,
+        items: latest ? items.get(latest.id) : [],
+        domainSkillIds,
+        maxLevel: 5,
+        reviewStatus: latest
+          ? ((reviewStatuses[latest.id] as 'pending' | 'approved' | 'completed' | undefined) ?? null)
+          : null,
+      });
       out[m.id] = {
         registry: latest,
-        status: deriveRegistryStatus({
-          registryStatus: latest?.status ?? null,
-          ratedCount,
-          totalSkills: totalDomainSkills,
-          reviewStatus: latest ? reviewStatuses[latest.id] ?? null : null,
-        }),
+        status: metrics.status,
+        metricsLoading: metrics.loading,
       };
     });
     return out;
-  }, [team, teamRegistries, items, reviewStatuses, totalDomainSkills]);
+  }, [team, teamRegistries, items, reviewStatuses, domainSkillIds]);
 
   const pendingRegistryReviews = useMemo(() => {
     return teamRegistries.filter(
@@ -288,7 +300,7 @@ export function ManagerDashboard() {
         }
         return;
       }
-      if (info.status === 'approved') return;
+      if (info.metricsLoading || info.status === 'approved') return;
       const ts = info.registry.modified_at ?? info.registry.created_at;
       const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
       if (days >= STUCK_DAYS) {
