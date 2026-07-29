@@ -99,22 +99,30 @@ export function EmployeeDashboard() {
   const currentRegistry = myRegistries[0]; // sorted desc by version
   const currentItems = currentRegistry ? items.get(currentRegistry.id) ?? [] : [];
 
+  // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
   const domainSkillIds = useMemo(() => {
     if (!user?.domain_id) return [] as string[];
     return mappings
       .filter((m) => m.domain_id === user.domain_id)
-      .map((m) => m.skill_id);
-  }, [mappings, user]);
+      .map((m) => m.skill_id)
+      .filter((id) => skills.some((s) => s.id === id && s.status === 'active'));
+  }, [mappings, user, skills]);
 
-  const status = useMemo(() => {
-    return deriveRegistryStatus({
-      registryStatus: currentRegistry?.status ?? null,
-      ratedCount: currentItems.filter((i) => i.self_score !== null && i.self_score !== undefined)
-        .length,
-      totalSkills: domainSkillIds.length,
-      reviewStatus: currentRegistry ? reviewStatuses[currentRegistry.id] ?? null : null,
+  const registryMetrics = useMemo(() => {
+    return computeRegistryMetrics({
+      registryStatus: (currentRegistry?.status as 'draft' | 'submitted') ?? null,
+      items: currentRegistry ? items.get(currentRegistry.id) : [],
+      domainSkillIds,
+      maxLevel: Math.max(5, ...levels.map((l) => l.level)),
+      reviewStatus: currentRegistry
+        ? ((reviewStatuses[currentRegistry.id] as 'pending' | 'approved' | 'completed' | undefined) ??
+          null)
+        : null,
     });
-  }, [currentRegistry, currentItems, domainSkillIds, reviewStatuses]);
+  }, [currentRegistry, items, domainSkillIds, levels, reviewStatuses]);
+
+  const status = registryMetrics.status;
+  const statusLoading = registryMetrics.loading;
 
   // Latest approved registry for level metrics
   const latestApproved = useMemo(() => {
