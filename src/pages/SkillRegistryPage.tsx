@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 
 function formatDateTime(dateStr: string) {
@@ -49,12 +49,6 @@ function formatRelative(dateStr: string): string {
   if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
   const years = Math.floor(days / 365);
   return `${years} year${years === 1 ? '' : 's'} ago`;
-}
-
-function computeAvg(items: { self_score: number }[]): number | null {
-  if (!items || items.length === 0) return null;
-  const sum = items.reduce((acc, i) => acc + i.self_score, 0);
-  return Math.round((sum / items.length) * 10) / 10;
 }
 
 function StarRow({ value, max }: { value: number | null; max: number }) {
@@ -236,22 +230,22 @@ export default function SkillRegistryPage() {
 
   // Pick the registry to feature: draft if exists, else latest submitted
   const featured = draft ?? latest ?? null;
-  const featuredItems = featured ? (items.get(featured.id) ?? []) : [];
-  const ratedCount = featuredItems.length;
-  const totalSkills = domainSkills.length;
-  const avgLevel = computeAvg(featuredItems);
+  const domainSkillIds = domainSkills.map((s) => s.id);
+  const featuredMetrics = computeRegistryMetrics({
+    registryStatus: (featured?.status as 'draft' | 'submitted' | undefined) ?? null,
+    items: featured ? items.get(featured.id) : [],
+    domainSkillIds,
+    maxLevel,
+    reviewStatus: featured ? (reviewStatuses[featured.id] ?? null) : null,
+  });
+  const { ratedCount, totalSkills, completionPct, avgOnFive, loading: metricsLoading } = featuredMetrics;
   const updatedTimes = submittedRegistries.length;
   const lastEditDate = featured
     ? (featured.status === 'submitted' && featured.submitted_at ? featured.submitted_at : (featured.modified_at ?? featured.created_at))
     : null;
 
-  // Derive featured status from the unified helper (handles draft / incomplete / review_pending / approved)
-  const featuredStatus = deriveRegistryStatus({
-    registryStatus: (featured?.status as 'draft' | 'submitted' | undefined) ?? null,
-    ratedCount,
-    totalSkills,
-    reviewStatus: featured ? (reviewStatuses[featured.id] ?? null) : null,
-  });
+  // Status comes from the same shared metrics computation as the counts above
+  const featuredStatus = featuredMetrics.status;
 
   return (
     <div className="space-y-6">
@@ -301,11 +295,11 @@ export default function SkillRegistryPage() {
                   <span>Completion Status</span>
                 </div>
                 <div className="flex items-baseline gap-2 mb-3">
-                  <span className="text-4xl font-bold text-foreground leading-none">{ratedCount}</span>
+                  <span className="text-4xl font-bold text-foreground leading-none">{metricsLoading ? '—' : ratedCount}</span>
                   <span className="text-base text-muted-foreground">/ {totalSkills}</span>
                   <span className="text-[11px] uppercase tracking-wide text-muted-foreground ml-1">Skills Rated</span>
                 </div>
-                <Progress value={totalSkills > 0 ? (ratedCount / totalSkills) * 100 : 0} className="h-2" />
+                <Progress value={metricsLoading ? 0 : completionPct} className="h-2" />
               </div>
 
               {/* Overall Average Rating */}
@@ -316,12 +310,12 @@ export default function SkillRegistryPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-4xl font-bold text-foreground leading-none">
-                    {avgLevel !== null ? avgLevel.toFixed(1) : '—'}
+                    {!metricsLoading && avgOnFive !== null ? avgOnFive.toFixed(1) : '—'}
                   </span>
                   <div className="flex flex-col gap-1">
-                    <StarRow value={avgLevel} max={maxLevel} />
+                    <StarRow value={metricsLoading ? null : avgOnFive} max={5} />
                     <span className="text-[11px] text-muted-foreground">
-                      Out of {maxLevel.toFixed(1)} possible
+                      Out of 5.0 possible
                     </span>
                   </div>
                 </div>
@@ -387,14 +381,15 @@ export default function SkillRegistryPage() {
               </TableHeader>
               <TableBody>
                 {submittedRegistries.map((reg) => {
-                  const regItems = items.get(reg.id) ?? [];
-                  const avg = computeAvg(regItems);
-                  const rowStatus = deriveRegistryStatus({
+                  const rowMetrics = computeRegistryMetrics({
                     registryStatus: 'submitted',
-                    ratedCount: regItems.length,
-                    totalSkills,
+                    items: items.get(reg.id),
+                    domainSkillIds,
+                    maxLevel,
                     reviewStatus: reviewStatuses[reg.id] ?? null,
                   });
+                  const avg = rowMetrics.avgOnFive;
+                  const rowStatus = rowMetrics.status;
                   return (
                     <TableRow key={reg.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/skill-registry/${reg.id}`)}>
                       <TableCell className="text-sm font-medium">v{reg.version_number}</TableCell>
@@ -402,7 +397,7 @@ export default function SkillRegistryPage() {
                         {reg.submitted_at ? formatDateTime(reg.submitted_at) : formatDateTime(reg.created_at)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{assignedDomain.name}</TableCell>
-                      <TableCell className="text-sm font-medium">{avg !== null ? avg : '—'}</TableCell>
+                      <TableCell className="text-sm font-medium">{avg !== null ? avg.toFixed(1) : '—'}</TableCell>
                       <TableCell>
                         <RegistryStatusBadge status={rowStatus} size="sm" />
                       </TableCell>

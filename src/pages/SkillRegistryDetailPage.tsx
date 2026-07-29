@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
-import { deriveRegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -399,11 +399,15 @@ export default function SkillRegistryDetailPage() {
   const isLatest = latestVersion ? latestVersion.id === registry.id : true;
 
   // Stats
-  const totalSkills = domainSkills.length;
   const ratedItems = allItems;
-  const completionPct = totalSkills > 0 ? Math.round((ratedItems.length / totalSkills) * 100) : 0;
-  const avgRaw = ratedItems.length > 0 ? ratedItems.reduce((s, i) => s + i.self_score, 0) / ratedItems.length : 0;
-  const avgOnFive = maxLevel > 0 ? (avgRaw / maxLevel) * 5 : 0;
+  const metrics = computeRegistryMetrics({
+    registryStatus: registry.status as 'draft' | 'submitted',
+    items: itemsLoaded ? allItems : undefined,
+    domainSkillIds: domainSkills.map((s) => s.id),
+    maxLevel,
+    reviewStatus: reviewStatuses[registry.id] ?? null,
+  });
+  const { totalSkills, ratedCount: summaryRatedCount, completionPct, avgOnFive } = metrics;
 
   // Top / lowest rated skills (by self_score)
   const maxScore = ratedItems.length > 0 ? Math.max(...ratedItems.map((i) => i.self_score)) : 0;
@@ -458,14 +462,7 @@ export default function SkillRegistryDetailPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{assignedDomain?.name ?? 'Domain'}</h1>
-            <RegistryStatusBadge
-              status={deriveRegistryStatus({
-                registryStatus: registry.status as 'draft' | 'submitted',
-                ratedCount: ratedItems.length,
-                totalSkills,
-                reviewStatus: reviewStatuses[registry.id] ?? null,
-              })}
-            />
+            <RegistryStatusBadge status={metrics.status} />
             {!isLatest && (
               <Badge variant="outline" className="text-xs text-muted-foreground">
                 Version {registry.version_number}
@@ -521,14 +518,14 @@ export default function SkillRegistryDetailPage() {
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Completion</p>
             <p className="mt-1 text-xl font-semibold text-primary">
-              {completionPct}% <span className="text-sm font-medium text-primary/80">({ratedItems.length}/{totalSkills})</span>
+              {completionPct}% <span className="text-sm font-medium text-primary/80">({summaryRatedCount}/{totalSkills})</span>
             </p>
           </div>
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Avg Rating</p>
             <p className="mt-1 text-xl font-semibold text-foreground flex items-center gap-1.5">
               <Star size={18} className="fill-amber-400 text-amber-400" />
-              {ratedItems.length > 0 ? avgOnFive.toFixed(1) : '—'}
+              {avgOnFive !== null ? avgOnFive.toFixed(1) : '—'}
             </p>
           </div>
           <div className="min-w-0">

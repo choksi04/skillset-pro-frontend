@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { RatingLevel } from "@/stores/registryStore";
 import { Badge } from "@/components/ui/badge";
+import { computeRegistryMetrics, itemsFromRatingsMap } from "@/lib/registryMetrics";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,13 +132,16 @@ export default function TeamRegistryDetailPage() {
   }, [levels]);
 
   const ratedSkillIds = Object.keys(ratings);
-  const totalSkills = domainSkills.length;
-  const ratedCount = ratedSkillIds.filter((id) => domainSkillIds.includes(id)).length;
-  const completionPct = totalSkills > 0 ? Math.round((ratedCount / totalSkills) * 100) : 0;
-
-  const employeeAvgRaw =
-    ratedCount > 0 ? ratedSkillIds.reduce((s, id) => s + Number(ratings[id] || 0), 0) / ratedCount : 0;
-  const employeeAvg5 = maxLevel > 0 ? (employeeAvgRaw / maxLevel) * 5 : 0;
+  const activeDomainSkillIds = useMemo(() => domainSkills.map((s) => s.id), [domainSkills]);
+  const metrics = computeRegistryMetrics({
+    registryStatus: (registry?.status as "draft" | "submitted" | undefined) ?? null,
+    items: itemsFromRatingsMap(ratings),
+    domainSkillIds: activeDomainSkillIds,
+    maxLevel,
+  });
+  const { totalSkills, ratedCount, completionPct } = metrics;
+  const employeeAvgRaw = metrics.avgRaw ?? 0;
+  const employeeAvg5 = metrics.avgOnFive ?? 0;
 
   const managerScoresMap = useMemo(() => {
     const m: Record<string, number> = {};
