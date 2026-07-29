@@ -10,7 +10,7 @@ import { EmptyState } from '../shared/EmptyState';
 
 import type { SkillRegistry, SkillRegistryItem } from '@/stores/skillRegistryStore';
 import type { Domain } from '@/stores/domainStore';
-import { deriveRegistryStatus, type RegistryStatus } from '@/lib/registryStatus';
+import { computeRegistryMetrics } from '@/lib/registryMetrics';
 
 interface Props {
   loading: boolean;
@@ -20,8 +20,8 @@ interface Props {
   reviewStatuses: Record<string, string | undefined>;
   /** All active employees with their domain assignment. */
   employees: { id: string; domain_id: string | null }[];
-  /** Total skills mapped per domain (for completeness threshold). */
-  totalSkillsByDomain: Map<string, number>;
+  /** Active skills mapped per domain (shared metric rule). */
+  domainSkillIdsByDomain: Map<string, string[]>;
   /** Filter: optional domain to highlight. */
   domainFilter?: string;
 }
