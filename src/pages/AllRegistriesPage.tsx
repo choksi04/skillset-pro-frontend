@@ -29,6 +29,8 @@ interface SkillEmployee {
   level: number;
   registryId: string;
   reviewStatus: ReviewStatus;
+  /** Canonical registry status (shared helper) for this employee's latest registry. */
+  status: RegistryStatus;
 }
 
 interface SkillAgg {
@@ -45,18 +47,17 @@ interface EmployeeAgg {
   employee_id: string;
   employeeName: string;
   domainName: string;
-  selfAvg: number;
-  entryCount: number;
+  /** Average on the shared 0–5 display scale; null when nothing is rated. */
+  selfAvg: number | null;
+  ratedCount: number;
+  totalSkills: number;
   latestRegistryId: string | null;
   reviewStatus: ReviewStatus;
+  status: RegistryStatus;
   topSkill: { name: string; level: number } | null;
   lowSkill: { name: string; level: number } | null;
 }
 
-function avg(values: number[]): number {
-  if (!values.length) return 0;
-  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
-}
 
 function exportSkillsCSV(rows: SkillAgg[]) {
   const header = ["Skill Name", "Category", "Employees", "L1", "L2", "L3", "L4", "L5", "Avg Level"];
