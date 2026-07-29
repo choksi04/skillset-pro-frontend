@@ -122,6 +122,8 @@ export default function AllRegistriesPage() {
   } = useSkillRegistryStore();
   const { skills, fetchSkills, initialized: skillsInit } = useSkillStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
+  const { levels, fetchLevels } = useCompetencyLevelStore();
+  const maxLevel = levels.length > 0 ? levels.length : 5;
 
   const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
