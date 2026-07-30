@@ -704,23 +704,40 @@ export default function TeamAssessmentsPage() {
                     className={safePage === 1 ? "pointer-events-none opacity-50" : ""}
                   />
                 </PaginationItem>
-                {Array.from({ length: pageCount }).map((_, i) => {
-                  const n = i + 1;
-                  return (
-                    <PaginationItem key={n}>
-                      <PaginationLink
-                        href="#"
-                        isActive={n === safePage}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setPage(n);
-                        }}
-                      >
-                        {n}
-                      </PaginationLink>
-                    </PaginationItem>
+                {(() => {
+                  const items: (number | "ellipsis")[] = [];
+                  if (pageCount <= 7) {
+                    for (let i = 1; i <= pageCount; i++) items.push(i);
+                  } else {
+                    items.push(1);
+                    if (safePage > 3) items.push("ellipsis");
+                    for (let i = Math.max(2, safePage - 1); i <= Math.min(pageCount - 1, safePage + 1); i++) {
+                      items.push(i);
+                    }
+                    if (safePage < pageCount - 2) items.push("ellipsis");
+                    items.push(pageCount);
+                  }
+                  return items.map((item, idx) =>
+                    item === "ellipsis" ? (
+                      <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={item}>
+                        <PaginationLink
+                          href="#"
+                          isActive={item === safePage}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPage(item);
+                          }}
+                        >
+                          {item}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
                   );
-                })}
+                })()}
                 <PaginationItem>
                   <PaginationNext
                     href="#"
