@@ -5,7 +5,7 @@ import { useAdaptiveEngineStore, gradeMCQ } from '@/stores/adaptiveEngineStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelByNumber } from '@/stores/competencyLevelStore';
-import { Question } from '@/stores/questionStore';
+import { Question, useQuestionStore } from '@/stores/questionStore';
 import { getLatestSelfRatings } from '@/lib/selfRatings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -111,7 +111,7 @@ export default function AdaptiveRunner({
     fetchLevels();
   }, []);
 
-  // Initialize the engine + fetch the first question
+  // Initialize the engine + rehydrate previously saved answers + fetch the first question
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
@@ -126,7 +126,46 @@ export default function AdaptiveRunner({
           return;
         }
         const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
-        setProgress({ asked: 0, total });
+
+        // ── Resume support: rebuild the answered list from persisted state ──
+        // The adaptive state records every asked question; the answers themselves
+        // live in attempt_answers. Without this, reopening a completed-but-unsubmitted
+        // attempt lands on an empty review screen with Submit disabled.
+        const priorHistory = state.skills.flatMap((s) =>
+          (s.history ?? []).map((h) => ({ skillId: s.skill_id, questionId: h.question_id, level: h.level })),
+        );
+
+        let restored: AnsweredEntry[] = [];
+        if (priorHistory.length > 0) {
+          const attempts = await useAttemptStore.getState().fetchAttemptsForAssessment(assessment.id);
+          const attemptRow = attempts.find((a) => a.id === attemptId) ?? attempts[0];
+          const answerMap = new Map(
+            (attemptRow?.answers ?? []).map((a) => [a.question_id, a.answer_text]),
+          );
+          const questionRows = await useQuestionStore
+            .getState()
+            .fetchQuestionsByIds(priorHistory.map((h) => h.questionId));
+          const qMap = new Map(questionRows.map((q) => [q.id, q]));
+
+          restored = priorHistory
+            .map((h) => {
+              const question = qMap.get(h.questionId);
+              if (!question) return null;
+              return {
+                questionId: h.questionId,
+                question,
+                skillId: h.skillId,
+                level: h.level,
+                answer: answerMap.get(h.questionId) ?? '',
+              } as AnsweredEntry;
+            })
+            .filter((e): e is AnsweredEntry => e !== null);
+
+          for (const e of restored) ensureTopic(e.question.topic_id);
+          setAnswered(restored);
+        }
+
+        setProgress({ asked: restored.length, total });
         await loadNext();
       } catch (err: any) {
         const msg = err?.message || 'Unexpected error while starting the assessment';
@@ -138,6 +177,7 @@ export default function AdaptiveRunner({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   async function loadNext() {
     try {
