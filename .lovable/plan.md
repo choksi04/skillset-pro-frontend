@@ -1,39 +1,44 @@
-## Plan: Remove extra body/page scroll on Team Assessment page
+# Fix: Submit disabled after reopening a completed adaptive assessment
 
-### Current state confirmed
-- `src/pages/TeamAssessmentsPage.tsx` renders inside `<main>` of `src/components/layout/AppLayout.tsx`.
-- `AppLayout` already uses the correct single-scroll pattern: outermost `h-screen overflow-hidden`, right column `flex-1 flex-col overflow-hidden`, and `<main class="flex-1 overflow-y-auto p-6">`.
-- The Team Assessment page itself has no extra height/overflow rules; it is just `space-y-6` with header, table, pagination, and dialog portals.
-- The standalone dev server does not show a body scrollbar (verified via Playwright), but the document body is not explicitly locked to `overflow-hidden`. In some host contexts (e.g., Lovable preview) or when the body has a small amount of extra height from wrapper styles, the browser can still render a second page scrollbar alongside the internal `<main>` scrollbar.
+## What the employee hit
 
-### Root cause
-The authenticated app shell is a full-height flex container, but the **document body has no `overflow-hidden` rule**. The `h-screen` shell prevents the body from growing in standalone mode, but the host document/preview can still present a body scrollbar if the shell is 1px–taller than the viewport or the wrapper adds any extra height. The missing `min-h-0` on the scrolling `<main>` also makes the flex item slightly less robust against content expansion.
+They answered every question in an **adaptive** assessment, closed the page before submitting, reopened it, and the Submit button was greyed out.
 
-### Implementation
-Only one file will change: `src/components/layout/AppLayout.tsx`.
+## Root cause
 
-1. Add a `useEffect` that toggles `overflow-hidden` on `document.body` (and `document.documentElement`) while the authenticated shell is mounted. This suppresses the browser/page scrollbar on every authenticated page without touching the login, loading, or not-found pages.
-2. Add `min-h-0` to the `<main>` element to guarantee the flex item does not try to grow to its content height and is forced to scroll internally.
-3. Keep the existing `h-screen overflow-hidden` outer shell so the app still fills the viewport directly.
+The adaptive runner keeps the list of answered questions only in local component state.
 
-### Why this does not affect unrelated pages
-- `AppLayout` only wraps authenticated routes. The effect runs in `AppLayout` and is cleaned up on unmount, so `/login`, `/loading`, and `/404` keep their original body/html styles.
-- No backend, API, database, or table logic changes.
-- Team Assessment data, filters, pagination, and actions are untouched.
+- The adaptive engine state (which questions were asked, per-skill progress) *is* persisted in the attempt, and the answers *are* persisted in the answers table.
+- On reopen, the runner re-initialises with an empty in-memory answered list. Because the engine state says all questions were already asked, it immediately jumps to the review screen with zero rows.
+- The review screen's Submit button is disabled when the in-memory answered list is empty, so a fully answered attempt can never be submitted.
 
-### Manual test steps
-1. Sign in and open Team Assessments.
-2. Verify only **one** vertical scrollbar is visible (the internal `<main>` scrollbar on the right side of the content area).
-3. Verify the browser/page body cannot be scrolled.
-4. Scroll the content area; the header, sidebar, and page tabs should stay fixed.
-5. Confirm the table header, filters, pagination, and all row action buttons remain visible and usable.
-6. Open and close the filters popover and the "Assign from Template" / "Change reviewer" dialogs; confirm the body does not regain a scroll after closing.
-7. Repeat on a few viewport sizes: 1920×1080, 1366×768, 1280×800, 1024×768, and a narrow mobile width (e.g., 820×1180) to ensure no clipping.
+This also explains the earlier "No answer recorded" report on the same screen.
 
-### Viewport sizes to test
-- Desktop: 1920×1080, 1440×900, 1366×768, 1280×800
-- Laptop: 1024×768
-- Tablet: 820×1180, 768×1024
+The fixed (non-adaptive) runner already rehydrates answers from the attempt, so it is not affected.
 
-### Suggested next prompt
-Implement the plan to remove the body scrollbar from Team Assessments.
+## The fix (smallest atomic change)
+
+Rehydrate the adaptive runner's answered list from the already-persisted attempt data on start-up, instead of assuming a fresh session.
+
+Scope: `src/components/assessment/AdaptiveRunner.tsx` only. No backend, schema, or engine-logic changes.
+
+1. After initialising the adaptive attempt, load the attempt's saved answers using the existing attempt store fetch scoped to the assessment.
+2. Load the corresponding question records with the existing `fetchQuestionsByIds` helper so the review list can render text, skill, topic, and level.
+3. Seed the runner's `answered` list and the asked-count/progress ring from those saved answers, matching each answer to its skill and level from the persisted adaptive state.
+4. Keep the Submit button disabled while this hydration is in flight (show the existing loading state), then enable it once saved answers are present.
+
+## Guardrails kept intact
+
+- Submit stays disabled when there genuinely are no answers.
+- Already submitted/evaluated attempts are unaffected — they never enter the runner.
+- No duplicate submission: the existing `finalizing` guard and terminal-status checks are unchanged.
+- Nothing changes for fixed assessments, registry, question bank, or review flows.
+
+## Manual test steps
+
+1. Start an adaptive assessment as an employee and answer all questions.
+2. Close/navigate away before clicking Submit.
+3. Reopen the assessment and resume.
+4. The review screen should list every previously answered question with the chosen option, and Submit should be enabled.
+5. Submit and confirm the attempt is evaluated and a manager review is created as before.
+6. Repeat, closing after only 1–2 answers: the runner should continue at the next question with prior answers preserved.
