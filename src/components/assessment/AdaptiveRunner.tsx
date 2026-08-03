@@ -5,7 +5,7 @@ import { useAdaptiveEngineStore, gradeMCQ } from '@/stores/adaptiveEngineStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelByNumber } from '@/stores/competencyLevelStore';
-import { Question } from '@/stores/questionStore';
+import { Question, useQuestionStore } from '@/stores/questionStore';
 import { getLatestSelfRatings } from '@/lib/selfRatings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
