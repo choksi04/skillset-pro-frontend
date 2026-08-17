@@ -94,8 +94,11 @@ export default function AdaptiveRunner({
   const [finished, setFinished] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [answered, setAnswered] = useState<AnsweredEntry[]>([]);
+  const [exhaustedEarly, setExhaustedEarly] = useState(false);
+  const plannedTotalRef = useRef(0);
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
+
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const [topicMap, setTopicMap] = useState<Record<string, string>>({});
