@@ -168,7 +168,9 @@ export default function AdaptiveRunner({
           setAnswered(restored);
         }
 
+        plannedTotalRef.current = total;
         setProgress({ asked: restored.length, total });
+
         await loadNext();
       } catch (err: any) {
         const msg = err?.message || 'Unexpected error while starting the assessment';
