@@ -379,6 +379,18 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
+        {exhaustedEarly && (
+          <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
+            <p className="text-sm text-foreground">
+              This is the end of your assessment. The adaptive engine ran out of eligible questions for
+              the selected skills, so it finished after {answered.length} question
+              {answered.length === 1 ? '' : 's'}.
+            </p>
+          </div>
+        )}
+
+
+
         <div className="flex-1 rounded-xl border border-border bg-card overflow-y-auto">
           {answered.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground py-12">
