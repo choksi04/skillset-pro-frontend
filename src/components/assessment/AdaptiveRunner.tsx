@@ -185,9 +185,14 @@ export default function AdaptiveRunner({
       if (!question || !skillState) {
         // No more questions — open review instead of auto-finalizing.
         setCurrentQuestion(null);
+        // The engine can stop early when the bank runs out of eligible MCQs.
+        // Cap the advertised total so the UI never promises more than delivered.
+        setProgress((p) => ({ asked: p.asked, total: p.asked }));
+        setExhaustedEarly((prevTotal) => prevTotal);
         setReviewOpen(true);
         return;
       }
+
       setCurrentQuestion(question);
       ensureTopic(question.topic_id);
       setCurrentSkillId(skillState.skill_id);
