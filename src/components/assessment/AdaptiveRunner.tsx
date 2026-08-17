@@ -190,8 +190,11 @@ export default function AdaptiveRunner({
         setCurrentQuestion(null);
         // The engine can stop early when the bank runs out of eligible MCQs.
         // Cap the advertised total so the UI never promises more than delivered.
-        setProgress((p) => ({ asked: p.asked, total: p.asked }));
-        setExhaustedEarly((prevTotal) => prevTotal);
+        setProgress((p) => {
+          if (plannedTotalRef.current > 0 && p.asked < plannedTotalRef.current) setExhaustedEarly(true);
+          return { asked: p.asked, total: p.asked };
+        });
+
         setReviewOpen(true);
         return;
       }
