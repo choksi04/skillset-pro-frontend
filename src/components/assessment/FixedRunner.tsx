@@ -600,9 +600,22 @@ export default function FixedRunner({ assessment, onComplete, onCancel }: Props)
           <Button size="sm" variant="outline" onClick={handleExit} disabled={isExiting || isSubmitting} className="gap-1.5">
             {isExiting ? <><Loader2 size={14} className="animate-spin" /> Exiting…</> : 'Exit'}
           </Button>
-          <Button size="sm" variant="default" onClick={openReview} disabled={isPaused || isSubmitting || isOpeningReview || isNavigating} className="gap-1.5">
-            {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Review & submit
-          </Button>
+          {(() => {
+            const atEnd = currentIdx === currentQuestions.length - 1 || answeredCount >= currentQuestions.length;
+            return (
+              <Button
+                size="sm"
+                variant={atEnd ? 'default' : 'outline'}
+                onClick={openReview}
+                disabled={isPaused || isSubmitting || isOpeningReview || isNavigating}
+                className="gap-1.5"
+              >
+                {isOpeningReview ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
+                {atEnd ? 'Review & submit' : 'Review answers'}
+              </Button>
+            );
+          })()}
+
         </div>
       </div>
 

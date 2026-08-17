@@ -94,8 +94,11 @@ export default function AdaptiveRunner({
   const [finished, setFinished] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [answered, setAnswered] = useState<AnsweredEntry[]>([]);
+  const [exhaustedEarly, setExhaustedEarly] = useState(false);
+  const plannedTotalRef = useRef(0);
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
+
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const [topicMap, setTopicMap] = useState<Record<string, string>>({});
@@ -165,7 +168,9 @@ export default function AdaptiveRunner({
           setAnswered(restored);
         }
 
+        plannedTotalRef.current = total;
         setProgress({ asked: restored.length, total });
+
         await loadNext();
       } catch (err: any) {
         const msg = err?.message || 'Unexpected error while starting the assessment';
@@ -185,9 +190,17 @@ export default function AdaptiveRunner({
       if (!question || !skillState) {
         // No more questions — open review instead of auto-finalizing.
         setCurrentQuestion(null);
+        // The engine can stop early when the bank runs out of eligible MCQs.
+        // Cap the advertised total so the UI never promises more than delivered.
+        setProgress((p) => {
+          if (plannedTotalRef.current > 0 && p.asked < plannedTotalRef.current) setExhaustedEarly(true);
+          return { asked: p.asked, total: p.asked };
+        });
+
         setReviewOpen(true);
         return;
       }
+
       setCurrentQuestion(question);
       ensureTopic(question.topic_id);
       setCurrentSkillId(skillState.skill_id);
@@ -365,6 +378,18 @@ export default function AdaptiveRunner({
             </Button>
           </div>
         </div>
+
+        {exhaustedEarly && (
+          <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
+            <p className="text-sm text-foreground">
+              This is the end of your assessment. The adaptive engine ran out of eligible questions for
+              the selected skills, so it finished after {answered.length} question
+              {answered.length === 1 ? '' : 's'}.
+            </p>
+          </div>
+        )}
+
+
 
         <div className="flex-1 rounded-xl border border-border bg-card overflow-y-auto">
           {answered.length === 0 ? (
