@@ -230,15 +230,17 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       assessmentRow.domain_id,
     );
 
-    const { data: mcqAvailability } = await supabase
-      .from('questions')
-      .select('skill_id')
-      .in('skill_id', candidateSkills)
-      .eq('question_type', 'mcq')
-      .eq('status', 'published')
-      .is('deleted_on', null);
-    const skillsWithMcq = new Set((mcqAvailability || []).map((q: any) => q.skill_id));
+    // Per-skill existence check (HEAD counts) — a listing query is capped at
+    // 1000 rows and would silently drop skills from large question banks.
+    const skillsWithMcq = await getSkillsWithPublishedMcqs(candidateSkills);
     const usableSkills = candidateSkills.filter((s) => skillsWithMcq.has(s));
+    const excludedSkills = candidateSkills.filter((s) => !skillsWithMcq.has(s));
+    if (excludedSkills.length > 0) {
+      console.warn(
+        'adaptive: skills excluded — no published MCQs available:',
+        excludedSkills.join(', '),
+      );
+    }
 
     if (usableSkills.length === 0) {
       return { state: null, reason: 'No published MCQs available for any selected skill' };
