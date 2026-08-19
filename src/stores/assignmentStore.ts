@@ -4,6 +4,7 @@ import { getCurrentUserId } from '@/lib/audit';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { useTemplateStore, AssessmentTemplate } from './templateStore';
 import { getLatestSelfRatings } from '@/lib/selfRatings';
+import { getSkillsWithPublishedMcqs } from '@/lib/questionAvailability';
 
 export type AssignmentStatus =
   | 'new'
