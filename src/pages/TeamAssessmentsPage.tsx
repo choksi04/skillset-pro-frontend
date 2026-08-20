@@ -105,6 +105,15 @@ export default function TeamAssessmentsPage() {
   const navigate = useNavigate();
   const { fetchAssignments } = useAssignmentStore();
 
+  // Resolve an assessment question's target_level (uuid or level name) to its numeric level.
+  const resolveLevel = useMemo(() => {
+    const byId = getIdToLevelMap(levels);
+    const byName = getCompetencyToLevelMap(levels);
+    return (t: string) => byId[t] ?? byName[t] ?? null;
+  }, [levels]);
+
+
+
 
 
 
