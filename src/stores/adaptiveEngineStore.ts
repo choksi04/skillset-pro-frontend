@@ -341,6 +341,12 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const state = await loadState(attemptId);
     if (!state) return { question: null, aq: null, skillState: null };
 
+    // Hard stop: never deliver more than the attempt's authoritative target.
+    const delivered = state.excludedQuestionIds.length;
+    if (delivered >= getTargetTotal(state)) {
+      return { question: null, aq: null, skillState: null };
+    }
+
     const skillsLeft = state.skills.filter((s) => !s.done);
     if (skillsLeft.length === 0) return { question: null, aq: null, skillState: null };
 
@@ -351,6 +357,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       if (!s.done) ordered.push(s);
     }
     const skill = ordered[0];
+
 
     const { levelToId } = await loadCompetencyLevelMap();
     if (Object.keys(levelToId).length === 0) {
