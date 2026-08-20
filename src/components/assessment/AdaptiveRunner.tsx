@@ -95,6 +95,7 @@ export default function AdaptiveRunner({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [answered, setAnswered] = useState<AnsweredEntry[]>([]);
   const [exhaustedEarly, setExhaustedEarly] = useState(false);
+  const [shortfall, setShortfall] = useState<string | null>(null);
   const plannedTotalRef = useRef(0);
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
