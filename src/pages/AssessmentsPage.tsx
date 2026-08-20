@@ -414,7 +414,10 @@ export default function AssessmentsPage() {
                     <TableCell className="align-top">
                       {(() => {
                         if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
-                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        const { level } = getAchievedLevelFromAttempt(attempt, {
+                          questions: a.assessment_questions,
+                          resolveLevel,
+                        });
                         if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
                           <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
