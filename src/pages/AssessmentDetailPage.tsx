@@ -663,7 +663,7 @@ export default function AssessmentDetailPage() {
 
       {/* Result Summary — terminal attempts only */}
       {isAttemptTerminal && attempt && (
-        <ResultSummaryCard attempt={attempt} review={review} />
+        <ResultSummaryCard attempt={attempt} review={review} questions={assessment.assessment_questions} />
       )}
 
       {/* Assessment Questions list — collapsible.
