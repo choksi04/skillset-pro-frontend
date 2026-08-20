@@ -507,9 +507,10 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       levelChanged = true;
     }
 
-    if (skill.attemptedCount >= state.questionsPerSkill) {
+    if (Math.max(skill.attemptedCount, skill.deliveredCount ?? 0) >= getSkillQuota(state, skill_id)) {
       skill.done = true;
     }
+
 
     const currentSkillIdx = state.skills.findIndex((s) => s.skill_id === skill_id);
     state.rrIndex = (currentSkillIdx + 1) % state.skills.length;
