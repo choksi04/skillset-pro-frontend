@@ -29,6 +29,9 @@ export interface SkillAdaptiveState {
   history: { question_id: string; level: number; correct: boolean; fallback?: boolean }[];
   /** Topic IDs already asked for this skill — used to diversify topic coverage. */
   askedTopicIds?: string[];
+  /** Questions handed to the employee for this skill (answered or not). */
+  deliveredCount?: number;
+
 }
 
 export interface AdaptiveAttemptState {
