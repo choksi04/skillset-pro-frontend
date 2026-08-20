@@ -7,7 +7,7 @@ import { useSkillStore } from "@/stores/skillStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 import { useTemplateStore } from "@/stores/templateStore";
-import { useCompetencyLevelStore, getLevelLabelByNumber, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, getLevelLabelByNumber, getFormattedLevelLabel, getIdToLevelMap, getCompetencyToLevelMap } from "@/stores/competencyLevelStore";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
