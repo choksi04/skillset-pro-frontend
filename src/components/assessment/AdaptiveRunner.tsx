@@ -458,6 +458,9 @@ export default function AdaptiveRunner({
   const skillName = skillNameMap.get(currentSkillId) ?? 'Skill';
   const levelLabel = getLevelLabelByNumber(levels, currentLevel);
   const totalForRing = Math.max(progress.total, progress.asked + 1);
+  const currentNumber = progress.total > 0
+    ? Math.min(progress.asked + 1, progress.total)
+    : progress.asked + 1;
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -470,11 +473,12 @@ export default function AdaptiveRunner({
               <Brain size={14} className="text-primary" /> Adaptive Assessment
             </h3>
             <p className="text-xs text-muted-foreground">
-              Question {progress.asked + 1}
-              {progress.total > 0 ? ` of up to ${progress.total}` : ''} · the next question adapts to your answers
+              Question {currentNumber}
+              {progress.total > 0 ? ` of ${progress.total}` : ''} · the next question adapts to your answers
             </p>
           </div>
         </div>
+
         <Badge variant="outline" className="gap-1.5">
           <Sparkles size={12} className="text-primary" /> Adaptive Engine
         </Badge>
