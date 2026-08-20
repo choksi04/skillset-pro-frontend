@@ -84,14 +84,19 @@ function applySkillErrorCap(s: {
  * secondary "X / Y correct" label.
  */
 export function getAchievedLevelFromAttempt(
-  attempt: Pick<AssessmentAttempt, "skill_scores"> & { adaptive_state?: any } | null | undefined,
+  attempt: Pick<AssessmentAttempt, "skill_scores"> & { adaptive_state?: any; ai_evaluations?: any[] } | null | undefined,
+  opts?: {
+    /** Questions delivered for this (fixed) assessment, each with its target competency level. */
+    questions?: Array<{ question_id: string; skill_id: string; target_level: string }>;
+    /** Resolve a target_level identifier (uuid or name) to its numeric level. */
+    resolveLevel?: (targetLevel: string) => number | null | undefined;
+  },
 ): { level: number | null; correct: number; total: number } {
   if (!attempt) return { level: null, correct: 0, total: 0 };
 
   const adaptive: any = (attempt as any).adaptive_state ?? {};
   const adaptiveSkills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
 
-  if (adaptiveSkills.length > 0) {
     const perSkill = adaptiveSkills
       .filter((s) => Array.isArray(s.history) && s.history.length > 0)
       .map((s) => {
