@@ -475,7 +475,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     if (!state) return;
 
     const skill = state.skills.find((s) => s.skill_id === skill_id);
-    if (!skill || skill.done) return;
+    // A delivered question's answer is ALWAYS recorded — `done` only gates
+    // delivery of new questions, never persistence of an answer already given.
+    if (!skill) return;
+    if (skill.history.some((h) => h.question_id === question_id)) return;
+
 
     if (correct) {
       skill.correctStreak += 1;
