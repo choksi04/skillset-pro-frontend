@@ -78,6 +78,15 @@ export default function AssessmentsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Resolve an assessment question's target_level (uuid or level name) to its numeric level.
+  const resolveLevel = useMemo(() => {
+    const byId = getIdToLevelMap(competencyLevels);
+    const byName = getCompetencyToLevelMap(competencyLevels);
+    return (t: string) => byId[t] ?? byName[t] ?? null;
+  }, [competencyLevels]);
+
+
+
   const [search, setSearch] = useState("");
   const [assignerNames, setAssignerNames] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
