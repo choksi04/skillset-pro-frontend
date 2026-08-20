@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useAdaptiveEngineStore, gradeMCQ } from '@/stores/adaptiveEngineStore';
+import { useAdaptiveEngineStore, gradeMCQ, getTargetTotal } from '@/stores/adaptiveEngineStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelByNumber } from '@/stores/competencyLevelStore';
@@ -95,6 +95,7 @@ export default function AdaptiveRunner({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [answered, setAnswered] = useState<AnsweredEntry[]>([]);
   const [exhaustedEarly, setExhaustedEarly] = useState(false);
+  const [shortfall, setShortfall] = useState<string | null>(null);
   const plannedTotalRef = useRef(0);
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
@@ -128,7 +129,9 @@ export default function AdaptiveRunner({
           setLoading(false);
           return;
         }
-        const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
+        const total = getTargetTotal(state);
+        if (state.shortfallReason) setShortfall(state.shortfallReason);
+
 
         // ── Resume support: rebuild the answered list from persisted state ──
         // The adaptive state records every asked question; the answers themselves
@@ -379,15 +382,16 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        {exhaustedEarly && (
+        {(exhaustedEarly || shortfall) && (
           <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
             <p className="text-sm text-foreground">
-              This is the end of your assessment. The adaptive engine ran out of eligible questions for
-              the selected skills, so it finished after {answered.length} question
+              This is the end of your assessment. It finished after {answered.length} question
               {answered.length === 1 ? '' : 's'}.
+              {shortfall ? ` ${shortfall}` : ' The adaptive engine ran out of eligible questions for the selected skills.'}
             </p>
           </div>
         )}
+
 
 
 
@@ -454,6 +458,9 @@ export default function AdaptiveRunner({
   const skillName = skillNameMap.get(currentSkillId) ?? 'Skill';
   const levelLabel = getLevelLabelByNumber(levels, currentLevel);
   const totalForRing = Math.max(progress.total, progress.asked + 1);
+  const currentNumber = progress.total > 0
+    ? Math.min(progress.asked + 1, progress.total)
+    : progress.asked + 1;
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -466,11 +473,12 @@ export default function AdaptiveRunner({
               <Brain size={14} className="text-primary" /> Adaptive Assessment
             </h3>
             <p className="text-xs text-muted-foreground">
-              Question {progress.asked + 1}
-              {progress.total > 0 ? ` of up to ${progress.total}` : ''} · the next question adapts to your answers
+              Question {currentNumber}
+              {progress.total > 0 ? ` of ${progress.total}` : ''} · the next question adapts to your answers
             </p>
           </div>
         </div>
+
         <Badge variant="outline" className="gap-1.5">
           <Sparkles size={12} className="text-primary" /> Adaptive Engine
         </Badge>

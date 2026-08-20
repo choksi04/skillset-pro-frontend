@@ -7,7 +7,7 @@ import { useAttemptStore, AssessmentAttempt, AnswerEntry, SkillScore } from './a
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { syncAssignmentForAttempt } from './assignmentStore';
 import { getLatestSelfRatingMap } from '@/lib/selfRatings';
-import { getSkillsWithPublishedMcqs } from '@/lib/questionAvailability';
+import { getPublishedMcqCountsBySkill } from '@/lib/questionAvailability';
 
 /**
  * Per-skill state tracked in assessment_attempts.adaptive_state.
@@ -29,6 +29,9 @@ export interface SkillAdaptiveState {
   history: { question_id: string; level: number; correct: boolean; fallback?: boolean }[];
   /** Topic IDs already asked for this skill — used to diversify topic coverage. */
   askedTopicIds?: string[];
+  /** Questions handed to the employee for this skill (answered or not). */
+  deliveredCount?: number;
+
 }
 
 export interface AdaptiveAttemptState {
@@ -39,7 +42,27 @@ export interface AdaptiveAttemptState {
   template_id: string | null;
   skills: SkillAdaptiveState[];
   excludedQuestionIds: string[]; // global pool: never reuse a question across skills
+  /** Per-skill question quota (may differ from questionsPerSkill after top-up redistribution). */
+  quotas?: Record<string, number>;
+  /** Authoritative number of questions this attempt will deliver. */
+  targetTotal?: number;
+  /** skills_per_assessment x questions_per_skill as configured on the template. */
+  configuredTotal?: number;
+  /** Human-readable explanation when targetTotal < configuredTotal. */
+  shortfallReason?: string | null;
 }
+
+/** Per-skill quota, tolerant of attempts created before quotas were persisted. */
+export function getSkillQuota(state: AdaptiveAttemptState, skillId: string): number {
+  return state.quotas?.[skillId] ?? state.questionsPerSkill;
+}
+
+/** Authoritative total for an attempt, tolerant of legacy adaptive_state rows. */
+export function getTargetTotal(state: AdaptiveAttemptState): number {
+  if (typeof state.targetTotal === 'number' && state.targetTotal > 0) return state.targetTotal;
+  return state.skills.reduce((acc, s) => acc + getSkillQuota(state, s.skill_id), 0);
+}
+
 
 interface AdaptiveEngineStore {
   /** Initialize per-skill state for an adaptive attempt. Idempotent. */
@@ -189,6 +212,12 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       .maybeSingle();
     if (!templateRow) return { state: null, reason: 'Template not found' };
 
+    const skillsPerAssessment = templateRow.skills_per_assessment ?? 5;
+    const questionsPerSkill =
+      templateRow.questions_per_skill && templateRow.questions_per_skill > 0
+        ? templateRow.questions_per_skill
+        : 4;
+
     let candidateSkills: string[] = [];
     if (templateRow.skill_selection_mode === 'custom') {
       const { data: tplSkills } = await supabase
@@ -204,7 +233,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       );
       candidateSkills = Object.entries(ratingMap)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, templateRow.skills_per_assessment ?? 5)
+        .slice(0, skillsPerAssessment)
         .map(([skillId]) => skillId);
     }
 
@@ -217,10 +246,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         .select('skill_id')
         .eq('domain_id', assessmentRow.domain_id)
         .is('deleted_on', null);
-      candidateSkills = (domainSkills || [])
-        .map((s: any) => s.skill_id)
-        .slice(0, templateRow.skills_per_assessment ?? 5);
+      candidateSkills = (domainSkills || []).map((s: any) => s.skill_id);
     }
+
+    // One consistent cap across every selection mode.
+    candidateSkills = [...new Set(candidateSkills.filter(Boolean))].slice(0, skillsPerAssessment);
 
     if (candidateSkills.length === 0) {
       return { state: null, reason: 'No skills resolved for this adaptive assessment' };
@@ -231,11 +261,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       assessmentRow.domain_id,
     );
 
-    // Per-skill existence check (HEAD counts) — a listing query is capped at
-    // 1000 rows and would silently drop skills from large question banks.
-    const skillsWithMcq = await getSkillsWithPublishedMcqs(candidateSkills);
-    const usableSkills = candidateSkills.filter((s) => skillsWithMcq.has(s));
-    const excludedSkills = candidateSkills.filter((s) => !skillsWithMcq.has(s));
+    // Per-skill counts (HEAD counts) — a listing query is capped at 1000 rows
+    // and would silently drop skills from large question banks.
+    const mcqCounts = await getPublishedMcqCountsBySkill(candidateSkills);
+    const usableSkills = candidateSkills.filter((s) => (mcqCounts.get(s) ?? 0) > 0);
+    const excludedSkills = candidateSkills.filter((s) => (mcqCounts.get(s) ?? 0) === 0);
     if (excludedSkills.length > 0) {
       console.warn(
         'adaptive: skills excluded — no published MCQs available:',
@@ -246,6 +276,36 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     if (usableSkills.length === 0) {
       return { state: null, reason: 'No published MCQs available for any selected skill' };
     }
+
+    // ── Question budget ──────────────────────────────────────────────────
+    // The configured total is what the template promises. Start every usable
+    // skill at questionsPerSkill (capped by its eligible bank), then top up
+    // the remaining budget round-robin so dropped/thin skills do not silently
+    // shrink the assessment.
+    const configuredTotal = candidateSkills.length * questionsPerSkill;
+    const quotas: Record<string, number> = {};
+    for (const s of usableSkills) {
+      quotas[s] = Math.min(questionsPerSkill, mcqCounts.get(s) ?? 0);
+    }
+    let assigned = usableSkills.reduce((acc, s) => acc + quotas[s], 0);
+    let progressed = true;
+    while (assigned < configuredTotal && progressed) {
+      progressed = false;
+      for (const s of usableSkills) {
+        if (assigned >= configuredTotal) break;
+        if (quotas[s] < (mcqCounts.get(s) ?? 0)) {
+          quotas[s] += 1;
+          assigned += 1;
+          progressed = true;
+        }
+      }
+    }
+    const targetTotal = assigned;
+    const shortfallReason =
+      targetTotal < configuredTotal
+        ? `Only ${targetTotal} of the ${configuredTotal} configured questions could be generated — the question bank does not have enough published MCQs for the selected skills.`
+        : null;
+    if (shortfallReason) console.warn('adaptive:', shortfallReason);
 
     const skills: SkillAdaptiveState[] = usableSkills.map((skill_id) => {
       const start = clampLevel(selfRatingMap[skill_id] ?? 3);
@@ -264,20 +324,31 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const state: AdaptiveAttemptState = {
       initialized: true,
       rrIndex: 0,
-      questionsPerSkill: clampLevel(templateRow.questions_per_skill ?? 4) === 0 ? 4 : (templateRow.questions_per_skill ?? 4),
+      questionsPerSkill,
       domain_id: assessmentRow.domain_id ?? null,
       template_id: templateId,
       skills,
       excludedQuestionIds: [],
+      quotas,
+      targetTotal,
+      configuredTotal,
+      shortfallReason,
     };
 
     await persistState(attemptRow.id, state);
     return { state };
   },
 
+
   getNextQuestion: async (attemptId, assessmentId) => {
     const state = await loadState(attemptId);
     if (!state) return { question: null, aq: null, skillState: null };
+
+    // Hard stop: never deliver more than the attempt's authoritative target.
+    const delivered = state.excludedQuestionIds.length;
+    if (delivered >= getTargetTotal(state)) {
+      return { question: null, aq: null, skillState: null };
+    }
 
     const skillsLeft = state.skills.filter((s) => !s.done);
     if (skillsLeft.length === 0) return { question: null, aq: null, skillState: null };
@@ -289,6 +360,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       if (!s.done) ordered.push(s);
     }
     const skill = ordered[0];
+
 
     const { levelToId } = await loadCompetencyLevelMap();
     if (Object.keys(levelToId).length === 0) {
@@ -364,10 +436,15 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     }
 
     state.excludedQuestionIds.push(chosen.row.id);
+    skill.deliveredCount = (skill.deliveredCount ?? skill.attemptedCount) + 1;
+    if (skill.deliveredCount >= getSkillQuota(state, skill.skill_id)) {
+      skill.done = true;
+    }
     if (chosen.row.topic_id) {
       skill.askedTopicIds = [...(skill.askedTopicIds ?? []), chosen.row.topic_id];
     }
     await persistState(attemptId, state);
+
 
     const question: Question = {
       id: chosen.row.id,
@@ -398,7 +475,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     if (!state) return;
 
     const skill = state.skills.find((s) => s.skill_id === skill_id);
-    if (!skill || skill.done) return;
+    // A delivered question's answer is ALWAYS recorded — `done` only gates
+    // delivery of new questions, never persistence of an answer already given.
+    if (!skill) return;
+    if (skill.history.some((h) => h.question_id === question_id)) return;
+
 
     if (correct) {
       skill.correctStreak += 1;
@@ -426,9 +507,10 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       levelChanged = true;
     }
 
-    if (skill.attemptedCount >= state.questionsPerSkill) {
+    if (Math.max(skill.attemptedCount, skill.deliveredCount ?? 0) >= getSkillQuota(state, skill_id)) {
       skill.done = true;
     }
+
 
     const currentSkillIdx = state.skills.findIndex((s) => s.skill_id === skill_id);
     state.rrIndex = (currentSkillIdx + 1) % state.skills.length;
