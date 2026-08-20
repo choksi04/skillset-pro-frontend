@@ -209,6 +209,12 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       .maybeSingle();
     if (!templateRow) return { state: null, reason: 'Template not found' };
 
+    const skillsPerAssessment = templateRow.skills_per_assessment ?? 5;
+    const questionsPerSkill =
+      templateRow.questions_per_skill && templateRow.questions_per_skill > 0
+        ? templateRow.questions_per_skill
+        : 4;
+
     let candidateSkills: string[] = [];
     if (templateRow.skill_selection_mode === 'custom') {
       const { data: tplSkills } = await supabase
@@ -224,7 +230,7 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       );
       candidateSkills = Object.entries(ratingMap)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, templateRow.skills_per_assessment ?? 5)
+        .slice(0, skillsPerAssessment)
         .map(([skillId]) => skillId);
     }
 
@@ -237,10 +243,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         .select('skill_id')
         .eq('domain_id', assessmentRow.domain_id)
         .is('deleted_on', null);
-      candidateSkills = (domainSkills || [])
-        .map((s: any) => s.skill_id)
-        .slice(0, templateRow.skills_per_assessment ?? 5);
+      candidateSkills = (domainSkills || []).map((s: any) => s.skill_id);
     }
+
+    // One consistent cap across every selection mode.
+    candidateSkills = [...new Set(candidateSkills.filter(Boolean))].slice(0, skillsPerAssessment);
 
     if (candidateSkills.length === 0) {
       return { state: null, reason: 'No skills resolved for this adaptive assessment' };
@@ -251,11 +258,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
       assessmentRow.domain_id,
     );
 
-    // Per-skill existence check (HEAD counts) — a listing query is capped at
-    // 1000 rows and would silently drop skills from large question banks.
-    const skillsWithMcq = await getSkillsWithPublishedMcqs(candidateSkills);
-    const usableSkills = candidateSkills.filter((s) => skillsWithMcq.has(s));
-    const excludedSkills = candidateSkills.filter((s) => !skillsWithMcq.has(s));
+    // Per-skill counts (HEAD counts) — a listing query is capped at 1000 rows
+    // and would silently drop skills from large question banks.
+    const mcqCounts = await getPublishedMcqCountsBySkill(candidateSkills);
+    const usableSkills = candidateSkills.filter((s) => (mcqCounts.get(s) ?? 0) > 0);
+    const excludedSkills = candidateSkills.filter((s) => (mcqCounts.get(s) ?? 0) === 0);
     if (excludedSkills.length > 0) {
       console.warn(
         'adaptive: skills excluded — no published MCQs available:',
@@ -266,6 +273,36 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     if (usableSkills.length === 0) {
       return { state: null, reason: 'No published MCQs available for any selected skill' };
     }
+
+    // ── Question budget ──────────────────────────────────────────────────
+    // The configured total is what the template promises. Start every usable
+    // skill at questionsPerSkill (capped by its eligible bank), then top up
+    // the remaining budget round-robin so dropped/thin skills do not silently
+    // shrink the assessment.
+    const configuredTotal = candidateSkills.length * questionsPerSkill;
+    const quotas: Record<string, number> = {};
+    for (const s of usableSkills) {
+      quotas[s] = Math.min(questionsPerSkill, mcqCounts.get(s) ?? 0);
+    }
+    let assigned = usableSkills.reduce((acc, s) => acc + quotas[s], 0);
+    let progressed = true;
+    while (assigned < configuredTotal && progressed) {
+      progressed = false;
+      for (const s of usableSkills) {
+        if (assigned >= configuredTotal) break;
+        if (quotas[s] < (mcqCounts.get(s) ?? 0)) {
+          quotas[s] += 1;
+          assigned += 1;
+          progressed = true;
+        }
+      }
+    }
+    const targetTotal = assigned;
+    const shortfallReason =
+      targetTotal < configuredTotal
+        ? `Only ${targetTotal} of the ${configuredTotal} configured questions could be generated — the question bank does not have enough published MCQs for the selected skills.`
+        : null;
+    if (shortfallReason) console.warn('adaptive:', shortfallReason);
 
     const skills: SkillAdaptiveState[] = usableSkills.map((skill_id) => {
       const start = clampLevel(selfRatingMap[skill_id] ?? 3);
@@ -284,16 +321,21 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const state: AdaptiveAttemptState = {
       initialized: true,
       rrIndex: 0,
-      questionsPerSkill: clampLevel(templateRow.questions_per_skill ?? 4) === 0 ? 4 : (templateRow.questions_per_skill ?? 4),
+      questionsPerSkill,
       domain_id: assessmentRow.domain_id ?? null,
       template_id: templateId,
       skills,
       excludedQuestionIds: [],
+      quotas,
+      targetTotal,
+      configuredTotal,
+      shortfallReason,
     };
 
     await persistState(attemptRow.id, state);
     return { state };
   },
+
 
   getNextQuestion: async (attemptId, assessmentId) => {
     const state = await loadState(attemptId);
