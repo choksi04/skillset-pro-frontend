@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Assessment } from '@/stores/assessmentStore';
 import { useAttemptStore } from '@/stores/attemptStore';
-import { useAdaptiveEngineStore, gradeMCQ } from '@/stores/adaptiveEngineStore';
+import { useAdaptiveEngineStore, gradeMCQ, getTargetTotal } from '@/stores/adaptiveEngineStore';
 import { useReviewStore } from '@/stores/reviewStore';
 import { useSkillStore } from '@/stores/skillStore';
 import { useCompetencyLevelStore, getLevelLabelByNumber } from '@/stores/competencyLevelStore';
