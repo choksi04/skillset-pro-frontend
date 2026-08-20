@@ -382,15 +382,16 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        {exhaustedEarly && (
+        {(exhaustedEarly || shortfall) && (
           <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
             <p className="text-sm text-foreground">
-              This is the end of your assessment. The adaptive engine ran out of eligible questions for
-              the selected skills, so it finished after {answered.length} question
+              This is the end of your assessment. It finished after {answered.length} question
               {answered.length === 1 ? '' : 's'}.
+              {shortfall ? ` ${shortfall}` : ' The adaptive engine ran out of eligible questions for the selected skills.'}
             </p>
           </div>
         )}
+
 
 
 
