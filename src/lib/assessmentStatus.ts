@@ -125,9 +125,48 @@ export function getAchievedLevelFromAttempt(
     return { level, correct: totals.correct, total: totals.total };
   }
 
-  // Non-adaptive fallback (fixed runner) — use per-skill calculated_level with error cap.
+  // Fixed (non-adaptive) evidence path — mirror the adaptive rule using the
+  // delivered questions' target levels + per-question AI evaluation scores.
+  const questions = opts?.questions ?? [];
+  const evals: any[] = (attempt as any).ai_evaluations ?? [];
+  if (questions.length > 0 && evals.length > 0 && opts?.resolveLevel) {
+    const scoreByQuestion = new Map<string, number>(
+      evals.map((e: any) => [e.question_id as string, Number(e.score) || 0]),
+    );
+
+    const bySkill = new Map<string, { total: number; correct: number; achieved: number | null }>();
+    questions.forEach((q) => {
+      const score = scoreByQuestion.get(q.question_id);
+      if (score == null) return; // question not evaluated — ignore
+      const lvl = opts.resolveLevel!(q.target_level);
+      const entry = bySkill.get(q.skill_id) ?? { total: 0, correct: 0, achieved: null };
+      entry.total += 1;
+      if (score >= 50) {
+        entry.correct += 1;
+        if (typeof lvl === "number") {
+          entry.achieved = entry.achieved == null ? lvl : Math.max(entry.achieved, lvl);
+        }
+      }
+      bySkill.set(q.skill_id, entry);
+    });
+
+    const rows = Array.from(bySkill.values());
+    if (rows.length > 0) {
+      const totals = rows.reduce(
+        (acc, r) => ({ correct: acc.correct + r.correct, total: acc.total + r.total }),
+        { correct: 0, total: 0 },
+      );
+      const lvls = rows.map((r) => r.achieved).filter((l): l is number => typeof l === "number");
+      const level = lvls.length ? Math.round(lvls.reduce((a, b) => a + b, 0) / lvls.length) : null;
+      return { level, correct: totals.correct, total: totals.total };
+    }
+  }
+
+  // Fallback (no evaluations / level data) — use per-skill calculated_level with error cap.
   const ss = attempt.skill_scores ?? [];
   if (ss.length === 0) return { level: null, correct: 0, total: 0 };
+
+
 
   const totals = ss.reduce(
     (acc, s) => {
