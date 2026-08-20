@@ -224,7 +224,7 @@ export default function TeamAssessmentsPage() {
 
     let levelLabel = "N/A";
     let hasLevel = false;
-    const achieved = getAchievedLevelFromAttempt(attempt);
+    const achieved = getAchievedLevelFromAttempt(attempt, { questions: a.assessment_questions, resolveLevel });
     if (achieved.level != null && levels.length > 0) {
       levelLabel = getLevelLabelByNumber(levels, achieved.level);
       hasLevel = true;
