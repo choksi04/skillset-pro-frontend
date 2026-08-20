@@ -39,7 +39,27 @@ export interface AdaptiveAttemptState {
   template_id: string | null;
   skills: SkillAdaptiveState[];
   excludedQuestionIds: string[]; // global pool: never reuse a question across skills
+  /** Per-skill question quota (may differ from questionsPerSkill after top-up redistribution). */
+  quotas?: Record<string, number>;
+  /** Authoritative number of questions this attempt will deliver. */
+  targetTotal?: number;
+  /** skills_per_assessment x questions_per_skill as configured on the template. */
+  configuredTotal?: number;
+  /** Human-readable explanation when targetTotal < configuredTotal. */
+  shortfallReason?: string | null;
 }
+
+/** Per-skill quota, tolerant of attempts created before quotas were persisted. */
+export function getSkillQuota(state: AdaptiveAttemptState, skillId: string): number {
+  return state.quotas?.[skillId] ?? state.questionsPerSkill;
+}
+
+/** Authoritative total for an attempt, tolerant of legacy adaptive_state rows. */
+export function getTargetTotal(state: AdaptiveAttemptState): number {
+  if (typeof state.targetTotal === 'number' && state.targetTotal > 0) return state.targetTotal;
+  return state.skills.reduce((acc, s) => acc + getSkillQuota(state, s.skill_id), 0);
+}
+
 
 interface AdaptiveEngineStore {
   /** Initialize per-skill state for an adaptive attempt. Idempotent. */
