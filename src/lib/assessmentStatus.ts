@@ -97,7 +97,9 @@ export function getAchievedLevelFromAttempt(
   const adaptive: any = (attempt as any).adaptive_state ?? {};
   const adaptiveSkills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
 
+  if (adaptiveSkills.length > 0) {
     const perSkill = adaptiveSkills
+
       .filter((s) => Array.isArray(s.history) && s.history.length > 0)
       .map((s) => {
         const total = s.history.length;
