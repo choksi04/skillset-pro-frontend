@@ -433,10 +433,15 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     }
 
     state.excludedQuestionIds.push(chosen.row.id);
+    skill.deliveredCount = (skill.deliveredCount ?? skill.attemptedCount) + 1;
+    if (skill.deliveredCount >= getSkillQuota(state, skill.skill_id)) {
+      skill.done = true;
+    }
     if (chosen.row.topic_id) {
       skill.askedTopicIds = [...(skill.askedTopicIds ?? []), chosen.row.topic_id];
     }
     await persistState(attemptId, state);
+
 
     const question: Question = {
       id: chosen.row.id,
