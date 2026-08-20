@@ -10,8 +10,24 @@ import { supabase } from '@/integrations/supabase/client';
  * skills to be dropped from generated assessments.
  */
 export async function getSkillsWithPublishedMcqs(skillIds: string[]): Promise<Set<string>> {
-  const unique = [...new Set(skillIds.filter(Boolean))];
+  const counts = await getPublishedMcqCountsBySkill(skillIds);
   const available = new Set<string>();
+  counts.forEach((count, skillId) => {
+    if (count > 0) available.add(skillId);
+  });
+  return available;
+}
+
+/**
+ * Returns the number of eligible published MCQs per skill.
+ * Uses per-skill HEAD counts so large question banks are not truncated by the
+ * PostgREST 1000-row listing cap.
+ */
+export async function getPublishedMcqCountsBySkill(
+  skillIds: string[],
+): Promise<Map<string, number>> {
+  const unique = [...new Set(skillIds.filter(Boolean))];
+  const counts = new Map<string, number>();
   const BATCH = 8;
 
   for (let i = 0; i < unique.length; i += BATCH) {
@@ -32,10 +48,9 @@ export async function getSkillsWithPublishedMcqs(skillIds: string[]): Promise<Se
         return { skillId, count: count ?? 0 };
       }),
     );
-    results.forEach((r) => {
-      if (r.count > 0) available.add(r.skillId);
-    });
+    results.forEach((r) => counts.set(r.skillId, r.count));
   }
 
-  return available;
+  return counts;
 }
+
