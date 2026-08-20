@@ -128,7 +128,9 @@ export default function AdaptiveRunner({
           setLoading(false);
           return;
         }
-        const total = state.skills.reduce((acc) => acc + state.questionsPerSkill, 0);
+        const total = getTargetTotal(state);
+        if (state.shortfallReason) setShortfall(state.shortfallReason);
+
 
         // ── Resume support: rebuild the answered list from persisted state ──
         // The adaptive state records every asked question; the answers themselves
