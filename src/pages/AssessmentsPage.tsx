@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/pagination";
 import { ClipboardCheck, Search, ArrowRight, HelpCircle, Clock, Layers, Filter as FilterIcon, Bot } from "lucide-react";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
-import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, getFormattedLevelLabel, getIdToLevelMap, getCompetencyToLevelMap } from "@/stores/competencyLevelStore";
 
 const PAGE_SIZE = 10;
 
@@ -77,6 +77,15 @@ export default function AssessmentsPage() {
   const { levels: competencyLevels, fetchLevels } = useCompetencyLevelStore();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Resolve an assessment question's target_level (uuid or level name) to its numeric level.
+  const resolveLevel = useMemo(() => {
+    const byId = getIdToLevelMap(competencyLevels);
+    const byName = getCompetencyToLevelMap(competencyLevels);
+    return (t: string) => byId[t] ?? byName[t] ?? null;
+  }, [competencyLevels]);
+
+
 
   const [search, setSearch] = useState("");
   const [assignerNames, setAssignerNames] = useState<Record<string, string>>({});
@@ -405,7 +414,10 @@ export default function AssessmentsPage() {
                     <TableCell className="align-top">
                       {(() => {
                         if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
-                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        const { level } = getAchievedLevelFromAttempt(attempt, {
+                          questions: a.assessment_questions,
+                          resolveLevel,
+                        });
                         if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
                           <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
