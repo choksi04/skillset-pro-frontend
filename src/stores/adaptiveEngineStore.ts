@@ -745,7 +745,9 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         confidence: 1,
         feedback: h.correct
           ? 'Correct answer.'
-          : 'Incorrect — selected option did not match the correct answer.',
+          : h.skipped
+            ? 'Not answered — counted as incorrect.'
+            : 'Incorrect — selected option did not match the correct answer.',
         dimensions: [] as any,
         created_by: userId,
       })),
