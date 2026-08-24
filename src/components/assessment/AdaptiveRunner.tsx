@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import AssessmentTimer from '@/components/assessment/AssessmentTimer';
 import {
   ChevronRight, Loader2, Sparkles, CheckCircle, Brain, ListChecks,
   ArrowLeft, Send,
@@ -100,6 +101,21 @@ export default function AdaptiveRunner({
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
 
+  // ── Timer state ──
+  const totalSeconds = Math.max(0, Math.round((assessment.duration_minutes ?? 0) * 60));
+  const timerEnabled = totalSeconds > 0;
+  const initialAttempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+  const initialRemainingRef = useRef<number>(
+    typeof initialAttempt?.remaining_seconds === 'number'
+      ? Math.max(0, initialAttempt.remaining_seconds)
+      : totalSeconds,
+  );
+  const remainingRef = useRef<number>(initialRemainingRef.current);
+  const [timeUp, setTimeUp] = useState(timerEnabled && initialRemainingRef.current <= 0);
+  const timeUpHandledRef = useRef(false);
+  const finalizingRef = useRef(false);
+
+
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const [topicMap, setTopicMap] = useState<Record<string, string>>({});
@@ -114,6 +130,31 @@ export default function AdaptiveRunner({
     fetchSkills();
     fetchLevels();
   }, []);
+
+  // Resumed after the clock already expired — go straight to the locked review.
+  useEffect(() => {
+    if (timeUp && !loading) setReviewOpen(true);
+  }, [timeUp, loading]);
+
+  // Persist the remaining time when the employee leaves / hides the tab / unmounts.
+  useEffect(() => {
+    if (!timerEnabled) return;
+    const persist = () => {
+      if (finalizingRef.current) return;
+      const attempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+      if (!attempt || attempt.status !== 'in_progress') return;
+      useAttemptStore.getState().pauseAttempt(attempt.id, remainingRef.current).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') persist(); };
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('beforeunload', persist);
+      document.removeEventListener('visibilitychange', onVisibility);
+      persist();
+    };
+  }, [assessment.id, timerEnabled]);
+
 
   // Initialize the engine + rehydrate previously saved answers + fetch the first question
   useEffect(() => {
@@ -218,6 +259,8 @@ export default function AdaptiveRunner({
   }
 
   async function finalize() {
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
     setFinalizing(true);
     try {
       const skillScores = await finalizeAdaptiveAttempt(attemptId, assessment.id);
@@ -307,6 +350,33 @@ export default function AdaptiveRunner({
     }
   }
 
+  // ── Time up: lock the runner and auto-submit exactly once ──
+  async function handleTimeUp() {
+    if (timeUpHandledRef.current) return;
+    timeUpHandledRef.current = true;
+    remainingRef.current = 0;
+    setTimeUp(true);
+    setReviewOpen(true);
+    toast.warning('Time is up. Your assessment will be submitted automatically.');
+
+    // Best-effort: persist the answer in progress before finalizing.
+    if (currentQuestion && selectedOption) {
+      try {
+        await recordAnswer(
+          attemptId,
+          assessment.id,
+          currentQuestion.id,
+          currentSkillId,
+          gradeMCQ(currentQuestion, selectedOption),
+          selectedOption,
+          Math.round((Date.now() - startedAtRef.current) / 1000),
+        );
+      } catch { /* best-effort */ }
+    }
+    await finalize();
+  }
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
@@ -359,7 +429,7 @@ export default function AdaptiveRunner({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {currentQuestion && (
+            {currentQuestion && !timeUp && (
               <Button
                 variant="outline"
                 size="sm"
@@ -382,7 +452,15 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        {(exhaustedEarly || shortfall) && (
+        {timeUp && (
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3">
+            <p className="text-sm text-foreground">
+              Time is up. Your assessment will be submitted automatically.
+            </p>
+          </div>
+        )}
+
+        {!timeUp && (exhaustedEarly || shortfall) && (
           <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
             <p className="text-sm text-foreground">
               This is the end of your assessment. It finished after {answered.length} question
@@ -391,6 +469,7 @@ export default function AdaptiveRunner({
             </p>
           </div>
         )}
+
 
 
 
@@ -479,9 +558,20 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        <Badge variant="outline" className="gap-1.5">
-          <Sparkles size={12} className="text-primary" /> Adaptive Engine
-        </Badge>
+        <div className="flex items-center gap-3">
+          {timerEnabled && (
+            <AssessmentTimer
+              initialRemaining={initialRemainingRef.current}
+              totalSeconds={totalSeconds}
+              isPaused={timeUp || finalizing}
+              onTick={(r) => { remainingRef.current = r; }}
+              onTimeUp={handleTimeUp}
+            />
+          )}
+          <Badge variant="outline" className="gap-1.5">
+            <Sparkles size={12} className="text-primary" /> Adaptive Engine
+          </Badge>
+        </div>
       </div>
 
       <div className="flex-1 rounded-xl border border-border bg-card p-6 overflow-y-auto">
@@ -501,7 +591,7 @@ export default function AdaptiveRunner({
               value={selectedOption}
               onValueChange={setSelectedOption}
               className="space-y-2"
-              disabled={submitting}
+              disabled={submitting || timeUp}
             >
               {mcq.optionLines.map((opt) => (
                 <label
@@ -529,7 +619,7 @@ export default function AdaptiveRunner({
             <Button
               size="sm"
               onClick={handleSubmitAnswer}
-              disabled={!selectedOption || submitting}
+              disabled={!selectedOption || submitting || timeUp}
               className="gap-1.5"
             >
               {submitting ? (
