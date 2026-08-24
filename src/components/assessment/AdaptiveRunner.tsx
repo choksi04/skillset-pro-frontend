@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import AssessmentTimer from '@/components/assessment/AssessmentTimer';
 import {
   ChevronRight, Loader2, Sparkles, CheckCircle, Brain, ListChecks,
-  ArrowLeft, Send,
+  ArrowLeft, Send, Pause, Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
