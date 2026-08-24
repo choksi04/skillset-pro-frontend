@@ -162,10 +162,15 @@ export default function AdaptiveRunner({
     fetchLevels();
   }, []);
 
-  // Resumed after the clock already expired — go straight to the locked review.
+  // Resumed after the clock already expired — route through the same single
+  // auto-submit handler so every user follows one path (guarded to run once).
   useEffect(() => {
-    if (timeUp && !loading) setReviewOpen(true);
-  }, [timeUp, loading]);
+    if (!timeUp || loading || initError || !attemptId || isPaused) return;
+    setReviewOpen(true);
+    if (timeUpHandledRef.current) return;
+    void handleTimeUp();
+  }, [timeUp, loading, initError, attemptId, isPaused]);
+
 
   // Persist the remaining time when the employee leaves / hides the tab / unmounts.
   useEffect(() => {
