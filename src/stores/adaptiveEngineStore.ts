@@ -50,6 +50,12 @@ export interface AdaptiveAttemptState {
   configuredTotal?: number;
   /** Human-readable explanation when targetTotal < configuredTotal. */
   shortfallReason?: string | null;
+  /**
+   * The question currently handed to the employee but not yet answered.
+   * Lets a resumed attempt reopen on the same unanswered question instead of
+   * skipping ahead (delivery already excludes the question from the pool).
+   */
+  pendingQuestion?: { question_id: string; skill_id: string; level: number } | null;
 }
 
 /** Per-skill quota, tolerant of attempts created before quotas were persisted. */
