@@ -100,6 +100,21 @@ export default function AdaptiveRunner({
   const startedAtRef = useRef<number>(Date.now());
   const initRef = useRef(false);
 
+  // ── Timer state ──
+  const totalSeconds = Math.max(0, Math.round((assessment.duration_minutes ?? 0) * 60));
+  const timerEnabled = totalSeconds > 0;
+  const initialAttempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+  const initialRemainingRef = useRef<number>(
+    typeof initialAttempt?.remaining_seconds === 'number'
+      ? Math.max(0, initialAttempt.remaining_seconds)
+      : totalSeconds,
+  );
+  const remainingRef = useRef<number>(initialRemainingRef.current);
+  const [timeUp, setTimeUp] = useState(timerEnabled && initialRemainingRef.current <= 0);
+  const timeUpHandledRef = useRef(false);
+  const finalizingRef = useRef(false);
+
+
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
   const [topicMap, setTopicMap] = useState<Record<string, string>>({});
