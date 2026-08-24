@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import AssessmentTimer from '@/components/assessment/AssessmentTimer';
 import {
   ChevronRight, Loader2, Sparkles, CheckCircle, Brain, ListChecks,
   ArrowLeft, Send,
