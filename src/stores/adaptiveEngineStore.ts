@@ -590,24 +590,33 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const now = new Date().toISOString();
     const skillScores: SkillScore[] = [];
 
+    // Bring the attempt up to its configured size: every question the employee
+    // never answered (delivered-but-skipped, or never delivered) is materialised
+    // and counted as incorrect, so the result reflects the full assessment.
+    await materializeSkippedQuestions(attemptId, assessmentId, state);
+
     for (const skill of state.skills) {
       // Simplified rule: achieved level = max level among CORRECT answers.
       // If nothing correct → L1. avg_score retained for backward compatibility only.
       const correctLevels = skill.history.filter((h) => h.correct).map((h) => h.level);
       const finalLevel = correctLevels.length ? clampLevel(Math.max(...correctLevels)) : MIN_LEVEL;
 
-      const total = skill.history.length || 1;
+      // Denominator = the skill's configured quota (never fewer than what was
+      // actually asked), so skipping questions lowers the score.
+      const quota = getSkillQuota(state, skill.skill_id);
+      const denom = Math.max(skill.history.length, quota, 1);
       const correctCount = skill.history.filter((h) => h.correct).length;
-      const avg_score = Math.round((correctCount / total) * 100);
+      const avg_score = Math.round((correctCount / denom) * 100);
 
       skillScores.push({
         skill_id: skill.skill_id,
         avg_score,
         calculated_level: finalLevel,
         target_level: skill.startLevel,
-        question_count: skill.history.length,
+        question_count: Math.max(skill.history.length, quota),
       });
     }
+
 
     // Build per-question evaluation rows from the adaptive history (binary MCQ grading).
     const evalRows = state.skills.flatMap((skill) =>
