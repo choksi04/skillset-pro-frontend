@@ -368,16 +368,13 @@ async function persistAdaptiveResults(
       ? Math.round(skillScores.reduce((a, s) => a + s.avg_score, 0) / skillScores.length)
       : 0;
 
-  const attemptUpdate: Record<string, unknown> = {
+  const attemptUpdate = {
     total_ai_score: totalAi,
     evaluated_at: now,
     modified_by: userId,
     modified_at: now,
+    ...(markSubmitted ? { status: 'evaluated', submitted_at: now } : {}),
   };
-  if (markSubmitted) {
-    attemptUpdate.status = 'evaluated';
-    attemptUpdate.submitted_at = now;
-  }
 
   await Promise.all([
     supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId),
