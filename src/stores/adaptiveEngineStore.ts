@@ -99,6 +99,12 @@ interface AdaptiveEngineStore {
   /** Compute final per-skill levels and write attempt_skill_scores. Returns the scores. */
   finalizeAdaptiveAttempt: (attemptId: string, assessmentId: string) => Promise<SkillScore[]>;
   /**
+   * Bring an already-submitted adaptive attempt up to its configured size when
+   * it was finalized before skipped questions were materialised. Idempotent:
+   * no-op once the history covers `targetTotal`.
+   */
+  repairAdaptiveAttempt: (attemptId: string, assessmentId: string) => Promise<boolean>;
+  /**
    * Backfill `ai_evaluations` + `attempt_skill_scores` + `total_ai_score` for an
    * adaptive attempt that was finalized before per-question evaluation rows were
    * being written. Idempotent: no-op when ai_evaluations already exist for the
