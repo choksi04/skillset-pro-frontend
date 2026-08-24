@@ -552,9 +552,20 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        <Badge variant="outline" className="gap-1.5">
-          <Sparkles size={12} className="text-primary" /> Adaptive Engine
-        </Badge>
+        <div className="flex items-center gap-3">
+          {timerEnabled && (
+            <AssessmentTimer
+              initialRemaining={initialRemainingRef.current}
+              totalSeconds={totalSeconds}
+              isPaused={timeUp || finalizing}
+              onTick={(r) => { remainingRef.current = r; }}
+              onTimeUp={handleTimeUp}
+            />
+          )}
+          <Badge variant="outline" className="gap-1.5">
+            <Sparkles size={12} className="text-primary" /> Adaptive Engine
+          </Badge>
+        </div>
       </div>
 
       <div className="flex-1 rounded-xl border border-border bg-card p-6 overflow-y-auto">
