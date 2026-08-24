@@ -130,6 +130,26 @@ export default function AdaptiveRunner({
     fetchLevels();
   }, []);
 
+  // Persist the remaining time when the employee leaves / hides the tab / unmounts.
+  useEffect(() => {
+    if (!timerEnabled) return;
+    const persist = () => {
+      if (finalizingRef.current) return;
+      const attempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+      if (!attempt || attempt.status !== 'in_progress') return;
+      useAttemptStore.getState().pauseAttempt(attempt.id, remainingRef.current).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') persist(); };
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('beforeunload', persist);
+      document.removeEventListener('visibilitychange', onVisibility);
+      persist();
+    };
+  }, [assessment.id, timerEnabled]);
+
+
   // Initialize the engine + rehydrate previously saved answers + fetch the first question
   useEffect(() => {
     if (initRef.current) return;
