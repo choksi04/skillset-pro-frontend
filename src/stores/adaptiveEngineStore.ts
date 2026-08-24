@@ -350,6 +350,47 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const state = await loadState(attemptId);
     if (!state) return { question: null, aq: null, skillState: null };
 
+    // ── Resume: re-serve the pending (delivered but unanswered) question ──
+    const pending = state.pendingQuestion;
+    if (pending) {
+      const pendingSkill = state.skills.find((s) => s.skill_id === pending.skill_id);
+      const alreadyAnswered = pendingSkill?.history.some((h) => h.question_id === pending.question_id);
+      if (pendingSkill && !alreadyAnswered) {
+        const { data: row } = await supabase
+          .from('questions')
+          .select('id, tenant_id, skill_id, topic_id, competency_level, question_type, question_text, evaluation_guidelines, status, ai_generated, created_at, updated_at')
+          .eq('id', pending.question_id)
+          .maybeSingle();
+        if (row) {
+          const question: Question = {
+            id: (row as any).id,
+            tenant_id: (row as any).tenant_id,
+            skill_id: (row as any).skill_id,
+            topic_id: (row as any).topic_id,
+            competency_level: (row as any).competency_level,
+            question_type: (row as any).question_type,
+            question_text: (row as any).question_text,
+            evaluation_guidelines: (row as any).evaluation_guidelines ?? '',
+            status: (row as any).status,
+            ai_generated: (row as any).ai_generated ?? false,
+            created_at: (row as any).created_at,
+            updated_at: (row as any).updated_at,
+          };
+          const aq: AssessmentQuestion = {
+            question_id: question.id,
+            skill_id: pending.skill_id,
+            target_level: (row as any).competency_level ?? '',
+          };
+          return { question, aq, skillState: pendingSkill };
+        }
+      }
+      // Stale pointer (answered elsewhere or question removed) — clear it.
+      state.pendingQuestion = null;
+      await persistState(attemptId, state);
+    }
+
+
+
     // Hard stop: never deliver more than the attempt's authoritative target.
     const delivered = state.excludedQuestionIds.length;
     if (delivered >= getTargetTotal(state)) {
