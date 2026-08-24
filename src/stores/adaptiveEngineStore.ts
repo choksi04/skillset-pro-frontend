@@ -850,18 +850,22 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
         confidence: 1,
         feedback: h.correct
           ? 'Correct answer.'
-          : 'Incorrect — selected option did not match the correct answer.',
+          : h.skipped
+            ? 'Not answered — counted as incorrect.'
+            : 'Incorrect — selected option did not match the correct answer.',
         dimensions: [] as any,
         created_by: userId,
       })),
     );
     if (evalRows.length === 0) return false;
 
-    // 4) Recompute per-skill scores
+    // 4) Recompute per-skill scores — denominator is the configured quota so
+    //    skipped questions weigh against the score, same as at finalisation.
     const skillScores = skills
       .filter((s) => (s.history ?? []).length > 0)
       .map((skill) => {
-        const total = skill.history.length;
+        const quota = getSkillQuota(state as AdaptiveAttemptState, skill.skill_id);
+        const total = Math.max(skill.history.length, quota, 1);
         const correctCount = skill.history.filter((h) => h.correct).length;
         const avg_score = Math.round((correctCount / total) * 100);
         // Simplified: achieved level = max level among CORRECT answers, else L1.
