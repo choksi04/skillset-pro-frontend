@@ -24,12 +24,13 @@ import {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUploaded?: () => void;
 }
 
 type Step = 'mode' | 'configure' | 'file' | 'review';
 type Mode = 'direct' | 'template';
 
-export default function BulkUploadSheet({ open, onOpenChange }: Props) {
+export default function BulkUploadSheet({ open, onOpenChange, onUploaded }: Props) {
   const { skills, topics, fetchSkills, fetchTopicsForSkill } = useSkillStore();
   const { levels, fetchLevels } = useCompetencyLevelStore();
   const { addQuestions } = useQuestionStore();
@@ -208,6 +209,7 @@ export default function BulkUploadSheet({ open, onOpenChange }: Props) {
       })));
       toast.success(`Imported ${validRows.length} question${validRows.length === 1 ? '' : 's'}.`);
       handleClose(false);
+      onUploaded?.();
     } catch (e: any) {
       console.error(e);
       toast.error('Failed to import questions.');
