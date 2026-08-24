@@ -697,6 +697,7 @@ export default function AdaptiveRunner({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
