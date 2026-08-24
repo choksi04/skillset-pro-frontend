@@ -710,119 +710,31 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const state = await loadState(attemptId);
     if (!state) return [];
 
-    const userId = getCurrentUserId();
-    const now = new Date().toISOString();
-    const skillScores: SkillScore[] = [];
-
     // Bring the attempt up to its configured size: every question the employee
     // never answered (delivered-but-skipped, or never delivered) is materialised
     // and counted as incorrect, so the result reflects the full assessment.
     await materializeSkippedQuestions(attemptId, assessmentId, state);
 
-    for (const skill of state.skills) {
-      // Simplified rule: achieved level = max level among CORRECT answers.
-      // If nothing correct → L1. avg_score retained for backward compatibility only.
-      const correctLevels = skill.history.filter((h) => h.correct).map((h) => h.level);
-      const finalLevel = correctLevels.length ? clampLevel(Math.max(...correctLevels)) : MIN_LEVEL;
-
-      // Denominator = the skill's configured quota (never fewer than what was
-      // actually asked), so skipping questions lowers the score.
-      const quota = getSkillQuota(state, skill.skill_id);
-      const denom = Math.max(skill.history.length, quota, 1);
-      const correctCount = skill.history.filter((h) => h.correct).length;
-      const avg_score = Math.round((correctCount / denom) * 100);
-
-      skillScores.push({
-        skill_id: skill.skill_id,
-        avg_score,
-        calculated_level: finalLevel,
-        target_level: skill.startLevel,
-        question_count: Math.max(skill.history.length, quota),
-      });
-    }
-
-
-    // Build per-question evaluation rows from the adaptive history (binary MCQ grading).
-    const evalRows = state.skills.flatMap((skill) =>
-      skill.history.map((h) => ({
-        attempt_id: attemptId,
-        question_id: h.question_id,
-        score: h.correct ? 100 : 0,
-        confidence: 1,
-        feedback: h.correct
-          ? 'Correct answer.'
-          : h.skipped
-            ? 'Not answered — counted as incorrect.'
-            : 'Incorrect — selected option did not match the correct answer.',
-        dimensions: [] as any,
-        created_by: userId,
-      })),
-    );
-
-    await Promise.all([
-      supabase.from('attempt_skill_scores').delete().eq('attempt_id', attemptId),
-      supabase.from('ai_evaluations').delete().eq('attempt_id', attemptId),
-      supabase
-        .from('assessment_attempts')
-        .update({
-          status: 'evaluated',
-          submitted_at: now,
-          evaluated_at: now,
-          total_ai_score:
-            skillScores.length > 0
-              ? Math.round(
-                  skillScores.reduce((a, s) => a + s.avg_score, 0) / skillScores.length,
-                )
-              : 0,
-          modified_by: userId,
-          modified_at: now,
-        })
-        .eq('id', attemptId),
-    ]);
-
-    if (skillScores.length > 0) {
-      await supabase.from('attempt_skill_scores').insert(
-        skillScores.map((ss) => ({
-          attempt_id: attemptId,
-          skill_id: ss.skill_id,
-          avg_score: ss.avg_score,
-          calculated_level: ss.calculated_level,
-          target_level: ss.target_level,
-          question_count: ss.question_count,
-          created_by: userId,
-        })),
-      );
-    }
-
-    if (evalRows.length > 0) {
-      await supabase.from('ai_evaluations').insert(evalRows);
-    }
-
-    const totalAi =
-      skillScores.length > 0
-        ? Math.round(skillScores.reduce((a, s) => a + s.avg_score, 0) / skillScores.length)
-        : 0;
-
-    // Refresh attempts so EvalResults sees the new ai_evaluations rows.
-    await useAttemptStore.getState().fetchAttempts({ force: true });
-    useAttemptStore.setState((s) => ({
-      attempts: s.attempts.map((a) =>
-        a.id === attemptId
-          ? {
-              ...a,
-              status: 'evaluated' as AssessmentAttempt['status'],
-              skill_scores: skillScores,
-              total_ai_score: totalAi,
-              submitted_at: now,
-              evaluated_at: now,
-            }
-          : a,
-      ),
-    }));
-
-    syncAssignmentForAttempt(assessmentId, 'evaluated').catch(() => {});
-    return skillScores;
+    return persistAdaptiveResults(attemptId, assessmentId, state, true);
   },
+
+  repairAdaptiveAttempt: async (attemptId, assessmentId) => {
+    const state = await loadState(attemptId);
+    if (!state) return false;
+
+    const historyTotal = state.skills.reduce((acc, s) => acc + (s.history?.length ?? 0), 0);
+    if (historyTotal === 0) return false;
+    if (historyTotal >= getTargetTotal(state)) return false;
+
+    await materializeSkippedQuestions(attemptId, assessmentId, state);
+
+    const repairedTotal = state.skills.reduce((acc, s) => acc + (s.history?.length ?? 0), 0);
+    if (repairedTotal <= historyTotal) return false;
+
+    await persistAdaptiveResults(attemptId, assessmentId, state, false);
+    return true;
+  },
+
 
   reconstructEvaluationsFromHistory: async (attemptId: string) => {
     // 1) Skip if evaluations already exist
