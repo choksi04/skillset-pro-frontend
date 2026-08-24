@@ -98,11 +98,14 @@ export function getAchievedLevelFromAttempt(
   const adaptiveSkills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
 
   if (adaptiveSkills.length > 0) {
+    const quotas: Record<string, number> = adaptive?.quotas ?? {};
     const perSkill = adaptiveSkills
-
       .filter((s) => Array.isArray(s.history) && s.history.length > 0)
       .map((s) => {
-        const total = s.history.length;
+        // Total = the skill's configured quota, so questions the employee never
+        // reached still count against the assessment (they are wrong/skipped).
+        const quota = Number(quotas[s.skill_id] ?? adaptive?.questionsPerSkill ?? 0) || 0;
+        const total = Math.max(s.history.length, quota);
         const correct = s.history.filter((h: any) => h.correct).length;
         const correctLevels = s.history
           .filter((h: any) => h.correct)
@@ -115,6 +118,9 @@ export function getAchievedLevelFromAttempt(
       (acc, b) => ({ correct: acc.correct + b.correct, total: acc.total + b.total }),
       { correct: 0, total: 0 },
     );
+    // The configured size of the attempt is authoritative for the total.
+    const targetTotal = Number(adaptive?.targetTotal ?? 0) || 0;
+    const total = Math.max(totals.total, targetTotal);
     const achievedLevels = perSkill
       .map((b) => b.achieved)
       .filter((l): l is number => typeof l === "number");
@@ -122,7 +128,7 @@ export function getAchievedLevelFromAttempt(
       ? Math.round(achievedLevels.reduce((a, b) => a + b, 0) / achievedLevels.length)
       : null;
 
-    return { level, correct: totals.correct, total: totals.total };
+    return { level, correct: totals.correct, total };
   }
 
   // Fixed (non-adaptive) evidence path — mirror the adaptive rule using the

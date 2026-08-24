@@ -44,10 +44,13 @@ export default function ResultSummaryCard({ attempt, review, questions }: Props)
 
   const breakdown = useMemo(() => {
     if (adaptiveSkills.length > 0) {
+      const quotas: Record<string, number> = adaptive?.quotas ?? {};
       return adaptiveSkills
         .filter((s) => Array.isArray(s.history) && s.history.length > 0)
         .map((s) => {
-          const total = s.history.length;
+          // Configured quota is authoritative — unreached questions count as wrong.
+          const quota = Number(quotas[s.skill_id] ?? adaptive?.questionsPerSkill ?? 0) || 0;
+          const total = Math.max(s.history.length, quota);
           const correct = s.history.filter((h: any) => h.correct).length;
           const correctLevels = s.history
             .filter((h: any) => h.correct)
