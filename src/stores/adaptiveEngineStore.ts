@@ -490,6 +490,11 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     if (chosen.row.topic_id) {
       skill.askedTopicIds = [...(skill.askedTopicIds ?? []), chosen.row.topic_id];
     }
+    state.pendingQuestion = {
+      question_id: chosen.row.id,
+      skill_id: skill.skill_id,
+      level: chosen.level,
+    };
     await persistState(attemptId, state);
 
 
