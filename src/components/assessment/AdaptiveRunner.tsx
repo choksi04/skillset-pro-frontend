@@ -580,7 +580,8 @@ export default function AdaptiveRunner({
           <ProgressRing answered={progress.asked} total={totalForRing} />
           <div>
             <h3 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
-              <Brain size={14} className="text-primary" /> Adaptive Assessment
+              <Brain size={14} className="text-primary" />
+              {isPaused ? 'Adaptive Assessment paused' : 'Adaptive Assessment'}
             </h3>
             <p className="text-xs text-muted-foreground">
               Question {currentNumber}
@@ -594,17 +595,51 @@ export default function AdaptiveRunner({
             <AssessmentTimer
               initialRemaining={initialRemainingRef.current}
               totalSeconds={totalSeconds}
-              isPaused={timeUp || finalizing}
+              isPaused={timeUp || finalizing || isPaused}
               onTick={(r) => { remainingRef.current = r; }}
               onTimeUp={handleTimeUp}
             />
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={isPaused ? handleResume : handlePause}
+            disabled={isPausing || isResuming || submitting || finalizing || timeUp}
+            className="gap-1.5"
+          >
+            {isPausing || isResuming ? (
+              <><Loader2 size={14} className="animate-spin" /> {isPaused ? 'Resuming…' : 'Pausing…'}</>
+            ) : isPaused ? (
+              <><Play size={14} /> Resume</>
+            ) : (
+              <><Pause size={14} /> Pause</>
+            )}
+          </Button>
           <Badge variant="outline" className="gap-1.5">
             <Sparkles size={12} className="text-primary" /> Adaptive Engine
           </Badge>
         </div>
       </div>
 
+      {isPaused ? (
+        <div className="flex-1 flex items-center justify-center rounded-xl border border-dashed border-border bg-card/50">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <Pause size={28} className="text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Assessment paused</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Your progress is saved and the timer is stopped. Click Resume to continue on the same question.
+              </p>
+            </div>
+            <Button onClick={handleResume} disabled={isResuming} className="gap-1.5">
+              {isResuming ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              {isResuming ? 'Resuming…' : 'Resume assessment'}
+            </Button>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 rounded-xl border border-border bg-card p-6 overflow-y-auto">
         <div className="max-w-2xl space-y-5">
           <div className="flex items-center gap-2 flex-wrap">
