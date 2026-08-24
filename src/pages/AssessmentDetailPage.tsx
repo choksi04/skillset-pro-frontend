@@ -720,7 +720,15 @@ export default function AssessmentDetailPage() {
                       const hasAnswer = !!(ans && ans.answer_text && ans.answer_text.trim().length > 0);
                       const isMCQ = q?.question_type === "mcq";
                       let resultBadge: JSX.Element;
-                      if (ev) {
+                      if (!hasAnswer) {
+                        // Unanswered questions read as "Skipped" even when a
+                        // zero-score evaluation row exists for them.
+                        resultBadge = (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Skipped
+                          </Badge>
+                        );
+                      } else if (ev) {
                         const correct = isMCQ ? ev.score === 100 : ev.score >= 50;
                         resultBadge = correct ? (
                           <Badge className="text-[10px] bg-success/15 text-success border-success/20 gap-1">
@@ -729,12 +737,6 @@ export default function AssessmentDetailPage() {
                         ) : (
                           <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/20 gap-1">
                             <span className="inline-flex items-center gap-1">✗ Incorrect</span>
-                          </Badge>
-                        );
-                      } else if (!hasAnswer) {
-                        resultBadge = (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                            Skipped
                           </Badge>
                         );
                       } else {
