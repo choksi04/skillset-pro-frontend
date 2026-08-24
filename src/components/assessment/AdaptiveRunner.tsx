@@ -115,6 +115,37 @@ export default function AdaptiveRunner({
   const timeUpHandledRef = useRef(false);
   const finalizingRef = useRef(false);
 
+  // ── Manual pause / resume (local UI state; clock persisted on the attempt) ──
+  const [isPaused, setIsPaused] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+
+  const handlePause = async () => {
+    if (isPausing || isPaused) return;
+    setIsPausing(true);
+    try {
+      const attempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+      if (attempt) await useAttemptStore.getState().pauseAttempt(attempt.id, remainingRef.current);
+      setIsPaused(true);
+      toast.info('Assessment paused. Your progress has been saved.');
+    } finally {
+      setIsPausing(false);
+    }
+  };
+
+  const handleResume = async () => {
+    if (isResuming || !isPaused) return;
+    setIsResuming(true);
+    try {
+      const attempt = useAttemptStore.getState().getAttemptForAssessment(assessment.id);
+      if (attempt) await useAttemptStore.getState().resumeAttempt(attempt.id);
+      setIsPaused(false);
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+
 
 
   const skillNameMap = useMemo(() => new Map(skills.map((s) => [s.id, s.skill_name])), [skills]);
