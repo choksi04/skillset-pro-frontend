@@ -181,13 +181,28 @@ export default function AssessmentDetailPage() {
     const isTerminal =
       attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed";
     if (!isTerminal) return;
-    if ((attempt.ai_evaluations?.length ?? 0) > 0) return;
     if (!assessment.is_adaptive) return;
     if (backfilled === attempt.id) return;
+
+    const adaptive: any = (attempt as any).adaptive_state ?? {};
+    const skills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
+    const historyTotal = skills.reduce((acc, s) => acc + (s.history?.length ?? 0), 0);
+    const targetTotal = Number(adaptive?.targetTotal ?? 0) || 0;
+    const needsRepair = historyTotal > 0 && targetTotal > historyTotal;
+    const needsEvaluations = (attempt.ai_evaluations?.length ?? 0) === 0;
+    if (!needsRepair && !needsEvaluations) return;
+
     setBackfilled(attempt.id);
-    useAdaptiveEngineStore
-      .getState()
-      .reconstructEvaluationsFromHistory(attempt.id)
+    const engine = useAdaptiveEngineStore.getState();
+    const run = needsRepair
+      ? engine
+          .repairAdaptiveAttempt(attempt.id, assessment.id)
+          .then((did) =>
+            needsEvaluations ? engine.reconstructEvaluationsFromHistory(attempt.id).then((r) => did || r) : did,
+          )
+      : engine.reconstructEvaluationsFromHistory(attempt.id);
+
+    run
       .then((didWork) => {
         if (didWork) {
           fetchAttemptsForAssessment(assessment.id);
