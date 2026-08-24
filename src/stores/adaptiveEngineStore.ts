@@ -567,6 +567,8 @@ export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
     const currentSkillIdx = state.skills.findIndex((s) => s.skill_id === skill_id);
     state.rrIndex = (currentSkillIdx + 1) % state.skills.length;
 
+    if (state.pendingQuestion?.question_id === question_id) state.pendingQuestion = null;
+
     await persistState(attemptId, state);
     await useAttemptStore.getState().saveAnswer(attemptId, {
       question_id,
