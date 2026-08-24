@@ -253,6 +253,8 @@ export default function AdaptiveRunner({
   }
 
   async function finalize() {
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
     setFinalizing(true);
     try {
       const skillScores = await finalizeAdaptiveAttempt(attemptId, assessment.id);
