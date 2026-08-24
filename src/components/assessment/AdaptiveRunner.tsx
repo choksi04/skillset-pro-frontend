@@ -423,7 +423,7 @@ export default function AdaptiveRunner({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {currentQuestion && (
+            {currentQuestion && !timeUp && (
               <Button
                 variant="outline"
                 size="sm"
@@ -446,7 +446,15 @@ export default function AdaptiveRunner({
           </div>
         </div>
 
-        {(exhaustedEarly || shortfall) && (
+        {timeUp && (
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3">
+            <p className="text-sm text-foreground">
+              Time is up. Your assessment will be submitted automatically.
+            </p>
+          </div>
+        )}
+
+        {!timeUp && (exhaustedEarly || shortfall) && (
           <div className="mb-4 rounded-xl border border-warning/30 bg-warning/5 px-5 py-3">
             <p className="text-sm text-foreground">
               This is the end of your assessment. It finished after {answered.length} question
@@ -455,6 +463,7 @@ export default function AdaptiveRunner({
             </p>
           </div>
         )}
+
 
 
 
