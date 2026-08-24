@@ -184,6 +184,124 @@ async function loadState(attemptId: string): Promise<AdaptiveAttemptState | null
   return raw as AdaptiveAttemptState;
 }
 
+/**
+ * Bring an adaptive attempt up to its configured size at submit time.
+ *
+ * Every question the employee never answered is represented exactly like a
+ * delivered one (a row in `assessment_questions`) and appended to the per-skill
+ * history with `correct: false, skipped: true`, so scoring, the per-question
+ * list and the counts all work against the configured total instead of the
+ * number of answers. Idempotent: a second call finds the quota already filled.
+ */
+async function materializeSkippedQuestions(
+  attemptId: string,
+  assessmentId: string,
+  state: AdaptiveAttemptState,
+): Promise<void> {
+  const userId = getCurrentUserId();
+  const { levelToId, idToLevel } = await loadCompetencyLevelMap();
+
+  // Questions already attached to this assessment (delivered, answered or not).
+  const { data: aqRows } = await supabase
+    .from('assessment_questions')
+    .select('question_id, skill_id, target_level')
+    .eq('assessment_id', assessmentId)
+    .is('deleted_on', null);
+  const existing = (aqRows || []) as { question_id: string; skill_id: string; target_level: string }[];
+
+  let mutated = false;
+
+  for (const skill of state.skills) {
+    const quota = getSkillQuota(state, skill.skill_id);
+    const answered = new Set(skill.history.map((h) => h.question_id));
+
+    // 1) Delivered but never answered → count as skipped using their existing row.
+    for (const row of existing) {
+      if (row.skill_id !== skill.skill_id) continue;
+      if (answered.has(row.question_id)) continue;
+      if (skill.history.length >= quota) break;
+      skill.history.push({
+        question_id: row.question_id,
+        level: clampLevel(idToLevel[row.target_level] ?? skill.currentLevel),
+        correct: false,
+        skipped: true,
+      });
+      answered.add(row.question_id);
+      mutated = true;
+    }
+
+    // 2) Never delivered → pull fresh questions from the bank to fill the quota.
+    let need = quota - skill.history.length;
+    if (need <= 0) continue;
+
+    for (const lvl of fallbackLevelOrder(skill.currentLevel)) {
+      if (need <= 0) break;
+      const levelId = levelToId[lvl];
+      if (!levelId) continue;
+
+      const { data: rows } = await supabase
+        .from('questions')
+        .select('id')
+        .eq('skill_id', skill.skill_id)
+        .eq('question_type', 'mcq')
+        .eq('status', 'published')
+        .eq('competency_level', levelId)
+        .is('deleted_on', null)
+        .limit(need + state.excludedQuestionIds.length + 50);
+
+      const pool = (rows || [])
+        .map((r: any) => r.id as string)
+        .filter((id) => !state.excludedQuestionIds.includes(id) && !answered.has(id));
+
+      for (const questionId of pool) {
+        if (need <= 0) break;
+        const { error: insertErr } = await supabase.from('assessment_questions').insert({
+          assessment_id: assessmentId,
+          question_id: questionId,
+          skill_id: skill.skill_id,
+          target_level: levelId,
+          created_by: userId,
+        });
+        if (insertErr) {
+          console.error('adaptive: failed to persist skipped question row', insertErr);
+          continue;
+        }
+        useAssessmentStore.setState((s) => ({
+          assessments: s.assessments.map((a) =>
+            a.id === assessmentId
+              ? {
+                  ...a,
+                  assessment_questions: [
+                    ...a.assessment_questions,
+                    { question_id: questionId, skill_id: skill.skill_id, target_level: levelId },
+                  ],
+                  skill_ids: [...new Set([...a.skill_ids, skill.skill_id])],
+                }
+              : a,
+          ),
+        }));
+        state.excludedQuestionIds.push(questionId);
+        skill.history.push({
+          question_id: questionId,
+          level: clampLevel(lvl),
+          correct: false,
+          skipped: true,
+        });
+        answered.add(questionId);
+        need -= 1;
+        mutated = true;
+      }
+    }
+    // If the bank cannot supply enough questions, the shortfall still counts
+    // against the quota through the scoring denominator below.
+  }
+
+  if (mutated) {
+    state.pendingQuestion = null;
+    await persistState(attemptId, state);
+  }
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useAdaptiveEngineStore = create<AdaptiveEngineStore>(() => ({
