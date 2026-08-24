@@ -131,6 +131,11 @@ export default function AdaptiveRunner({
     fetchLevels();
   }, []);
 
+  // Resumed after the clock already expired — go straight to the locked review.
+  useEffect(() => {
+    if (timeUp && !loading) setReviewOpen(true);
+  }, [timeUp, loading]);
+
   // Persist the remaining time when the employee leaves / hides the tab / unmounts.
   useEffect(() => {
     if (!timerEnabled) return;
@@ -586,7 +591,7 @@ export default function AdaptiveRunner({
               value={selectedOption}
               onValueChange={setSelectedOption}
               className="space-y-2"
-              disabled={submitting}
+              disabled={submitting || timeUp}
             >
               {mcq.optionLines.map((opt) => (
                 <label
@@ -614,7 +619,7 @@ export default function AdaptiveRunner({
             <Button
               size="sm"
               onClick={handleSubmitAnswer}
-              disabled={!selectedOption || submitting}
+              disabled={!selectedOption || submitting || timeUp}
               className="gap-1.5"
             >
               {submitting ? (
