@@ -344,6 +344,33 @@ export default function AdaptiveRunner({
     }
   }
 
+  // ── Time up: lock the runner and auto-submit exactly once ──
+  async function handleTimeUp() {
+    if (timeUpHandledRef.current) return;
+    timeUpHandledRef.current = true;
+    remainingRef.current = 0;
+    setTimeUp(true);
+    setReviewOpen(true);
+    toast.warning('Time is up. Your assessment will be submitted automatically.');
+
+    // Best-effort: persist the answer in progress before finalizing.
+    if (currentQuestion && selectedOption) {
+      try {
+        await recordAnswer(
+          attemptId,
+          assessment.id,
+          currentQuestion.id,
+          currentSkillId,
+          gradeMCQ(currentQuestion, selectedOption),
+          selectedOption,
+          Math.round((Date.now() - startedAtRef.current) / 1000),
+        );
+      } catch { /* best-effort */ }
+    }
+    await finalize();
+  }
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
