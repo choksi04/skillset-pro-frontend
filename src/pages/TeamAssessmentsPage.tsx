@@ -7,7 +7,7 @@ import { useSkillStore } from "@/stores/skillStore";
 import { useDomainStore } from "@/stores/domainStore";
 import { useReviewStore } from "@/stores/reviewStore";
 import { useTemplateStore } from "@/stores/templateStore";
-import { useCompetencyLevelStore, getLevelLabelByNumber, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import { useCompetencyLevelStore, getLevelLabelByNumber, getFormattedLevelLabel, getIdToLevelMap, getCompetencyToLevelMap } from "@/stores/competencyLevelStore";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +104,15 @@ export default function TeamAssessmentsPage() {
   const { currentRole, user } = useAuth();
   const navigate = useNavigate();
   const { fetchAssignments } = useAssignmentStore();
+
+  // Resolve an assessment question's target_level (uuid or level name) to its numeric level.
+  const resolveLevel = useMemo(() => {
+    const byId = getIdToLevelMap(levels);
+    const byName = getCompetencyToLevelMap(levels);
+    return (t: string) => byId[t] ?? byName[t] ?? null;
+  }, [levels]);
+
+
 
 
 
@@ -215,7 +224,7 @@ export default function TeamAssessmentsPage() {
 
     let levelLabel = "N/A";
     let hasLevel = false;
-    const achieved = getAchievedLevelFromAttempt(attempt);
+    const achieved = getAchievedLevelFromAttempt(attempt, { questions: a.assessment_questions, resolveLevel });
     if (achieved.level != null && levels.length > 0) {
       levelLabel = getLevelLabelByNumber(levels, achieved.level);
       hasLevel = true;
@@ -627,7 +636,10 @@ export default function TeamAssessmentsPage() {
                     <TableCell className="align-top">
                       {(() => {
                         if (!isCompleted) return <span className="text-sm text-muted-foreground">—</span>;
-                        const { level } = getAchievedLevelFromAttempt(attempt);
+                        const { level } = getAchievedLevelFromAttempt(attempt, {
+                          questions: a.assessment_questions,
+                          resolveLevel,
+                        });
                         if (level == null) return <span className="text-sm text-muted-foreground">—</span>;
                         return (
                           <Badge className="text-[11px] h-5 px-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">

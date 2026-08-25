@@ -4,6 +4,7 @@ import { getCurrentUserId } from '@/lib/audit';
 import { useAssessmentStore, AssessmentQuestion } from './assessmentStore';
 import { useTemplateStore, AssessmentTemplate } from './templateStore';
 import { getLatestSelfRatings } from '@/lib/selfRatings';
+import { getSkillsWithPublishedMcqs } from '@/lib/questionAvailability';
 
 export type AssignmentStatus =
   | 'new'
@@ -244,14 +245,17 @@ async function generateAssessmentForTemplate(
   if (candidateSkills.length === 0) {
     return { assessmentId: null, reason: 'No skills available for this domain' };
   }
-  const { data: mcqRows } = await supabase
-    .from('questions')
-    .select('skill_id')
-    .in('skill_id', candidateSkills)
-    .eq('question_type', 'mcq')
-    .eq('status', 'published')
-    .is('deleted_on', null);
-  if (!mcqRows || mcqRows.length === 0) {
+  // Per-skill existence check (HEAD counts) — a listing query is capped at
+  // 1000 rows and would misreport availability for large question banks.
+  const skillsWithMcq = await getSkillsWithPublishedMcqs(candidateSkills);
+  const skillsWithoutMcq = candidateSkills.filter((s) => !skillsWithMcq.has(s));
+  if (skillsWithoutMcq.length > 0) {
+    console.warn(
+      'assignment: skills excluded — no published MCQs available:',
+      skillsWithoutMcq.join(', '),
+    );
+  }
+  if (skillsWithMcq.size === 0) {
     return { assessmentId: null, reason: 'No published MCQs available for the selected skills' };
   }
 

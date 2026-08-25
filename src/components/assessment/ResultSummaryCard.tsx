@@ -1,13 +1,21 @@
 import { useMemo } from "react";
 import { AssessmentAttempt } from "@/stores/attemptStore";
 import { useSkillStore } from "@/stores/skillStore";
-import { useCompetencyLevelStore, getFormattedLevelLabel } from "@/stores/competencyLevelStore";
+import {
+  useCompetencyLevelStore,
+  getFormattedLevelLabel,
+  getIdToLevelMap,
+  getCompetencyToLevelMap,
+} from "@/stores/competencyLevelStore";
+import { getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Award, MessageSquare } from "lucide-react";
 
 interface Props {
   attempt: AssessmentAttempt;
   review?: any;
+  /** Questions delivered for this assessment (fixed flow) — enables evidence-based achieved level. */
+  questions?: Array<{ question_id: string; skill_id: string; target_level: string }>;
 }
 
 /**
@@ -17,22 +25,32 @@ interface Props {
  * - Counts: attempted / correct / wrong
  * - Skill-wise breakdown
  */
-export default function ResultSummaryCard({ attempt, review }: Props) {
+export default function ResultSummaryCard({ attempt, review, questions }: Props) {
   const { skills } = useSkillStore();
   const { levels: competencyLevels } = useCompetencyLevelStore();
 
   const skillMap = useMemo(() => new Map(skills.map((s) => [s.id, s])), [skills]);
 
-  // Derive per-skill stats from adaptive_state.history (preferred) or skill_scores fallback.
+  const resolveLevel = useMemo(() => {
+    const byId = getIdToLevelMap(competencyLevels);
+    const byName = getCompetencyToLevelMap(competencyLevels);
+    return (t: string) => byId[t] ?? byName[t] ?? null;
+  }, [competencyLevels]);
+
+  // Derive per-skill stats from adaptive_state.history (preferred) or, for fixed
+  // attempts, the delivered questions + per-question AI evaluation scores.
   const adaptive: any = (attempt as any).adaptive_state ?? {};
   const adaptiveSkills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
 
   const breakdown = useMemo(() => {
     if (adaptiveSkills.length > 0) {
+      const quotas: Record<string, number> = adaptive?.quotas ?? {};
       return adaptiveSkills
         .filter((s) => Array.isArray(s.history) && s.history.length > 0)
         .map((s) => {
-          const total = s.history.length;
+          // Configured quota is authoritative — unreached questions count as wrong.
+          const quota = Number(quotas[s.skill_id] ?? adaptive?.questionsPerSkill ?? 0) || 0;
+          const total = Math.max(s.history.length, quota);
           const correct = s.history.filter((h: any) => h.correct).length;
           const correctLevels = s.history
             .filter((h: any) => h.correct)
@@ -47,7 +65,41 @@ export default function ResultSummaryCard({ attempt, review }: Props) {
           };
         });
     }
-    // Fallback to skill_scores (non-adaptive or missing history)
+
+    // Fixed flow — evidence-based, mirroring the shared helper used by the listings.
+    const evals: any[] = (attempt as any).ai_evaluations ?? [];
+    const qs = questions ?? [];
+    if (qs.length > 0 && evals.length > 0) {
+      const scoreByQuestion = new Map<string, number>(
+        evals.map((e: any) => [e.question_id as string, Number(e.score) || 0]),
+      );
+      const bySkill = new Map<string, { total: number; correct: number; achieved: number | null }>();
+      qs.forEach((q) => {
+        const score = scoreByQuestion.get(q.question_id);
+        if (score == null) return;
+        const lvl = resolveLevel(q.target_level);
+        const entry = bySkill.get(q.skill_id) ?? { total: 0, correct: 0, achieved: null };
+        entry.total += 1;
+        if (score >= 50) {
+          entry.correct += 1;
+          if (typeof lvl === "number") {
+            entry.achieved = entry.achieved == null ? lvl : Math.max(entry.achieved, lvl);
+          }
+        }
+        bySkill.set(q.skill_id, entry);
+      });
+      if (bySkill.size > 0) {
+        return Array.from(bySkill.entries()).map(([skill_id, r]) => ({
+          skill_id,
+          total: r.total,
+          correct: r.correct,
+          wrong: r.total - r.correct,
+          achieved: r.achieved,
+        }));
+      }
+    }
+
+    // Fallback to skill_scores (missing evaluations / level data)
     return attempt.skill_scores.map((ss) => ({
       skill_id: ss.skill_id,
       total: ss.question_count,
@@ -55,27 +107,26 @@ export default function ResultSummaryCard({ attempt, review }: Props) {
       wrong: ss.question_count - Math.round((ss.avg_score / 100) * ss.question_count),
       achieved: ss.calculated_level,
     }));
-  }, [adaptiveSkills, attempt.skill_scores]);
+  }, [adaptiveSkills, attempt, questions, resolveLevel]);
 
-  const totalAttempted = breakdown.reduce((a, b) => a + b.total, 0);
-  const totalCorrect = breakdown.reduce((a, b) => a + b.correct, 0);
-  const totalWrong = totalAttempted - totalCorrect;
+  // Overall achieved level + counts come from the shared helper so listing and
+  // detail screens always agree.
+  const achievedResult = useMemo(
+    () => getAchievedLevelFromAttempt(attempt as any, { questions, resolveLevel }),
+    [attempt, questions, resolveLevel],
+  );
+  const totalAttempted = achievedResult.total;
+  const totalCorrect = achievedResult.correct;
+  const totalWrong = Math.max(0, totalAttempted - totalCorrect);
+  const overallAchieved = achievedResult.level;
 
-  // Overall achieved level = rounded average of per-skill achieved levels (skipping nulls).
-  const achievedLevels = breakdown.map((b) => b.achieved).filter((l): l is number => typeof l === "number");
-  const overallAchieved = achievedLevels.length
-    ? Math.round(achievedLevels.reduce((a, b) => a + b, 0) / achievedLevels.length)
-    : null;
+  // Verified level — only from a completed manager review for this attempt.
+  const verifiedAvg = useMemo(
+    () => getVerifiedLevelFromReviews(review ? [review] : [], attempt.id, attempt).level,
+    [review, attempt],
+  );
+  const showVerified = verifiedAvg != null;
 
-  // Verified level (manager review)
-  const verifiedLevels = (review?.skill_reviews ?? [])
-    .map((s: any) => s.verified_level)
-    .filter((v: any) => typeof v === "number");
-  const verifiedAvg =
-    verifiedLevels.length > 0
-      ? Math.round(verifiedLevels.reduce((a: number, b: number) => a + b, 0) / verifiedLevels.length)
-      : null;
-  const showVerified = verifiedAvg != null && review?.status === "completed";
 
   // Per-skill manager comments lookup
   const skillReviewMap = useMemo(

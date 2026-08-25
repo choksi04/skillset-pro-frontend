@@ -618,7 +618,7 @@ export default function QuestionBankPage() {
             variant="default"
             onClick={async () => {
               const draftIds = Array.from(selectedIds).filter(id => {
-                const q = questions.find(qq => qq.id === id);
+                const q = pageQuestions.find(qq => qq.id === id) || questions.find(qq => qq.id === id);
                 return q && q.status === 'draft';
               });
               if (draftIds.length === 0) {
@@ -768,11 +768,11 @@ export default function QuestionBankPage() {
                               <Copy size={14} className="mr-2" /> Duplicate
                             </DropdownMenuItem>
                             {q.status === 'draft' && (
-                              <DropdownMenuItem onClick={() => publishQuestion(q.id)}>
+                              <DropdownMenuItem onClick={async () => { await publishQuestion(q.id); await loadQuestionPage(); }}>
                                 <CheckCircle size={14} className="mr-2" /> Publish
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => toggleQuestionStatus(q.id)}>
+                            <DropdownMenuItem onClick={async () => { await toggleQuestionStatus(q.id); await loadQuestionPage(); }}>
                               {q.status === 'disabled' ? <><ToggleLeft size={14} className="mr-2" /> Enable</> : <><ToggleRight size={14} className="mr-2" /> Disable</>}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(q)}>
@@ -982,7 +982,7 @@ export default function QuestionBankPage() {
       <QuestionFormSheet open={formOpen} onOpenChange={setFormOpen} editQuestion={editQuestion} onSaved={loadQuestionPage} />
 
       {/* Bulk Upload */}
-      <BulkUploadSheet open={bulkOpen} onOpenChange={setBulkOpen} />
+      <BulkUploadSheet open={bulkOpen} onOpenChange={setBulkOpen} onUploaded={loadQuestionPage} />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>

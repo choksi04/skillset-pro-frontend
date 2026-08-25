@@ -181,13 +181,28 @@ export default function AssessmentDetailPage() {
     const isTerminal =
       attempt.status === "submitted" || attempt.status === "evaluated" || attempt.status === "reviewed";
     if (!isTerminal) return;
-    if ((attempt.ai_evaluations?.length ?? 0) > 0) return;
     if (!assessment.is_adaptive) return;
     if (backfilled === attempt.id) return;
+
+    const adaptive: any = (attempt as any).adaptive_state ?? {};
+    const skills: any[] = Array.isArray(adaptive?.skills) ? adaptive.skills : [];
+    const historyTotal = skills.reduce((acc, s) => acc + (s.history?.length ?? 0), 0);
+    const targetTotal = Number(adaptive?.targetTotal ?? 0) || 0;
+    const needsRepair = historyTotal > 0 && targetTotal > historyTotal;
+    const needsEvaluations = (attempt.ai_evaluations?.length ?? 0) === 0;
+    if (!needsRepair && !needsEvaluations) return;
+
     setBackfilled(attempt.id);
-    useAdaptiveEngineStore
-      .getState()
-      .reconstructEvaluationsFromHistory(attempt.id)
+    const engine = useAdaptiveEngineStore.getState();
+    const run = needsRepair
+      ? engine
+          .repairAdaptiveAttempt(attempt.id, assessment.id)
+          .then((did) =>
+            needsEvaluations ? engine.reconstructEvaluationsFromHistory(attempt.id).then((r) => did || r) : did,
+          )
+      : engine.reconstructEvaluationsFromHistory(attempt.id);
+
+    run
       .then((didWork) => {
         if (didWork) {
           fetchAttemptsForAssessment(assessment.id);
@@ -663,7 +678,7 @@ export default function AssessmentDetailPage() {
 
       {/* Result Summary — terminal attempts only */}
       {isAttemptTerminal && attempt && (
-        <ResultSummaryCard attempt={attempt} review={review} />
+        <ResultSummaryCard attempt={attempt} review={review} questions={assessment.assessment_questions} />
       )}
 
       {/* Assessment Questions list — collapsible.
@@ -720,7 +735,15 @@ export default function AssessmentDetailPage() {
                       const hasAnswer = !!(ans && ans.answer_text && ans.answer_text.trim().length > 0);
                       const isMCQ = q?.question_type === "mcq";
                       let resultBadge: JSX.Element;
-                      if (ev) {
+                      if (!hasAnswer) {
+                        // Unanswered questions read as "Skipped" even when a
+                        // zero-score evaluation row exists for them.
+                        resultBadge = (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Skipped
+                          </Badge>
+                        );
+                      } else if (ev) {
                         const correct = isMCQ ? ev.score === 100 : ev.score >= 50;
                         resultBadge = correct ? (
                           <Badge className="text-[10px] bg-success/15 text-success border-success/20 gap-1">
@@ -729,12 +752,6 @@ export default function AssessmentDetailPage() {
                         ) : (
                           <Badge className="text-[10px] bg-destructive/15 text-destructive border-destructive/20 gap-1">
                             <span className="inline-flex items-center gap-1">✗ Incorrect</span>
-                          </Badge>
-                        );
-                      } else if (!hasAnswer) {
-                        resultBadge = (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                            Skipped
                           </Badge>
                         );
                       } else {
