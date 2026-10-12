@@ -6,6 +6,7 @@ import { useDomainStore } from "@/stores/domainStore";
 import { useSkillStore } from "@/stores/skillStore";
 import { useRegistryReviewStore } from "@/stores/registryReviewStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { getManagerDomainIds } from "@/lib/managerScope";
 import { supabase } from "@/integrations/supabase/client";
 import { RatingLevel } from "@/stores/registryStore";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,7 @@ import { toast } from "sonner";
 export default function TeamRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, currentRole } = useAuth();
 
   const { registries, fetchRegistries, fetchItems } = useSkillRegistryStore();
   const { domains, mappings, fetchDomains } = useDomainStore();
@@ -203,7 +204,13 @@ export default function TeamRegistryDetailPage() {
     navigate("/team-registry");
   };
 
-  if (!registry) {
+  // Manager scope: domains they lead plus their own assigned domain
+  const scopeResolving = currentRole === "manager" && !!registry && domains.length === 0;
+  const canView =
+    currentRole === "admin" ||
+    (currentRole === "manager" && !!registry && getManagerDomainIds(user, domains).has(registry.domain_id));
+
+  if (!registry || scopeResolving || !canView) {
     return (
       <div className="space-y-6">
         <Button
@@ -214,7 +221,9 @@ export default function TeamRegistryDetailPage() {
         >
           <ArrowLeft size={14} /> Back to Team Registries
         </Button>
-        <div className="text-center py-16 text-sm text-muted-foreground">Registry not found.</div>
+        <div className="text-center py-16 text-sm text-muted-foreground">
+          {!registry || scopeResolving ? (registry ? "Loading…" : "Registry not found.") : "You don't have access to this registry."}
+        </div>
       </div>
     );
   }
@@ -227,10 +236,7 @@ export default function TeamRegistryDetailPage() {
     .toUpperCase();
 
   // Score select options
-  const scoreOptions = useMemo(
-    () => levels.filter((l) => l.status === "active").sort((a, b) => a.level - b.level),
-    [levels],
-  );
+  const scoreOptions = levels.filter((l) => l.status === "active").sort((a, b) => a.level - b.level);
 
   return (
     <div className="space-y-6 pb-12">
