@@ -32,7 +32,7 @@ import AllRegistriesPage from "@/pages/AllRegistriesPage";
 import NotFound from "@/pages/NotFound";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 
 function LegacyExecRedirect() {
   const [searchParams] = useSearchParams();
@@ -44,9 +44,11 @@ const queryClient = new QueryClient();
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   if (loading)
     return <div className="flex h-screen items-center justify-center text-muted-foreground text-sm">Loading…</div>;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated)
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
 
