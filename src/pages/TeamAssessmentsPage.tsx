@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
+import { getManagerDomainIds } from "@/lib/managerScope";
 import { useNavigate } from "react-router-dom";
 import { useAssessmentStore, Assessment, assessmentStatusConfig } from "@/stores/assessmentStore";
 import { useAttemptStore } from "@/stores/attemptStore";
@@ -198,14 +199,13 @@ export default function TeamAssessmentsPage() {
     return d?.name ?? null;
   };
 
-  // Domains the current manager leads
+  // Manager scope — domains they lead plus their own assigned domain
   const ledDomainIds = useMemo(() => {
     if (currentRole !== "manager" || !user) return new Set<string>();
-    return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
+    return getManagerDomainIds(user, domains);
   }, [domains, currentRole, user]);
   const notDomainLead = currentRole === "manager" && ledDomainIds.size === 0;
 
-  // Manager scope — only domains the manager leads
   const teamAssessments = useMemo(() => {
     if (currentRole === "admin") return assessments;
     if (currentRole === "manager") {
@@ -269,7 +269,11 @@ export default function TeamAssessmentsPage() {
   const pageStart = (safePage - 1) * PAGE_SIZE;
   const paged = filteredTeam.slice(pageStart, pageStart + PAGE_SIZE);
 
-  const showLoadingRows = !initialized || namesLoading || teamAssessments.some((a) => !(a.employee_id in userMeta));
+  const showLoadingRows =
+    !initialized ||
+    namesLoading ||
+    (currentRole === "manager" && domains.length === 0) ||
+    teamAssessments.some((a) => !(a.employee_id in userMeta));
 
   const toggleStatus = (key: string) =>
     setStatusFilter((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
@@ -496,7 +500,7 @@ export default function TeamAssessmentsPage() {
                     <ClipboardCheck size={32} className="text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground text-center max-w-md">
                       {notDomainLead
-                        ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
+                        ? "You're not assigned to a domain yet. Ask an admin to assign you."
                         : teamAssessments.length === 0
                           ? "No team assessments yet."
                           : "No assessments match the current filters."}
