@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
+import { getManagerDomainIds } from "@/lib/managerScope";
 import { useNavigate } from "react-router-dom";
 import { useAssessmentStore, Assessment, assessmentStatusConfig } from "@/stores/assessmentStore";
 import { useAttemptStore } from "@/stores/attemptStore";
