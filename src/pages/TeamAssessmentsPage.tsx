@@ -268,7 +268,11 @@ export default function TeamAssessmentsPage() {
   const pageStart = (safePage - 1) * PAGE_SIZE;
   const paged = filteredTeam.slice(pageStart, pageStart + PAGE_SIZE);
 
-  const showLoadingRows = !initialized || namesLoading || teamAssessments.some((a) => !(a.employee_id in userMeta));
+  const showLoadingRows =
+    !initialized ||
+    namesLoading ||
+    (currentRole === "manager" && domains.length === 0) ||
+    teamAssessments.some((a) => !(a.employee_id in userMeta));
 
   const toggleStatus = (key: string) =>
     setStatusFilter((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
