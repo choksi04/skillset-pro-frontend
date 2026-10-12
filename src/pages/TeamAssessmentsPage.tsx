@@ -198,14 +198,13 @@ export default function TeamAssessmentsPage() {
     return d?.name ?? null;
   };
 
-  // Domains the current manager leads
+  // Manager scope — domains they lead plus their own assigned domain
   const ledDomainIds = useMemo(() => {
     if (currentRole !== "manager" || !user) return new Set<string>();
-    return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
+    return getManagerDomainIds(user, domains);
   }, [domains, currentRole, user]);
   const notDomainLead = currentRole === "manager" && ledDomainIds.size === 0;
 
-  // Manager scope — only domains the manager leads
   const teamAssessments = useMemo(() => {
     if (currentRole === "admin") return assessments;
     if (currentRole === "manager") {
@@ -496,7 +495,7 @@ export default function TeamAssessmentsPage() {
                     <ClipboardCheck size={32} className="text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground text-center max-w-md">
                       {notDomainLead
-                        ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
+                        ? "You're not assigned to a domain yet. Ask an admin to assign you."
                         : teamAssessments.length === 0
                           ? "No team assessments yet."
                           : "No assessments match the current filters."}
