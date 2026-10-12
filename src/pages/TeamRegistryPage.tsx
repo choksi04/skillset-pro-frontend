@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { getManagerDomainIds } from "@/lib/managerScope";
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
