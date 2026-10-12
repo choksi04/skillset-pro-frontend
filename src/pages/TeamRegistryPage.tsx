@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { getManagerDomainIds } from "@/lib/managerScope";
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
@@ -78,13 +79,13 @@ export default function TeamRegistryPage() {
     fetchLevels();
   }, []);
 
-  // Domains the current manager leads
+  // Manager scope — domains they lead plus their own assigned domain
   const ledDomainIds = useMemo(() => {
     if (currentRole !== 'manager' || !user) return new Set<string>();
-    return new Set(domains.filter((d) => d.domain_lead_id === user.id).map((d) => d.id));
+    return getManagerDomainIds(user, domains);
   }, [domains, currentRole, user]);
 
-  // Role-scoped registries (admin sees all; manager sees only domains they lead)
+  // Role-scoped registries (admin sees all; manager sees their scoped domains)
   const teamRegistries = useMemo(() => {
     if (currentRole === 'admin') return registries;
     if (currentRole === 'manager') {
@@ -198,7 +199,7 @@ export default function TeamRegistryPage() {
     });
   }, [rows, search, statusFilter, domainFilter]);
 
-  const isLoading = !initialized || namesLoading;
+  const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
   const filtersActive = statusFilter !== 'all' || domainFilter !== 'all';
 
   // Domains visible in filter dropdown
@@ -317,11 +318,11 @@ export default function TeamRegistryPage() {
                     <div className="flex flex-col items-center text-center">
                       <Users size={28} className="text-muted-foreground mb-3" />
                       <h3 className="text-base font-semibold text-foreground mb-1">
-                        {notDomainLead ? 'Not a Domain Lead' : 'No Registries Yet'}
+                        {notDomainLead ? 'No Domain Assigned' : 'No Registries Yet'}
                       </h3>
                       <p className="text-sm text-muted-foreground max-w-md">
                         {notDomainLead
-                          ? "You're not assigned as Domain Lead for any domain. Ask an admin to assign you."
+                          ? "You're not assigned to a domain yet. Ask an admin to assign you."
                           : 'No team members have submitted their skill registries yet.'}
                       </p>
                     </div>
