@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Brain, AlertCircle, ShieldCheck, Target, BarChart3 } from "lucide-react";
 
@@ -40,10 +40,13 @@ function FeatureRow({ icon: Icon, title, desc }: { icon: typeof ShieldCheck; tit
 
 export default function LoginPage() {
   const { isAuthenticated, loginWithAzure } = useAuth();
+  const location = useLocation();
   const [error, setError] = useState("");
   const [azureLoading, setAzureLoading] = useState(false);
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  const from = (location.state as { from?: string } | null)?.from;
+  const target = from && from.startsWith("/") && !from.startsWith("/login") ? from : "/";
+  if (isAuthenticated) return <Navigate to={target} replace />;
 
   const handleAzureLogin = async () => {
     setError("");
