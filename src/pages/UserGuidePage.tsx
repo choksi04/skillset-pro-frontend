@@ -211,6 +211,7 @@ const managerGuide: GuideStep[] = [
       'See each team member\'s current version, total versions, and trend indicators (▲ improvement, ▼ regression).',
       'Click an employee to view their skill self-scores grouped by category, plus the full version history table.',
       'Domain-scoped: you see only employees in domains you manage. Admins see across all domains.',
+      'Click Export CSV (Managers and Admins) to download every registry matching your current search and filters — one row per employee and skill, with self rating, manager score, status, completion and average.',
       'You will be notified when a team member submits a new registry version.',
     ],
   },
