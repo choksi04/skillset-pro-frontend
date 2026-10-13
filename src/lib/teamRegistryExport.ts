@@ -71,7 +71,8 @@ export async function buildTeamRegistryExport(args: {
   reviewItems.forEach((ri) => { if (!rItemsByReview.has(ri.review_id)) rItemsByReview.set(ri.review_id, new Map()); rItemsByReview.get(ri.review_id)!.set(ri.skill_id, ri); });
   const skillById = new Map(skills.map((s) => [s.id, s]));
 
-  const sorted = [...rows].sort((a, b) => a.fullName.localeCompare(b.fullName) || a.empId.localeCompare(b.empId));
+  // Keep the caller's order (the table's selected sort).
+  const sorted = rows;
   const out: CsvCell[][] = [];
   for (const r of sorted) {
     const regItems = itemsByReg.get(r.registry.id) ?? [];
