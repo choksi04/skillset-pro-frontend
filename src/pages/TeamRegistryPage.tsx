@@ -18,7 +18,10 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { Users, Search, Filter, Star, ChevronRight } from 'lucide-react';
+import { Users, Search, Filter, Star, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { toCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
+import { buildTeamRegistryExport, TEAM_REGISTRY_HEADER } from '@/lib/teamRegistryExport';
 import { useNavigate } from 'react-router-dom';
 import { registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
 import { computeRegistryMetrics } from '@/lib/registryMetrics';
@@ -212,22 +215,58 @@ export default function TeamRegistryPage() {
   // plus the canonical order.
   const statusFilterOptions: RegistryStatus[] = ['draft', 'incomplete', 'review_pending', 'approved'];
 
+  // Export: Admin / Manager only, scoped to the same filtered rows the table shows.
+  const canExport = currentRole === 'admin' || currentRole === 'manager';
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (!canExport || exporting) return;
+    if (filteredRows.length === 0) {
+      toast({ title: 'Nothing to export', description: 'No team registries match the current search and filters.' });
+      return;
+    }
+    setExporting(true);
+    try {
+      const exportRows = filteredRows.map((r) => {
+        const reg = groupedByEmployee.get(r.empId)![0];
+        return {
+          empId: r.empId, fullName: r.fullName, designation: r.designation,
+          domainId: r.domainId, domainName: r.domainName,
+          registry: { id: reg.id, version_number: reg.version_number, status: reg.status, submitted_at: reg.submitted_at, updatedAt: r.updatedAt },
+        };
+      });
+      const data = await buildTeamRegistryExport({ rows: exportRows, mappings, skills, maxLevel });
+      downloadCsv(toCsv(TEAM_REGISTRY_HEADER, data), timestampedFilename('Team_Registry'));
+      toast({ title: 'Export complete', description: `${exportRows.length} registries, ${data.length} rows exported.` });
+    } catch (e: any) {
+      console.error('Team registry export failed', e);
+      toast({ title: 'Export failed', description: 'No file was downloaded. Please try again.', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Team Registries</h2>
           <p className="text-sm text-muted-foreground mt-1">Review and manage skill assessments submitted by your team.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          {canExport && (
+            <Button variant="outline" size="sm" className="gap-1.5 h-9" onClick={handleExport} disabled={exporting || isLoading}>
+              {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </Button>
+          )}
+          <div className="relative w-full sm:w-auto">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search members or roles..."
-              className="pl-9 w-[260px] h-9 text-sm"
+              className="pl-9 w-full sm:w-[260px] h-9 text-sm"
             />
           </div>
           <Popover>
