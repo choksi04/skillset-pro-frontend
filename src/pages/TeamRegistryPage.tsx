@@ -378,7 +378,6 @@ export default function TeamRegistryPage() {
                   </TableHead>
                 );
               })}
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[20%]">Registry Subject</TableHead>
               <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[12%] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
