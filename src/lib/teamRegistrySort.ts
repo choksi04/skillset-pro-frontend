@@ -28,7 +28,6 @@ export function nextSort(cur: TeamRegistrySort, key: TeamRegistrySortKey): TeamR
 function valueOf(r: SortableTeamRow, key: TeamRegistrySortKey): string | number | null {
   switch (key) {
     case 'member': return r.fullName.trim() || null;
-    case 'subject': return r.domainName.trim() || null;
     case 'status': return registryStatusConfig[r.status]?.label ?? null;
     case 'completion': return r.metricsLoading || !Number.isFinite(r.completionPct) ? null : r.completionPct;
     case 'rating': return r.metricsLoading || r.avgOnFive === null || !Number.isFinite(r.avgOnFive) ? null : r.avgOnFive;
