@@ -369,7 +369,7 @@ export default function TeamRegistryPage() {
                     <button
                       type="button"
                       onClick={() => handleSort(key)}
-                      className={`inline-flex items-center gap-1 uppercase tracking-wide rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-foreground' : ''}`}
+                      className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-wide rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-foreground' : ''}`}
                       aria-label={`Sort by ${label}${active ? (sort.dir === 'asc' ? ', currently ascending' : ', currently descending') : ''}`}
                     >
                       {label}
