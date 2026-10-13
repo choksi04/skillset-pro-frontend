@@ -76,7 +76,7 @@ export async function buildTeamRegistryExport(args: {
   for (const r of sorted) {
     const regItems = itemsByReg.get(r.registry.id) ?? [];
     const review = latestReview.get(r.registry.id) ?? null;
-    const reviewStatus = review ? (review.status === 'approved' || review.status === 'completed' ? 'approved' : 'pending') : null;
+    const reviewStatus = review ? (review.status === 'approved' ? 'approved' : 'pending') : null;
     const domainSkillIds = mappings.filter((m) => m.domain_id === r.domainId).map((m) => m.skill_id)
       .filter((id) => skillById.get(id)?.status === 'active');
     const m = computeRegistryMetrics({ registryStatus: r.registry.status, items: regItems, domainSkillIds, maxLevel, reviewStatus: reviewStatus as any });
