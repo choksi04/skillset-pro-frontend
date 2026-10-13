@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { computeRegistryMetrics } from '@/lib/registryMetrics';
+import { computeRegistryMetrics, versionSkillIds } from '@/lib/registryMetrics';
 import { registryStatusConfig } from '@/lib/registryStatus';
 import type { CsvCell } from '@/lib/csv';
 
@@ -78,8 +78,11 @@ export async function buildTeamRegistryExport(args: {
     const regItems = itemsByReg.get(r.registry.id) ?? [];
     const review = latestReview.get(r.registry.id) ?? null;
     const reviewStatus = review ? (review.status === 'approved' ? 'approved' : 'pending') : null;
-    const domainSkillIds = mappings.filter((m) => m.domain_id === r.domainId).map((m) => m.skill_id)
+    const currentDomainSkillIds = mappings.filter((m) => m.domain_id === r.domainId).map((m) => m.skill_id)
       .filter((id) => skillById.get(id)?.status === 'active');
+    // Approved versions export their own saved skills (frozen history).
+    const domainSkillIds = versionSkillIds({ registryStatus: r.registry.status, reviewStatus, items: regItems, domainSkillIds: currentDomainSkillIds })
+      .filter((id) => skillById.has(id));
     const m = computeRegistryMetrics({ registryStatus: r.registry.status, items: regItems, domainSkillIds, maxLevel, reviewStatus: reviewStatus as any });
     const base: CsvCell[] = [
       r.empId, r.fullName, r.designation, r.domainId, r.domainName,

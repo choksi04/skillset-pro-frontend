@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
-import { computeRegistryMetrics } from '@/lib/registryMetrics';
+import { computeRegistryMetrics, isFrozenVersion } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -84,15 +84,22 @@ export default function SkillRegistryDetailPage() {
     return mappings.filter((m) => m.domain_id === assignedDomain.id).map((m) => m.skill_id);
   }, [assignedDomain, mappings]);
 
-  const domainSkills = useMemo(
-    () => skills.filter((s) => domainSkillIds.includes(s.id) && s.status === 'active'),
-    [skills, domainSkillIds]
-  );
-
   // Load items for this registry
   const [itemsLoaded, setItemsLoaded] = useState(false);
   const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+
+  // Approved versions are frozen history: show only the skills saved with that version.
+  const frozen = isFrozenVersion(
+    (registry?.status as 'draft' | 'submitted' | undefined) ?? null,
+    registry ? reviewStatuses[registry.id] ?? null : null,
+  );
+  const domainSkills = useMemo(
+    () => frozen
+      ? skills.filter((s) => ratings[s.id] != null)
+      : skills.filter((s) => domainSkillIds.includes(s.id) && s.status === 'active'),
+    [skills, domainSkillIds, frozen, ratings]
+  );
 
   useEffect(() => {
     if (!submissionId) return;
