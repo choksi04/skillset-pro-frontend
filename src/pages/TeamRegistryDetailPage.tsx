@@ -111,9 +111,16 @@ export default function TeamRegistryDetailPage() {
     return mappings.filter((m) => m.domain_id === domain.id).map((m) => m.skill_id);
   }, [domain, mappings]);
 
+  // Approved versions are frozen history: show only the skills saved with that version.
+  const frozen = isFrozenVersion(
+    (registry?.status as "draft" | "submitted" | undefined) ?? null,
+    review?.status ?? null,
+  );
   const domainSkills = useMemo(
-    () => skills.filter((s) => domainSkillIds.includes(s.id) && s.status === "active"),
-    [skills, domainSkillIds],
+    () => frozen
+      ? skills.filter((s) => ratings[s.id] != null)
+      : skills.filter((s) => domainSkillIds.includes(s.id) && s.status === "active"),
+    [skills, domainSkillIds, frozen, ratings],
   );
 
   const groupedSkills = useMemo(() => {
