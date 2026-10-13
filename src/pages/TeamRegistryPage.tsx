@@ -250,7 +250,7 @@ export default function TeamRegistryPage() {
     }
     setExporting(true);
     try {
-      const exportRows = filteredRows.map((r) => {
+      const exportRows = sortedRows.map((r) => {
         const reg = groupedByEmployee.get(r.empId)![0];
         return {
           empId: r.empId, fullName: r.fullName, designation: r.designation,
