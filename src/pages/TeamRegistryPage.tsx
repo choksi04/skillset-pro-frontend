@@ -19,6 +19,12 @@ import {
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
 import { Users, Search, Filter, Star, ChevronRight, Download, Loader2 } from 'lucide-react';
+import {
+  Pagination, PaginationContent, PaginationEllipsis, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious,
+} from '@/components/ui/pagination';
+
+const PAGE_SIZE = 10;
 import { toast } from '@/hooks/use-toast';
 import { toCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
 import { buildTeamRegistryExport, TEAM_REGISTRY_HEADER } from '@/lib/teamRegistryExport';
@@ -202,6 +208,15 @@ export default function TeamRegistryPage() {
     });
   }, [rows, search, statusFilter, domainFilter]);
 
+  // Pagination (display only — export always uses the full filteredRows list)
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter]);
+  const total = filteredRows.length;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pagedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
+
   const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
   const filtersActive = statusFilter !== 'all' || domainFilter !== 'all';
 
@@ -371,7 +386,7 @@ export default function TeamRegistryPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRows.map((r) => (
+              pagedRows.map((r) => (
                 <TableRow
                   key={r.empId}
                   className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
@@ -449,6 +464,59 @@ export default function TeamRegistryPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {!isLoading && total > 0 && (
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-xs text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{' '}
+            <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{' '}
+            <span className="font-medium text-foreground">{total}</span> team members
+          </p>
+          {pageCount > 1 && (
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent className="flex-wrap">
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
+                    className={safePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                {(() => {
+                  const list: (number | 'ellipsis')[] = [];
+                  if (pageCount <= 7) {
+                    for (let i = 1; i <= pageCount; i++) list.push(i);
+                  } else {
+                    list.push(1);
+                    if (safePage > 3) list.push('ellipsis');
+                    for (let i = Math.max(2, safePage - 1); i <= Math.min(pageCount - 1, safePage + 1); i++) list.push(i);
+                    if (safePage < pageCount - 2) list.push('ellipsis');
+                    list.push(pageCount);
+                  }
+                  return list.map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <PaginationItem key={`e-${idx}`}><PaginationEllipsis /></PaginationItem>
+                    ) : (
+                      <PaginationItem key={item}>
+                        <PaginationLink href="#" isActive={item === safePage} onClick={(e) => { e.preventDefault(); setPage(item); }}>
+                          {item}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  );
+                })()}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(pageCount, p + 1)); }}
+                    className={safePage === pageCount ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
+      )}
     </div>
   );
 }
