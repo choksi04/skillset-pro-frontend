@@ -347,11 +347,17 @@ export default function TeamRegistryPage() {
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
             {([
-                ['member', 'Team Member', 'w-[24%]'],
+                 ['member', 'Team Member', 'w-[24%]'],
+                ['subject', null, 'w-[20%]'],
                 ['status', 'Status', 'w-[12%]'],
                 ['completion', 'Completion', 'w-[20%]'],
                 ['rating', 'Avg Rating', 'w-[12%]'],
-              ] as [TeamRegistrySortKey, string, string][]).map(([key, label, w]) => {
+              ] as [TeamRegistrySortKey | 'subject', string | null, string][]).map(([key, label, w]) => {
+                if (key === 'subject') {
+                  return (
+                    <TableHead key="subject" className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[20%]">Registry Subject</TableHead>
+                  );
+                }
                 const active = sort.key === key;
                 const Icon = !active ? ChevronsUpDown : sort.dir === 'asc' ? ChevronUp : ChevronDown;
                 return (
