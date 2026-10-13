@@ -48,8 +48,30 @@ export interface RegistryMetrics {
   status: RegistryStatus;
 }
 
+/**
+ * An approved (or completed) submitted version is frozen history: its skill
+ * set is the items saved with that version, not today's domain catalog.
+ */
+export function isFrozenVersion(
+  registryStatus?: 'draft' | 'submitted' | null,
+  reviewStatus?: string | null,
+): boolean {
+  return registryStatus === 'submitted' && (reviewStatus === 'approved' || reviewStatus === 'completed');
+}
+
+/** Skill IDs that define a version's membership (own items when frozen, else domain). */
+export function versionSkillIds(
+  input: Pick<RegistryMetricsInput, 'registryStatus' | 'reviewStatus' | 'items' | 'domainSkillIds'>,
+): string[] {
+  if (input.items && isFrozenVersion(input.registryStatus, input.reviewStatus)) {
+    return [...new Set(input.items.map((i) => i.skill_id))];
+  }
+  return input.domainSkillIds;
+}
+
 export function computeRegistryMetrics(input: RegistryMetricsInput): RegistryMetrics {
-  const { registryStatus, items, domainSkillIds, maxLevel, reviewStatus } = input;
+  const { registryStatus, items, maxLevel, reviewStatus } = input;
+  const domainSkillIds = versionSkillIds(input);
 
   const totalSkills = domainSkillIds.length;
   const loading = items === undefined;
