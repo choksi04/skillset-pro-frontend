@@ -343,7 +343,7 @@ export default function TeamRegistryPage() {
 
       {/* Table */}
       <Card className="border-border overflow-hidden">
-        <Table>
+        <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
               {([
