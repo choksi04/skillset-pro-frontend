@@ -343,7 +343,7 @@ export default function TeamRegistryPage() {
 
       {/* Table */}
       <Card className="border-border overflow-hidden">
-        <Table>
+        <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
               {([
@@ -368,7 +368,7 @@ export default function TeamRegistryPage() {
                       aria-label={`Sort by ${label}${active ? (sort.dir === 'asc' ? ', currently ascending' : ', currently descending') : ''}`}
                     >
                       {label}
-                      <Icon size={12} className={active ? '' : 'opacity-40'} aria-hidden="true" />
+                      <Icon size={14} className={active ? '' : 'opacity-70'} aria-hidden="true" />
                     </button>
                   </TableHead>
                 );
