@@ -18,7 +18,11 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { Users, Search, Filter, Star, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import {
+  sortTeamRegistryRows, nextSort, DEFAULT_TEAM_REGISTRY_SORT,
+  type TeamRegistrySort, type TeamRegistrySortKey,
+} from '@/lib/teamRegistrySort';
 import {
   Pagination, PaginationContent, PaginationEllipsis, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -208,14 +212,19 @@ export default function TeamRegistryPage() {
     });
   }, [rows, search, statusFilter, domainFilter]);
 
-  // Pagination (display only — export always uses the full filteredRows list)
+  // Sort the full filtered list (before pagination); export uses the same order.
+  const [sort, setSort] = useState<TeamRegistrySort>(DEFAULT_TEAM_REGISTRY_SORT);
+  const sortedRows = useMemo(() => sortTeamRegistryRows(filteredRows, sort), [filteredRows, sort]);
+
+  // Pagination (display only — export always uses the full sortedRows list)
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter]);
-  const total = filteredRows.length;
+  const handleSort = (key: TeamRegistrySortKey) => { setSort((s) => nextSort(s, key)); setPage(1); };
+  const total = sortedRows.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageStart = (safePage - 1) * PAGE_SIZE;
-  const pagedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
+  const pagedRows = sortedRows.slice(pageStart, pageStart + PAGE_SIZE);
 
   const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
   const filtersActive = statusFilter !== 'all' || domainFilter !== 'all';
@@ -241,7 +250,7 @@ export default function TeamRegistryPage() {
     }
     setExporting(true);
     try {
-      const exportRows = filteredRows.map((r) => {
+      const exportRows = sortedRows.map((r) => {
         const reg = groupedByEmployee.get(r.empId)![0];
         return {
           empId: r.empId, fullName: r.fullName, designation: r.designation,
@@ -337,11 +346,33 @@ export default function TeamRegistryPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[24%]">Team Member</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[20%]">Registry Subject</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[12%]">Status</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[20%]">Completion</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[12%]">Avg Rating</TableHead>
+              {([
+                ['member', 'Team Member', 'w-[24%]'],
+                ['subject', 'Registry Subject', 'w-[20%]'],
+                ['status', 'Status', 'w-[12%]'],
+                ['completion', 'Completion', 'w-[20%]'],
+                ['rating', 'Avg Rating', 'w-[12%]'],
+              ] as [TeamRegistrySortKey, string, string][]).map(([key, label, w]) => {
+                const active = sort.key === key;
+                const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
+                return (
+                  <TableHead
+                    key={key}
+                    aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    className={`text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 ${w}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(key)}
+                      className={`inline-flex items-center gap-1 uppercase tracking-wide rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-foreground' : ''}`}
+                      aria-label={`Sort by ${label}${active ? (sort.dir === 'asc' ? ', currently ascending' : ', currently descending') : ''}`}
+                    >
+                      {label}
+                      <Icon size={12} className={active ? '' : 'opacity-40'} aria-hidden="true" />
+                    </button>
+                  </TableHead>
+                );
+              })}
               <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[12%] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

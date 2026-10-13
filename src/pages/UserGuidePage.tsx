@@ -212,6 +212,7 @@ const managerGuide: GuideStep[] = [
       'Click an employee to view their skill self-scores grouped by category, plus the full version history table.',
       'Domain-scoped: you see only employees in domains you manage. Admins see across all domains.',
       'Click Export CSV (Managers and Admins) to download every registry matching your current search and filters — one row per employee and skill, with self rating, manager score, status, completion and average.',
+      'Click a column header (Team Member, Registry Subject, Status, Completion, Avg Rating) to sort the whole list; click again to reverse. Default is Team Member A–Z. Export CSV follows the selected sort.',
       'You will be notified when a team member submits a new registry version.',
     ],
   },
