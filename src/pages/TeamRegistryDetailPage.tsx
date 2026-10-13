@@ -10,7 +10,7 @@ import { getManagerDomainIds } from "@/lib/managerScope";
 import { supabase } from "@/integrations/supabase/client";
 import { RatingLevel } from "@/stores/registryStore";
 import { Badge } from "@/components/ui/badge";
-import { computeRegistryMetrics, itemsFromRatingsMap } from "@/lib/registryMetrics";
+import { computeRegistryMetrics, itemsFromRatingsMap, isFrozenVersion } from "@/lib/registryMetrics";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

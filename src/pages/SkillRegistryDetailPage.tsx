@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RatingLevel } from '@/stores/registryStore';
 import RatingSlider from '@/components/registry/RatingSlider';
 import { Badge } from '@/components/ui/badge';
-import { computeRegistryMetrics } from '@/lib/registryMetrics';
+import { computeRegistryMetrics, isFrozenVersion } from '@/lib/registryMetrics';
 import { RegistryStatusBadge } from '@/components/registry/RegistryStatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
