@@ -27,4 +27,9 @@ describe('historical registry versions', () => {
     expect(m.staleItemCount).toBe(0);
     expect(m.status).toBe('approved');
   });
+  it('newer draft after an approved version uses current domain skills and is not approved', () => {
+    const m = computeRegistryMetrics({ registryStatus: 'draft', items, domainSkillIds: [...v1, ...added], maxLevel: 5, reviewStatus: null });
+    expect(m.totalSkills).toBe(17);
+    expect(m.status).toBe('draft');
+  });
 });
