@@ -18,7 +18,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   sortTeamRegistryRows, nextSort, DEFAULT_TEAM_REGISTRY_SORT,
   type TeamRegistrySort, type TeamRegistrySortKey,
