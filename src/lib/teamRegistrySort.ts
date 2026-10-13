@@ -1,6 +1,6 @@
 import { registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
 
-export type TeamRegistrySortKey = 'member' | 'subject' | 'status' | 'completion' | 'rating';
+export type TeamRegistrySortKey = 'member' | 'status' | 'completion' | 'rating';
 export type SortDir = 'asc' | 'desc';
 export interface TeamRegistrySort { key: TeamRegistrySortKey; dir: SortDir }
 
@@ -16,15 +16,18 @@ export interface SortableTeamRow {
   metricsLoading: boolean;
 }
 
-/** Next sort state when a header is clicked: new column → asc, same column → toggle. */
+const SORTABLE_KEYS: readonly TeamRegistrySortKey[] = ['member', 'status', 'completion', 'rating'];
+
+/** Next sort state when a header is clicked: new column → asc, same column → toggle.
+ *  Unsortable keys (e.g. a legacy saved 'subject' sort) fall back to the default. */
 export function nextSort(cur: TeamRegistrySort, key: TeamRegistrySortKey): TeamRegistrySort {
+  if (!SORTABLE_KEYS.includes(key)) return DEFAULT_TEAM_REGISTRY_SORT;
   return cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' };
 }
 
 function valueOf(r: SortableTeamRow, key: TeamRegistrySortKey): string | number | null {
   switch (key) {
     case 'member': return r.fullName.trim() || null;
-    case 'subject': return r.domainName.trim() || null;
     case 'status': return registryStatusConfig[r.status]?.label ?? null;
     case 'completion': return r.metricsLoading || !Number.isFinite(r.completionPct) ? null : r.completionPct;
     case 'rating': return r.metricsLoading || r.avgOnFive === null || !Number.isFinite(r.avgOnFive) ? null : r.avgOnFive;

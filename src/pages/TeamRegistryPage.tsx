@@ -18,7 +18,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   sortTeamRegistryRows, nextSort, DEFAULT_TEAM_REGISTRY_SORT,
   type TeamRegistrySort, type TeamRegistrySortKey,
@@ -346,15 +346,14 @@ export default function TeamRegistryPage() {
         <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
-              {([
+            {([
                 ['member', 'Team Member', 'w-[24%]'],
-                ['subject', 'Registry Subject', 'w-[20%]'],
                 ['status', 'Status', 'w-[12%]'],
                 ['completion', 'Completion', 'w-[20%]'],
                 ['rating', 'Avg Rating', 'w-[12%]'],
               ] as [TeamRegistrySortKey, string, string][]).map(([key, label, w]) => {
                 const active = sort.key === key;
-                const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
+                const Icon = !active ? ChevronsUpDown : sort.dir === 'asc' ? ChevronUp : ChevronDown;
                 return (
                   <TableHead
                     key={key}
@@ -373,6 +372,7 @@ export default function TeamRegistryPage() {
                   </TableHead>
                 );
               })}
+              <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[20%]">Registry Subject</TableHead>
               <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium py-3 px-5 w-[12%] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

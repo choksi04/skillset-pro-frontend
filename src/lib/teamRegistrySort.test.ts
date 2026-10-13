@@ -37,4 +37,7 @@ describe('team registry sort', () => {
     expect(asc).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(ids(sortTeamRegistryRows(r, { key: 'member', dir: 'desc' }))).toEqual(asc);
   });
+  it('falls back to default when a removed sort key (subject) is passed', () => {
+    expect(nextSort(DEFAULT_TEAM_REGISTRY_SORT, 'subject' as never)).toEqual(DEFAULT_TEAM_REGISTRY_SORT);
+  });
 });
