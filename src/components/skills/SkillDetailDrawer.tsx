@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSkillStore, Skill, SkillTopic } from '@/stores/skillStore';
 import TopicFormDialog from '@/components/skills/TopicFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -118,7 +118,7 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin, readOnly = 
                     <h3 className="text-sm font-semibold text-foreground">Topics</h3>
                     <Badge variant="outline" className="text-[10px] ml-1">{skillTopics.length}</Badge>
                   </div>
-                  {isAdmin && (
+                  {canEdit && (
                     <Button size="sm" variant="outline" onClick={handleAddTopic} className="gap-1 h-7 text-xs">
                       <Plus size={12} /> Add Topic
                     </Button>
@@ -135,6 +135,11 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin, readOnly = 
                       <Skeleton key={i} className="h-20 w-full rounded-lg" />
                     ))}
                   </div>
+                ) : topicsError ? (
+                  <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center">
+                    <p className="text-xs text-destructive mb-2">Couldn't load topics.</p>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
+                  </div>
                 ) : skillTopics.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-6 text-center">
                     <BookOpen size={20} className="mx-auto text-muted-foreground mb-2" />
@@ -149,7 +154,7 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin, readOnly = 
                             <p className="text-sm font-medium text-foreground">{topic.name}</p>
                             {topic.description ? (
                               <p
-                                className="text-xs text-muted-foreground mt-1 line-clamp-2"
+                                className={`text-xs text-muted-foreground mt-1 ${readOnly ? 'whitespace-pre-line' : 'line-clamp-2'}`}
                                 title={topic.description}
                               >
                                 {topic.description}
@@ -158,7 +163,7 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin, readOnly = 
                               <p className="text-xs text-muted-foreground mt-1 italic">No description</p>
                             )}
                           </div>
-                          {isAdmin && (
+                          {canEdit && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0">
@@ -189,7 +194,7 @@ export default function SkillDetailDrawer({ skill, onClose, isAdmin, readOnly = 
         </SheetContent>
       </Sheet>
 
-      {skill && (
+      {skill && canEdit && (
         <TopicFormDialog
           open={topicDialogOpen}
           onOpenChange={setTopicDialogOpen}
