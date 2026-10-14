@@ -210,6 +210,7 @@ const managerGuide: GuideStep[] = [
       'Navigate to Operations > Team Registry from the sidebar.',
       'See each team member\'s current version, total versions, and trend indicators (▲ improvement, ▼ regression).',
       'Click an employee to view their skill self-scores grouped by category, plus the full version history table.',
+      'In Skill Review Breakdown, click the ⓘ icon beside a skill name to see its description, category, tags, status and topics (read-only) without leaving the review.',
       'Domain-scoped: you see only employees in domains you manage. Admins see across all domains.',
       'Click Export CSV (Managers and Admins) to download every registry matching your current search and filters — one row per employee and skill, with self rating, manager score, status, completion and average.',
       'Click a column header (Team Member, Registry Subject, Status, Completion, Avg Rating) to sort the whole list; click again to reverse. Default is Team Member A–Z. Export CSV follows the selected sort.',

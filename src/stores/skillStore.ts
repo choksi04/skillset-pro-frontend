@@ -46,7 +46,8 @@ interface SkillStore {
   loading: boolean;
   initialized: boolean;
   fetchSkills: (options?: FetchOptions) => Promise<void>;
-  fetchTopicsForSkill: (skillId: string) => Promise<void>;
+  /** Resolves true on success, false on fetch failure. */
+  fetchTopicsForSkill: (skillId: string) => Promise<boolean>;
   addCategory: (cat: Omit<SkillCategory, 'id' | 'created_at'>) => Promise<string | undefined>;
   updateCategory: (id: string, updates: Partial<SkillCategory>) => Promise<void>;
   toggleCategoryStatus: (id: string) => Promise<void>;
@@ -139,8 +140,10 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       set((state) => ({
         topics: { ...state.topics, [skillId]: topics },
       }));
+      return true;
     } catch (err) {
       console.error('Failed to fetch topics:', err);
+      return false;
     }
   },
 
