@@ -501,7 +501,7 @@ export default function TeamRegistryPage() {
         </Table>
       </Card>
 
-      {!isLoading && total > 0 && (
+      {!isLoading && (
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-muted-foreground">
             Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{' '}
