@@ -26,7 +26,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CheckCircle2, Star, User as UserIcon, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Star, User as UserIcon, ClipboardCheck, Info } from "lucide-react";
+import SkillDetailDrawer from "@/components/skills/SkillDetailDrawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 export default function TeamRegistryDetailPage() {
@@ -54,6 +56,7 @@ export default function TeamRegistryDetailPage() {
   const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [managerComments, setManagerComments] = useState<Record<string, string>>({});
+  const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
   const commentTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Fetch employee meta
@@ -351,7 +354,22 @@ export default function TeamRegistryDetailPage() {
               return (
                 <div key={skill.id} className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="px-5 pt-4 pb-3">
-                    <p className="text-sm font-semibold text-card-foreground">{skill.skill_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-card-foreground">{skill.skill_name}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setDetailSkillId(skill.id)}
+                            aria-label={`View skill details for ${skill.skill_name}`}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Info size={14} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>View skill details</TooltipContent>
+                      </Tooltip>
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{catName}</p>
                     {(skill.tags || []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
