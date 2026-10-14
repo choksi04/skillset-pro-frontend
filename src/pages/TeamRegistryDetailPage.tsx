@@ -57,6 +57,7 @@ export default function TeamRegistryDetailPage() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [managerComments, setManagerComments] = useState<Record<string, string>>({});
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
   const commentTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Fetch employee meta
@@ -360,7 +361,7 @@ export default function TeamRegistryDetailPage() {
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            onClick={() => setDetailSkillId(skill.id)}
+                            onClick={(e) => { detailTriggerRef.current = e.currentTarget; setDetailSkillId(skill.id); }}
                             aria-label={`View skill details for ${skill.skill_name}`}
                             className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
@@ -482,7 +483,7 @@ export default function TeamRegistryDetailPage() {
         return (
           <SkillDetailDrawer
             skill={detailSkill}
-            onClose={() => setDetailSkillId(null)}
+            onClose={() => { setDetailSkillId(null); const t = detailTriggerRef.current; setTimeout(() => t?.focus(), 0); }}
             isAdmin={false}
             readOnly
             categoryName={detailSkill?.skill_category || undefined}
