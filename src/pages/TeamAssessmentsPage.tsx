@@ -345,7 +345,7 @@ export default function TeamAssessmentsPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-full flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Team Assessments</h2>
@@ -353,14 +353,14 @@ export default function TeamAssessmentsPage() {
             Track and review your team's ongoing and completed skill assessments.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="relative w-full sm:w-auto">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search team members..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9 text-sm w-72"
+              className="pl-8 h-9 text-sm w-full sm:w-72"
             />
           </div>
           <Popover>
@@ -436,7 +436,7 @@ export default function TeamAssessmentsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden flex-1">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -700,16 +700,16 @@ export default function TeamAssessmentsPage() {
         </Table>
       </div>
 
-      {!showLoadingRows && total > 0 && (
-        <div className="flex items-center justify-between flex-wrap gap-3">
+      {!showLoadingRows && (
+        <div className="flex items-center justify-between flex-wrap gap-3 shrink-0">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{" "}
+            Showing <span className="font-medium text-foreground">{total === 0 ? 0 : pageStart + 1}</span> to{" "}
             <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{" "}
             <span className="font-medium text-foreground">{total}</span> assessments
           </p>
           {pageCount > 1 && (
             <Pagination className="mx-0 w-auto justify-end">
-              <PaginationContent>
+              <PaginationContent className="flex-wrap">
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
