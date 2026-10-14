@@ -476,6 +476,19 @@ export default function TeamRegistryDetailPage() {
           <div className="text-center py-12 text-sm text-muted-foreground">No skills mapped to this domain.</div>
         )}
       </div>
+
+      {(() => {
+        const detailSkill = detailSkillId ? skills.find((s) => s.id === detailSkillId) ?? null : null;
+        return (
+          <SkillDetailDrawer
+            skill={detailSkill}
+            onClose={() => setDetailSkillId(null)}
+            isAdmin={false}
+            readOnly
+            categoryName={detailSkill?.skill_category || undefined}
+          />
+        );
+      })()}
     </div>
   );
 }
