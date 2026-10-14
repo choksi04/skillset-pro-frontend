@@ -270,7 +270,7 @@ export default function TeamRegistryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-full flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div>
@@ -342,7 +342,7 @@ export default function TeamRegistryPage() {
       </div>
 
       {/* Table */}
-      <Card className="border-border overflow-hidden">
+      <Card className="border-border overflow-hidden flex-1">
         <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-border">
@@ -501,10 +501,10 @@ export default function TeamRegistryPage() {
         </Table>
       </Card>
 
-      {!isLoading && total > 0 && (
+      {!isLoading && (
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{' '}
+            Showing <span className="font-medium text-foreground">{total === 0 ? 0 : pageStart + 1}</span> to{' '}
             <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{' '}
             <span className="font-medium text-foreground">{total}</span> team members
           </p>
