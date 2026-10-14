@@ -504,7 +504,7 @@ export default function TeamRegistryPage() {
       {!isLoading && (
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{pageStart + 1}</span> to{' '}
+            Showing <span className="font-medium text-foreground">{total === 0 ? 0 : pageStart + 1}</span> to{' '}
             <span className="font-medium text-foreground">{Math.min(pageStart + PAGE_SIZE, total)}</span> of{' '}
             <span className="font-medium text-foreground">{total}</span> team members
           </p>
