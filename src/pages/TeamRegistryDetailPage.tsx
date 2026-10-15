@@ -54,8 +54,10 @@ export default function TeamRegistryDetailPage() {
 
   const [employee, setEmployee] = useState<{ full_name: string; designation: string } | null>(null);
   const [employeeArchived, setEmployeeArchived] = useState(false);
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [managerComments, setManagerComments] = useState<Record<string, string>>({});
+  const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
   const detailTriggerRef = useRef<HTMLElement | null>(null);
   const commentTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
