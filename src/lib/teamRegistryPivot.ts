@@ -43,8 +43,10 @@ export function buildAdminPivot(args: {
     const label = (id: string) => {
       const n = nameOf(id);
       if ((count.get(n) ?? 0) < 2) return n;
-      const activeSame = cols.filter((c) => nameOf(c) === n && isCurrent(c)).length;
-      return isCurrent(id) && activeSame === 1 ? n : isCurrent(id) ? `${n} [${id.slice(-6)}]` : `${n} (inactive) [${id.slice(-6)}]`.replace(/ \[[^\]]+\]$/, activeSame === 0 || cols.filter((c) => nameOf(c) === n && !isCurrent(c)).length > 1 ? ` [${id.slice(-6)}]` : '');
+      const cur = isCurrent(id);
+      const peers = cols.filter((c) => nameOf(c) === n && isCurrent(c) === cur).length;
+      const base = cur ? n : `${n} (inactive)`;
+      return peers > 1 ? `${base} [${id.slice(-6)}]` : base;
     };
     const emps = [...d.emps.entries()];
     const nameCount = new Map<string, number>();
