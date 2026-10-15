@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/integrations/supabase/client', () => {
   const q: any = {};
-  ['select', 'in', 'order', 'is'].forEach((m) => (q[m] = () => q));
-  q.range = () => Promise.resolve({ data: [], error: null });
+  ['select', 'in', 'order', 'is', 'range'].forEach((m) => (q[m] = () => q));
+  q.then = (res: any) => res({ data: [], error: null });
   return { supabase: { from: () => q } };
 });
 
