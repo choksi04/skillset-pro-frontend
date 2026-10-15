@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
 import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { filterArchived, isArchivedStatus } from '@/lib/archive';
 import {
   sortTeamRegistryRows, nextSort, DEFAULT_TEAM_REGISTRY_SORT,
   type TeamRegistrySort, type TeamRegistrySortKey,
@@ -79,6 +82,8 @@ export default function TeamRegistryPage() {
   const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const [userMeta, setUserMeta] = useState<Record<string, { full_name: string; designation: string }>>({});
+  const [userStatus, setUserStatus] = useState<Record<string, string>>({});
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -132,8 +137,13 @@ export default function TeamRegistryPage() {
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name, designation').in('id', missing).then(({ data }) => {
+    supabase.from('users').select('id, full_name, designation, status').in('id', missing).then(({ data }) => {
       if (data) {
+        setUserStatus((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.status; });
+          return next;
+        });
         setUserMeta((prev) => {
           const next = { ...prev };
           data.forEach((u: any) => {
@@ -202,7 +212,7 @@ export default function TeamRegistryPage() {
   // Filter + search
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return filterArchived(rows, (r) => r.empId, userStatus, includeArchived).filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (domainFilter !== 'all' && r.domainId !== domainFilter) return false;
       if (q) {
@@ -211,7 +221,7 @@ export default function TeamRegistryPage() {
       }
       return true;
     });
-  }, [rows, search, statusFilter, domainFilter]);
+  }, [rows, search, statusFilter, domainFilter, userStatus, includeArchived]);
 
   // Sort the full filtered list (before pagination); export uses the same order.
   const [sort, setSort] = useState<TeamRegistrySort>(DEFAULT_TEAM_REGISTRY_SORT);
@@ -219,7 +229,7 @@ export default function TeamRegistryPage() {
 
   // Pagination (display only — export always uses the full sortedRows list)
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter, includeArchived]);
   const handleSort = (key: TeamRegistrySortKey) => { setSort((s) => nextSort(s, key)); setPage(1); };
   const total = sortedRows.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
