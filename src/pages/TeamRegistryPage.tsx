@@ -30,8 +30,9 @@ import {
 
 const PAGE_SIZE = 10;
 import { toast } from '@/hooks/use-toast';
-import { toCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
+import { toCsv, rowsToCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
 import { buildTeamRegistryExport, TEAM_REGISTRY_HEADER } from '@/lib/teamRegistryExport';
+import { buildAdminPivot } from '@/lib/teamRegistryPivot';
 import { useNavigate } from 'react-router-dom';
 import { registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
 import { computeRegistryMetrics } from '@/lib/registryMetrics';
