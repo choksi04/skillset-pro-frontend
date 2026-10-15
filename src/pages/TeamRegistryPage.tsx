@@ -343,6 +343,10 @@ export default function TeamRegistryPage() {
                   ]}
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={includeArchived} onCheckedChange={(v) => setIncludeArchived(!!v)} />
+                <span className="text-foreground">Include archived</span>
+              </label>
               {filtersActive && (
                 <Button
                   variant="ghost"
