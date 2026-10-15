@@ -431,6 +431,10 @@ export default function TeamAssessmentsPage() {
                     ))}
                   </RadioGroup>
                 </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={includeArchived} onCheckedChange={(v) => setIncludeArchived(!!v)} />
+                  <span className="text-foreground">Include archived</span>
+                </label>
                 <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
                   <Button variant="ghost" size="sm" className="h-8" onClick={clearFilters}>
                     Clear
@@ -595,6 +599,14 @@ export default function TeamAssessmentsPage() {
                     </Button>
                   );
                 }
+                const archived = isArchivedStatus(userStatus[a.employee_id]);
+                if (archived) {
+                  actionEl = (
+                    <Button variant="outline" size="sm" className="h-8" onClick={(e) => { e.stopPropagation(); navigate(`/team-assessments/${a.id}`); }}>
+                      View (read-only)
+                    </Button>
+                  );
+                }
 
                 return (
                   <TableRow key={a.id} className="cursor-pointer" onClick={() => navigate(`/team-assessments/${a.id}`)}>
@@ -608,6 +620,7 @@ export default function TeamAssessmentsPage() {
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-card-foreground truncate">
                             {getName(a.employee_id)}
+                            {archived && <Badge variant="outline" className="ml-2 text-[10px] text-muted-foreground">Archived</Badge>}
                           </div>
                           {/* <div className="text-xs text-muted-foreground truncate">{email || "—"}</div> */}
                         </div>
