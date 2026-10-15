@@ -295,7 +295,7 @@ export default function TeamAssessmentsPage() {
         sort,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredTeam, sort, attempts, reviews, levels, userMeta, templates],
+    [filteredTeam, sort, getAttemptForAssessment, reviews, levels, userMeta, templates],
   );
   const handleSort = (key: TeamAssessmentSortKey) => {
     setSort((s) => nextAssessmentSort(s, key));
