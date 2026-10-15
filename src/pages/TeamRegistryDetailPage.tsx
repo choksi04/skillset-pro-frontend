@@ -30,6 +30,7 @@ import { ArrowLeft, CheckCircle2, Star, User as UserIcon, ClipboardCheck, Info }
 import SkillDetailDrawer from "@/components/skills/SkillDetailDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { isArchivedStatus } from "@/lib/archive";
 
 export default function TeamRegistryDetailPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
@@ -264,6 +265,11 @@ export default function TeamRegistryDetailPage() {
         <ArrowLeft size={14} /> Back to Team Registries
       </Button>
 
+      {employeeArchived && (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          Archived — this employee is inactive. This registry is read-only.
+        </div>
+      )}
       {/* Header band */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
