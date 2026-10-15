@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sortTeamAssessmentRows, nextAssessmentSort, DEFAULT_TEAM_ASSESSMENT_SORT, type SortableAssessmentRow } from './teamAssessmentSort';
 
 const row = (id: string, p: Partial<SortableAssessmentRow> = {}): SortableAssessmentRow => ({
-  id, employeeName: 'X', assessmentName: 'A', statusLabel: 'Not Started', achievedLevel: null, verifiedLevel: null, ...p,
+  id, employeeName: 'X', statusLabel: 'Not Started', achievedLevel: null, verifiedLevel: null, ...p,
 });
 const run = (r: SortableAssessmentRow[], key: any, dir: 'asc' | 'desc' = 'asc') =>
   sortTeamAssessmentRows(r, (x) => x, { key, dir }).map((x) => x.id);
@@ -16,15 +16,20 @@ describe('team assessment sort', () => {
     expect(nextAssessmentSort({ key: 'verified', dir: 'asc' }, 'verified')).toEqual({ key: 'verified', dir: 'desc' });
     expect(nextAssessmentSort({ key: 'status', dir: 'asc' }, 'bogus' as never)).toEqual(DEFAULT_TEAM_ASSESSMENT_SORT);
   });
+  it('assessment details is not sortable and falls back to Employee ascending', () => {
+    expect(nextAssessmentSort({ key: 'status', dir: 'desc' }, 'assessment' as never)).toEqual(DEFAULT_TEAM_ASSESSMENT_SORT);
+    const r = [row('2', { employeeName: 'bob' }), row('1', { employeeName: 'Alice' })];
+    expect(run(r, 'assessment')).toEqual(['1', '2']);
+  });
   it('sorts employee names case-insensitively, missing name last', () => {
     const r = [row('1', { employeeName: 'bob' }), row('2', { employeeName: '—' }), row('3', { employeeName: 'Alice' })];
     expect(run(r, 'employee')).toEqual(['3', '1', '2']);
     expect(run(r, 'employee', 'desc')).toEqual(['1', '3', '2']);
   });
-  it('duplicate titles use assessment ID tie-breaker in both directions', () => {
-    const r = ['c', 'a', 'b'].map((id) => row(id, { assessmentName: 'Frontend' }));
-    expect(run(r, 'assessment')).toEqual(['a', 'b', 'c']);
-    expect(run(r, 'assessment', 'desc')).toEqual(['a', 'b', 'c']);
+  it('duplicate employee names use assessment ID tie-breaker in both directions', () => {
+    const r = ['c', 'a', 'b'].map((id) => row(id, { employeeName: 'Dhruv Patel' }));
+    expect(run(r, 'employee')).toEqual(['a', 'b', 'c']);
+    expect(run(r, 'employee', 'desc')).toEqual(['a', 'b', 'c']);
   });
   it('sorts status by displayed label', () => {
     const r = [row('1', { statusLabel: 'Under Review' }), row('2', { statusLabel: 'Approved' }), row('3', { statusLabel: 'In Progress' })];

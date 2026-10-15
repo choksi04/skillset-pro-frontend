@@ -1,4 +1,4 @@
-export type TeamAssessmentSortKey = 'employee' | 'assessment' | 'status' | 'achieved' | 'verified';
+export type TeamAssessmentSortKey = 'employee' | 'status' | 'achieved' | 'verified';
 export type SortDir = 'asc' | 'desc';
 export interface TeamAssessmentSort { key: TeamAssessmentSortKey; dir: SortDir }
 
@@ -8,13 +8,12 @@ export const DEFAULT_TEAM_ASSESSMENT_SORT: TeamAssessmentSort = { key: 'employee
 export interface SortableAssessmentRow {
   id: string;
   employeeName: string;
-  assessmentName: string;
   statusLabel: string;
   achievedLevel: number | null;
   verifiedLevel: number | null;
 }
 
-const KEYS: readonly TeamAssessmentSortKey[] = ['employee', 'assessment', 'status', 'achieved', 'verified'];
+const KEYS: readonly TeamAssessmentSortKey[] = ['employee', 'status', 'achieved', 'verified'];
 
 export function nextAssessmentSort(cur: TeamAssessmentSort, key: TeamAssessmentSortKey): TeamAssessmentSort {
   if (!KEYS.includes(key)) return DEFAULT_TEAM_ASSESSMENT_SORT;
@@ -27,7 +26,6 @@ const num = (n: number | null) => (n === null || n === undefined || !Number.isFi
 function valueOf(r: SortableAssessmentRow, key: TeamAssessmentSortKey): string | number | null {
   switch (key) {
     case 'employee': return text(r.employeeName);
-    case 'assessment': return text(r.assessmentName);
     case 'status': return text(r.statusLabel);
     case 'achieved': return num(r.achievedLevel);
     case 'verified': return num(r.verifiedLevel);

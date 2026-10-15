@@ -286,7 +286,6 @@ export default function TeamAssessmentsPage() {
           return {
             id: a.id,
             employeeName: getName(a.employee_id),
-            assessmentName: getAssessmentName(a),
             statusLabel: (assessmentStatusConfig[status] ?? assessmentStatusConfig.pending).label,
             achievedLevel: achieved.level ?? null,
             verifiedLevel: getVerifiedLevelFromReviews(assessmentReviews, attempt?.id, attempt).level ?? null,
@@ -490,7 +489,14 @@ export default function TeamAssessmentsPage() {
                 ['status', 'Status'],
                 ['achieved', 'Achieved Level'],
                 ['verified', 'Verified Level'],
-              ] as [TeamAssessmentSortKey, string][]).map(([key, label]) => {
+              ] as [TeamAssessmentSortKey | 'assessment', string][]).map(([key, label]) => {
+                if (key === 'assessment') {
+                  return (
+                    <TableHead key="assessment" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                      {label}
+                    </TableHead>
+                  );
+                }
                 const active = sort.key === key;
                 const nextDir = active && sort.dir === 'asc' ? 'descending' : 'ascending';
                 const hint = `Sort by ${label}${active ? `, currently ${sort.dir === 'asc' ? 'ascending' : 'descending'}` : ''}. Activate to sort ${nextDir}.`;
