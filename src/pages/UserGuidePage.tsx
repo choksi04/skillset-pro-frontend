@@ -208,6 +208,7 @@ const managerGuide: GuideStep[] = [
     icon: <Users size={16} />,
     steps: [
       'Navigate to Operations > Team Registry from the sidebar.',
+      'Archiving a departed employee: an Admin sets the person to Inactive on Settings > Users. They then disappear from Team Registry and Team Assessment lists, counts and CSV exports; tick "Include archived" in Filter to see them (marked Archived, read-only). Removing someone from a domain does not archive them. To restore, set the person back to Active — all history is kept unchanged.',
       'See each team member\'s current version, total versions, and trend indicators (▲ improvement, ▼ regression).',
       'Click an employee to view their skill self-scores grouped by category, plus the full version history table.',
       'In Skill Review Breakdown, click the ⓘ icon beside a skill name to see its description, category, tags, status and topics (read-only) without leaving the review.',

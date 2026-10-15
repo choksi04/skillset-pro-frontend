@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/popover';
 import SearchableSelect from '@/components/ui/searchable-select';
 import { Users, Search, Filter, Star, ChevronRight, Download, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { filterArchived, isArchivedStatus } from '@/lib/archive';
 import {
   sortTeamRegistryRows, nextSort, DEFAULT_TEAM_REGISTRY_SORT,
   type TeamRegistrySort, type TeamRegistrySortKey,
@@ -79,6 +82,8 @@ export default function TeamRegistryPage() {
   const { reviewStatuses, fetchReviewStatusesForRegistries } = useRegistryReviewStore();
 
   const [userMeta, setUserMeta] = useState<Record<string, { full_name: string; designation: string }>>({});
+  const [userStatus, setUserStatus] = useState<Record<string, string>>({});
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [namesLoading, setNamesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -132,8 +137,13 @@ export default function TeamRegistryPage() {
       return;
     }
     setNamesLoading(true);
-    supabase.from('users').select('id, full_name, designation').in('id', missing).then(({ data }) => {
+    supabase.from('users').select('id, full_name, designation, status').in('id', missing).then(({ data }) => {
       if (data) {
+        setUserStatus((prev) => {
+          const next = { ...prev };
+          data.forEach((u: any) => { next[u.id] = u.status; });
+          return next;
+        });
         setUserMeta((prev) => {
           const next = { ...prev };
           data.forEach((u: any) => {
@@ -202,7 +212,7 @@ export default function TeamRegistryPage() {
   // Filter + search
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return filterArchived(rows, (r) => r.empId, userStatus, includeArchived).filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (domainFilter !== 'all' && r.domainId !== domainFilter) return false;
       if (q) {
@@ -211,7 +221,7 @@ export default function TeamRegistryPage() {
       }
       return true;
     });
-  }, [rows, search, statusFilter, domainFilter]);
+  }, [rows, search, statusFilter, domainFilter, userStatus, includeArchived]);
 
   // Sort the full filtered list (before pagination); export uses the same order.
   const [sort, setSort] = useState<TeamRegistrySort>(DEFAULT_TEAM_REGISTRY_SORT);
@@ -219,7 +229,7 @@ export default function TeamRegistryPage() {
 
   // Pagination (display only — export always uses the full sortedRows list)
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter, includeArchived]);
   const handleSort = (key: TeamRegistrySortKey) => { setSort((s) => nextSort(s, key)); setPage(1); };
   const total = sortedRows.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -228,7 +238,7 @@ export default function TeamRegistryPage() {
   const pagedRows = sortedRows.slice(pageStart, pageStart + PAGE_SIZE);
 
   const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
-  const filtersActive = statusFilter !== 'all' || domainFilter !== 'all';
+  const filtersActive = statusFilter !== 'all' || domainFilter !== 'all' || includeArchived;
 
   // Domains visible in filter dropdown
   const filterDomains = useMemo(() => {
@@ -333,12 +343,16 @@ export default function TeamRegistryPage() {
                   ]}
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={includeArchived} onCheckedChange={(v) => setIncludeArchived(!!v)} />
+                <span className="text-foreground">Include archived</span>
+              </label>
               {filtersActive && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full h-8 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => { setStatusFilter('all'); setDomainFilter('all'); }}
+                  onClick={() => { setStatusFilter('all'); setDomainFilter('all'); setIncludeArchived(false); }}
                 >
                   Clear filters
                 </Button>
@@ -442,7 +456,7 @@ export default function TeamRegistryPage() {
                         {getInitials(r.fullName)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{r.fullName || '—'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate flex items-center gap-2">{r.fullName || '—'}{isArchivedStatus(userStatus[r.empId]) && <Badge variant="outline" className="text-[10px] text-muted-foreground">Archived</Badge>}</p>
                         {r.designation && (
                           <p className="text-xs text-muted-foreground truncate">{r.designation}</p>
                         )}

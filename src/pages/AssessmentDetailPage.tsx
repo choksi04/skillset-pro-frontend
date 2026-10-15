@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from "@/stores/assessmentStore";
+import { isArchivedStatus } from "@/lib/archive";
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
@@ -85,6 +86,7 @@ export default function AssessmentDetailPage() {
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
+  const [employeeArchived, setEmployeeArchived] = useState(false);
   const [assignerName, setAssignerName] = useState("");
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -156,8 +158,9 @@ export default function AssessmentDetailPage() {
   const domain = domains.find((d) => d.id === assessment?.domain_id);
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === "admin" || user?.role === "manager";
-  const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
-  const canRevoke = !isOwner && isAdmin && !!assessment;
+  // Archived (inactive) employees: view-only — no regenerate, revoke or review actions.
+  const canManage = !isOwner && isAdmin && !employeeArchived && ["pending", "in_progress"].includes(assessment?.status ?? "");
+  const canRevoke = !isOwner && isAdmin && !employeeArchived && !!assessment;
   const isPendingEval =
     attempt?.status === "submitted" && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === "evaluated" || attempt?.status === "reviewed";
@@ -227,11 +230,14 @@ export default function AssessmentDetailPage() {
     if (!assessment || isOwner) return;
     supabase
       .from("users")
-      .select("full_name")
+      .select("full_name, status")
       .eq("id", assessment.employee_id)
       .single()
       .then(({ data }) => {
-        if (data) setEmployeeName(data.full_name);
+        if (data) {
+          setEmployeeName(data.full_name);
+          setEmployeeArchived(isArchivedStatus((data as any).status));
+        }
       });
   }, [assessment, isOwner]);
 
@@ -489,6 +495,11 @@ export default function AssessmentDetailPage() {
 
   return (
     <div className="space-y-6">
+      {employeeArchived && !isOwner && (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          Archived — this employee is inactive. This assessment is read-only.
+        </div>
+      )}
       {/* Header */}
       <div className="space-y-1">
         <Button
@@ -835,7 +846,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {/* Manager Review Panel (inline for team assessments) */}
-      {!isOwner && review && attempt && (
+      {!isOwner && !employeeArchived && review && attempt && (
         <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
       )}
 

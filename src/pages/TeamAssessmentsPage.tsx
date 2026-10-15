@@ -58,6 +58,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { getEffectiveStatus, getAchievedLevelFromAttempt, getVerifiedLevelFromReviews } from "@/lib/assessmentStatus";
+import { filterArchived, isArchivedStatus } from "@/lib/archive";
 import { useAssignmentStore } from "@/stores/assignmentStore";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -135,6 +136,8 @@ export default function TeamAssessmentsPage() {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [formatFilter, setFormatFilter] = useState<"all" | "adaptive" | "fixed">("all");
   const [verifFilter, setVerifFilter] = useState<"all" | "verified" | "unverified">("all");
+  const [userStatus, setUserStatus] = useState<Record<string, string>>({});
+  const [includeArchived, setIncludeArchived] = useState(false);
 
   useEffect(() => {
     fetchAssessments();
@@ -162,11 +165,16 @@ export default function TeamAssessmentsPage() {
     setNamesLoading(true);
     supabase
       .from("users")
-      .select("id, full_name, designation, domain_id")
+      .select("id, full_name, designation, domain_id, status")
       .in("id", missing)
       .then(
         ({ data }) => {
           if (data) {
+            setUserStatus((prev) => {
+              const next = { ...prev };
+              data.forEach((u: any) => { next[u.id] = u.status; });
+              return next;
+            });
             setUserMeta((prev) => {
               const next = { ...prev };
               data.forEach((u: any) => {
@@ -234,7 +242,7 @@ export default function TeamAssessmentsPage() {
 
   // Filter
   const filteredTeam = useMemo(() => {
-    let list = teamAssessments;
+    let list = filterArchived(teamAssessments, (a) => a.employee_id, userStatus, includeArchived);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -257,11 +265,11 @@ export default function TeamAssessmentsPage() {
       });
     }
     return list;
-  }, [teamAssessments, search, formatFilter, statusFilter, verifFilter, userMeta, templates, domains, reviews, levels]);
+  }, [teamAssessments, search, formatFilter, statusFilter, verifFilter, userMeta, templates, domains, reviews, levels, userStatus, includeArchived]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, formatFilter, verifFilter]);
+  }, [search, statusFilter, formatFilter, verifFilter, includeArchived]);
 
   const total = filteredTeam.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -281,8 +289,9 @@ export default function TeamAssessmentsPage() {
     setStatusFilter([]);
     setFormatFilter("all");
     setVerifFilter("all");
+    setIncludeArchived(false);
   };
-  const filterCount = statusFilter.length + (formatFilter !== "all" ? 1 : 0) + (verifFilter !== "all" ? 1 : 0);
+  const filterCount = statusFilter.length + (formatFilter !== "all" ? 1 : 0) + (verifFilter !== "all" ? 1 : 0) + (includeArchived ? 1 : 0);
 
   const sendReminder = async (a: Assessment) => {
     if (!user?.tenant_id) return;
@@ -422,6 +431,10 @@ export default function TeamAssessmentsPage() {
                     ))}
                   </RadioGroup>
                 </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={includeArchived} onCheckedChange={(v) => setIncludeArchived(!!v)} />
+                  <span className="text-foreground">Include archived</span>
+                </label>
                 <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
                   <Button variant="ghost" size="sm" className="h-8" onClick={clearFilters}>
                     Clear
@@ -586,6 +599,14 @@ export default function TeamAssessmentsPage() {
                     </Button>
                   );
                 }
+                const archived = isArchivedStatus(userStatus[a.employee_id]);
+                if (archived) {
+                  actionEl = (
+                    <Button variant="outline" size="sm" className="h-8" onClick={(e) => { e.stopPropagation(); navigate(`/team-assessments/${a.id}`); }}>
+                      View (read-only)
+                    </Button>
+                  );
+                }
 
                 return (
                   <TableRow key={a.id} className="cursor-pointer" onClick={() => navigate(`/team-assessments/${a.id}`)}>
@@ -599,6 +620,7 @@ export default function TeamAssessmentsPage() {
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-card-foreground truncate">
                             {getName(a.employee_id)}
+                            {archived && <Badge variant="outline" className="ml-2 text-[10px] text-muted-foreground">Archived</Badge>}
                           </div>
                           {/* <div className="text-xs text-muted-foreground truncate">{email || "—"}</div> */}
                         </div>
