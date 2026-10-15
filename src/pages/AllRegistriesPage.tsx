@@ -18,6 +18,8 @@ import { Download, Search, Database, Users, BarChart3, ChevronRight } from "luci
 import { type RegistryStatus } from "@/lib/registryStatus";
 import { computeRegistryMetrics } from "@/lib/registryMetrics";
 import { registryStatusConfig } from "@/lib/registryStatus";
+import { filterArchived, isArchivedStatus } from "@/lib/archive";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RegistryStatusBadge } from "@/components/registry/RegistryStatusBadge";
 
 type ReviewStatus = "approved" | "pending";
@@ -136,6 +138,8 @@ export default function AllRegistriesPage() {
   const [search, setSearch] = useState("");
   const [domainFilter, setDomainFilter] = useState("all");
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userStatus, setUserStatus] = useState<Record<string, string>>({});
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<SkillAgg | null>(null);
   const [drawerSearch, setDrawerSearch] = useState("");
 
@@ -170,15 +174,18 @@ export default function AllRegistriesPage() {
     if (empIds.length === 0) return;
     supabase
       .from("users")
-      .select("id, full_name")
+      .select("id, full_name, status")
       .in("id", empIds)
       .then(({ data }) => {
         if (data) {
           const map: Record<string, string> = {};
-          data.forEach((u) => {
+          const st: Record<string, string> = {};
+          data.forEach((u: any) => {
             map[u.id] = u.full_name;
+            st[u.id] = u.status;
           });
           setUserNames(map);
+          setUserStatus(st);
         }
       });
   }, [submittedRegistries]);
@@ -206,10 +213,10 @@ export default function AllRegistriesPage() {
 
   // Domain filtering
   const filteredLatest = useMemo(() => {
-    const entries = Array.from(latestPerEmployee.values());
+    const entries = filterArchived(Array.from(latestPerEmployee.values()), (r) => r.employee_id, userStatus, includeArchived);
     if (domainFilter === "all") return entries;
     return entries.filter((r) => r.domain_id === domainFilter);
-  }, [latestPerEmployee, domainFilter]);
+  }, [latestPerEmployee, domainFilter, userStatus, includeArchived]);
 
   // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
   // Keyed by registry id so both the employee view and the skill drawer show identical numbers.
@@ -260,7 +267,7 @@ export default function AllRegistriesPage() {
         const reg = filteredLatest.find((r) => r.id === registryId);
         employees.push({
           employee_id,
-          name: userNames[employee_id] || employee_id.slice(0, 8),
+          name: (userNames[employee_id] || employee_id.slice(0, 8)) + (isArchivedStatus(userStatus[employee_id]) ? " (Archived)" : ""),
           domain: reg ? domainMap.get(reg.domain_id) || "Unknown" : "Unknown",
           level,
           registryId,
@@ -280,7 +287,7 @@ export default function AllRegistriesPage() {
       });
     });
     return result.sort((a, b) => a.skillName.localeCompare(b.skillName));
-  }, [filteredLatest, items, skillMap, userNames, domainMap, reviewStatuses, metricsByRegistry]);
+  }, [filteredLatest, items, skillMap, userNames, userStatus, domainMap, reviewStatuses, metricsByRegistry]);
 
   const filteredSkills = useMemo(() => {
     if (!search) return skillAggs;
@@ -306,7 +313,7 @@ export default function AllRegistriesPage() {
           : null;
         return {
           employee_id: reg.employee_id,
-          employeeName: userNames[reg.employee_id] || reg.employee_id.slice(0, 8),
+          employeeName: (userNames[reg.employee_id] || reg.employee_id.slice(0, 8)) + (isArchivedStatus(userStatus[reg.employee_id]) ? " (Archived)" : ""),
           domainName: domainMap.get(reg.domain_id) || "Unknown",
           selfAvg: metrics?.avgOnFive ?? null,
           ratedCount: metrics?.ratedCount ?? 0,
@@ -321,7 +328,7 @@ export default function AllRegistriesPage() {
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [filteredLatest, items, userNames, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
+  }, [filteredLatest, items, userNames, userStatus, domainMap, skillMap, reviewStatuses, metricsByRegistry]);
 
 
   const filteredEmployees = useMemo(() => {
@@ -390,6 +397,10 @@ export default function AllRegistriesPage() {
           placeholder="All Domains"
           className="w-48 h-9 text-sm"
         />
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox checked={includeArchived} onCheckedChange={(v) => setIncludeArchived(!!v)} />
+          <span className="text-foreground">Include archived</span>
+        </label>
 
       </div>
 
@@ -503,7 +514,7 @@ export default function AllRegistriesPage() {
                     onClick={() => row.latestRegistryId && navigate(`/team-registry/${row.latestRegistryId}`)}
                   >
                     <TableCell>
-                      <h5 className="text-sm font-medium"> {row.employeeName} </h5>
+                      <h5 className="text-sm font-medium flex items-center gap-2"> {row.employeeName} {isArchivedStatus(userStatus[row.employee_id]) && <Badge variant="outline" className="text-[10px] text-muted-foreground">Archived</Badge>}</h5>
                       <p className="text-xs text-muted-foreground">{row.domainName}</p>
                     </TableCell>
 

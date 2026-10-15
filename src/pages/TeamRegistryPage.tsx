@@ -265,7 +265,7 @@ export default function TeamRegistryPage() {
         const reg = groupedByEmployee.get(r.empId)![0];
         return {
           empId: r.empId, fullName: r.fullName, designation: r.designation,
-          domainId: r.domainId, domainName: r.domainName,
+          domainId: r.domainId, domainName: r.domainName, archived: isArchivedStatus(userStatus[r.empId]),
           registry: { id: reg.id, version_number: reg.version_number, status: reg.status, submitted_at: reg.submitted_at, updatedAt: r.updatedAt },
         };
       });

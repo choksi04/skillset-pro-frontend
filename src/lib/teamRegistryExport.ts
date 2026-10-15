@@ -29,6 +29,8 @@ export interface ExportRegistryRow {
   designation: string;
   domainId: string;
   domainName: string;
+  /** Archived (inactive) employee — name is suffixed so exports identify them. */
+  archived?: boolean;
   registry: { id: string; version_number: number; status: 'draft' | 'submitted'; submitted_at: string | null; updatedAt: string | null };
 }
 
@@ -85,7 +87,7 @@ export async function buildTeamRegistryExport(args: {
       .filter((id) => skillById.has(id));
     const m = computeRegistryMetrics({ registryStatus: r.registry.status, items: regItems, domainSkillIds, maxLevel, reviewStatus: reviewStatus as any });
     const base: CsvCell[] = [
-      r.empId, r.fullName, r.designation, r.domainId, r.domainName,
+      r.empId, r.archived ? `${r.fullName} (Archived)` : r.fullName, r.designation, r.domainId, r.domainName,
       r.registry.id, r.registry.version_number, registryStatusConfig[m.status].label, r.registry.submitted_at, r.registry.updatedAt,
       m.ratedCount, m.totalSkills, m.completionPct, m.avgOnFive,
     ];
