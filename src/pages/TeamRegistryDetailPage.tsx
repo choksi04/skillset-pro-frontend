@@ -53,10 +53,9 @@ export default function TeamRegistryDetailPage() {
   const registry = useMemo(() => registries.find((r) => r.id === submissionId), [registries, submissionId]);
 
   const [employee, setEmployee] = useState<{ full_name: string; designation: string } | null>(null);
-  const [ratings, setRatings] = useState<Record<string, RatingLevel>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
-  const [managerComments, setManagerComments] = useState<Record<string, string>>({});
-  const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
+  const [employeeArchived, setEmployeeArchived] = useState(false);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const detailTriggerRef = useRef<HTMLElement | null>(null);
   const commentTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -65,7 +64,7 @@ export default function TeamRegistryDetailPage() {
     if (!registry) return;
     supabase
       .from("users")
-      .select("full_name, designation")
+      .select("full_name, designation, status")
       .eq("id", registry.employee_id)
       .single()
       .then(({ data }) => {
@@ -74,6 +73,7 @@ export default function TeamRegistryDetailPage() {
             full_name: (data as any).full_name,
             designation: (data as any).designation || "",
           });
+          setEmployeeArchived(isArchivedStatus((data as any).status));
         }
       });
   }, [registry?.employee_id]);
@@ -177,7 +177,8 @@ export default function TeamRegistryDetailPage() {
   const lowName = lowEntry ? (skillById.get(lowEntry.id)?.skill_name ?? "—") : "—";
 
   const isApproved = review?.status === "approved";
-  const isReviewable = registry?.status === "submitted" && !isApproved;
+  // Archived (inactive) employees are view-only.
+  const isReviewable = registry?.status === "submitted" && !isApproved && !employeeArchived;
 
   // ─── Handlers ───────────────────────────────────────────────────────────
   const handleScoreChange = useCallback(
