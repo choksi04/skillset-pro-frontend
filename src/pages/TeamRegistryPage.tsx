@@ -30,8 +30,9 @@ import {
 
 const PAGE_SIZE = 10;
 import { toast } from '@/hooks/use-toast';
-import { toCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
+import { toCsv, rowsToCsv, downloadCsv, timestampedFilename } from '@/lib/csv';
 import { buildTeamRegistryExport, TEAM_REGISTRY_HEADER } from '@/lib/teamRegistryExport';
+import { buildAdminPivot } from '@/lib/teamRegistryPivot';
 import { useNavigate } from 'react-router-dom';
 import { registryStatusConfig, type RegistryStatus } from '@/lib/registryStatus';
 import { computeRegistryMetrics } from '@/lib/registryMetrics';
@@ -259,8 +260,14 @@ export default function TeamRegistryPage() {
         };
       });
       const data = await buildTeamRegistryExport({ rows: exportRows, mappings, skills, maxLevel });
-      downloadCsv(toCsv(TEAM_REGISTRY_HEADER, data), timestampedFilename('Team_Registry'));
-      toast({ title: 'Export complete', description: `${exportRows.length} registries, ${data.length} rows exported.` });
+      if (currentRole === 'admin') {
+        // Admin: HR pivot matrix (self-rating levels per employee x skill, per domain).
+        const pivot = buildAdminPivot({ longRows: data, skills, mappings });
+        downloadCsv(rowsToCsv(pivot), timestampedFilename('Team_Registry'));
+      } else {
+        downloadCsv(toCsv(TEAM_REGISTRY_HEADER, data), timestampedFilename('Team_Registry'));
+      }
+      toast({ title: 'Export complete', description: `${exportRows.length} registries exported.` });
     } catch (e: any) {
       console.error('Team registry export failed', e);
       toast({ title: 'Export failed', description: 'No file was downloaded. Please try again.', variant: 'destructive' });
