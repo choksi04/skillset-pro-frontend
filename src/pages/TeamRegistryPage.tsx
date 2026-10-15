@@ -238,7 +238,7 @@ export default function TeamRegistryPage() {
   const pagedRows = sortedRows.slice(pageStart, pageStart + PAGE_SIZE);
 
   const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
-  const filtersActive = statusFilter !== 'all' || domainFilter !== 'all';
+  const filtersActive = statusFilter !== 'all' || domainFilter !== 'all' || includeArchived;
 
   // Domains visible in filter dropdown
   const filterDomains = useMemo(() => {
@@ -348,7 +348,7 @@ export default function TeamRegistryPage() {
                   variant="ghost"
                   size="sm"
                   className="w-full h-8 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => { setStatusFilter('all'); setDomainFilter('all'); }}
+                  onClick={() => { setStatusFilter('all'); setDomainFilter('all'); setIncludeArchived(false); }}
                 >
                   Clear filters
                 </Button>
@@ -452,7 +452,7 @@ export default function TeamRegistryPage() {
                         {getInitials(r.fullName)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{r.fullName || '—'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate flex items-center gap-2">{r.fullName || '—'}{isArchivedStatus(userStatus[r.empId]) && <Badge variant="outline" className="text-[10px] text-muted-foreground">Archived</Badge>}</p>
                         {r.designation && (
                           <p className="text-xs text-muted-foreground truncate">{r.designation}</p>
                         )}
