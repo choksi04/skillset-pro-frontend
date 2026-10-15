@@ -85,6 +85,7 @@ export default function AssessmentDetailPage() {
   const { user } = useAuth();
 
   const [employeeName, setEmployeeName] = useState("");
+  const [employeeArchived, setEmployeeArchived] = useState(false);
   const [assignerName, setAssignerName] = useState("");
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -156,8 +157,9 @@ export default function AssessmentDetailPage() {
   const domain = domains.find((d) => d.id === assessment?.domain_id);
   const isOwner = assessment?.employee_id === user?.id;
   const isAdmin = user?.role === "admin" || user?.role === "manager";
-  const canManage = !isOwner && isAdmin && ["pending", "in_progress"].includes(assessment?.status ?? "");
-  const canRevoke = !isOwner && isAdmin && !!assessment;
+  // Archived (inactive) employees: view-only — no regenerate, revoke or review actions.
+  const canManage = !isOwner && isAdmin && !employeeArchived && ["pending", "in_progress"].includes(assessment?.status ?? "");
+  const canRevoke = !isOwner && isAdmin && !employeeArchived && !!assessment;
   const isPendingEval =
     attempt?.status === "submitted" && (!attempt.ai_evaluations || attempt.ai_evaluations.length === 0);
   const isEvaluated = attempt?.status === "evaluated" || attempt?.status === "reviewed";
@@ -227,11 +229,14 @@ export default function AssessmentDetailPage() {
     if (!assessment || isOwner) return;
     supabase
       .from("users")
-      .select("full_name")
+      .select("full_name, status")
       .eq("id", assessment.employee_id)
       .single()
       .then(({ data }) => {
-        if (data) setEmployeeName(data.full_name);
+        if (data) {
+          setEmployeeName(data.full_name);
+          setEmployeeArchived(isArchivedStatus((data as any).status));
+        }
       });
   }, [assessment, isOwner]);
 
