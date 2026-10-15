@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessmentStore, Assessment, assessmentStatusConfig, AssessmentQuestion } from "@/stores/assessmentStore";
+import { isArchivedStatus } from "@/lib/archive";
 import { useAttemptStore } from "@/stores/attemptStore";
 import { useQuestionStore, Question } from "@/stores/questionStore";
 import { useSkillStore } from "@/stores/skillStore";
@@ -494,6 +495,11 @@ export default function AssessmentDetailPage() {
 
   return (
     <div className="space-y-6">
+      {employeeArchived && !isOwner && (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          Archived — this employee is inactive. This assessment is read-only.
+        </div>
+      )}
       {/* Header */}
       <div className="space-y-1">
         <Button
@@ -840,7 +846,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {/* Manager Review Panel (inline for team assessments) */}
-      {!isOwner && review && attempt && (
+      {!isOwner && !employeeArchived && review && attempt && (
         <ManagerReviewPanel review={review} attempt={attempt} assessment={assessment} />
       )}
 
