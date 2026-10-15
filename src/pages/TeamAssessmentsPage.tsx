@@ -45,7 +45,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
 } from "lucide-react";
+import { sortTeamAssessmentRows, nextAssessmentSort, DEFAULT_TEAM_ASSESSMENT_SORT, type TeamAssessmentSort, type TeamAssessmentSortKey } from "@/lib/teamAssessmentSort";
 import { toast } from "sonner";
 import AssignTemplateDialog from "@/components/templates/AssignTemplateDialog";
 import SearchableSelect from "@/components/ui/searchable-select";
@@ -138,6 +142,7 @@ export default function TeamAssessmentsPage() {
   const [verifFilter, setVerifFilter] = useState<"all" | "verified" | "unverified">("all");
   const [userStatus, setUserStatus] = useState<Record<string, string>>({});
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [sort, setSort] = useState<TeamAssessmentSort>(DEFAULT_TEAM_ASSESSMENT_SORT);
 
   useEffect(() => {
     fetchAssessments();
@@ -271,11 +276,37 @@ export default function TeamAssessmentsPage() {
     setPage(1);
   }, [search, statusFilter, formatFilter, verifFilter, includeArchived]);
 
-  const total = filteredTeam.length;
+  // Sort the full filtered list (after scope/archive/search/filters, before pagination)
+  const sortedTeam = useMemo(
+    () =>
+      sortTeamAssessmentRows(
+        filteredTeam,
+        (a) => {
+          const { attempt, assessmentReviews, status, achieved } = computeRow(a);
+          return {
+            id: a.id,
+            employeeName: getName(a.employee_id),
+            assessmentName: getAssessmentName(a),
+            statusLabel: (assessmentStatusConfig[status] ?? assessmentStatusConfig.pending).label,
+            achievedLevel: achieved.level ?? null,
+            verifiedLevel: getVerifiedLevelFromReviews(assessmentReviews, attempt?.id, attempt).level ?? null,
+          };
+        },
+        sort,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredTeam, sort, attempts, reviews, levels, userMeta, templates],
+  );
+  const handleSort = (key: TeamAssessmentSortKey) => {
+    setSort((s) => nextAssessmentSort(s, key));
+    setPage(1);
+  };
+
+  const total = sortedTeam.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageStart = (safePage - 1) * PAGE_SIZE;
-  const paged = filteredTeam.slice(pageStart, pageStart + PAGE_SIZE);
+  const paged = sortedTeam.slice(pageStart, pageStart + PAGE_SIZE);
 
   const showLoadingRows =
     !initialized ||
@@ -453,21 +484,41 @@ export default function TeamAssessmentsPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Employee
-              </TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Assessment Details
-              </TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Status
-              </TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Achieved Level
-              </TableHead>
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Verified Level
-              </TableHead>
+              {([
+                ['employee', 'Employee'],
+                ['assessment', 'Assessment Details'],
+                ['status', 'Status'],
+                ['achieved', 'Achieved Level'],
+                ['verified', 'Verified Level'],
+              ] as [TeamAssessmentSortKey, string][]).map(([key, label]) => {
+                const active = sort.key === key;
+                const nextDir = active && sort.dir === 'asc' ? 'descending' : 'ascending';
+                const hint = `Sort by ${label}${active ? `, currently ${sort.dir === 'asc' ? 'ascending' : 'descending'}` : ''}. Activate to sort ${nextDir}.`;
+                return (
+                  <TableHead
+                    key={key}
+                    aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(key)}
+                      aria-label={hint}
+                      title={hint}
+                      className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    >
+                      {label}
+                      {!active ? (
+                        <ChevronsUpDown size={14} className="opacity-70" aria-hidden />
+                      ) : sort.dir === 'asc' ? (
+                        <ChevronUp size={14} className="text-foreground" aria-hidden />
+                      ) : (
+                        <ChevronDown size={14} className="text-foreground" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                );
+              })}
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
                 Action
               </TableHead>
