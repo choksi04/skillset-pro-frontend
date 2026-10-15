@@ -226,6 +226,7 @@ const managerGuide: GuideStep[] = [
     steps: [
       'Navigate to Operations > Reviews from the sidebar to see all pending and completed reviews.',
       'Open an assessment from Team Assessments — the inline Manager Review Panel is shown alongside the per-question results.',
+      'Sort Team Assessments by clicking the Employee, Assessment Details, Status, Achieved Level or Verified Level header (default: Employee A–Z; click again to reverse). Sorting covers all matching pages; empty levels always appear last.',
       'Each skill row shows: Self-Rating, Achieved Level (from the assessment), and your action.',
       'Self-approval is blocked — you cannot review your own assessment.',
     ],
