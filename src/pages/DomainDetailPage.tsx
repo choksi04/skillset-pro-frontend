@@ -85,6 +85,8 @@ export default function DomainDetailPage() {
 
   const domain = domains.find((d) => d.id === id);
   const currentMappings = useMemo(() => mappings.filter((m) => m.domain_id === id), [mappings, id]);
+  // Count = active, non-deleted linked skills (shared rule); disabled ones stay listed with their status.
+  const eligibleCount = useMemo(() => eligibleDomainSkillIds(id ?? '', mappings, skills).size, [id, mappings, skills]);
 
   const mappedByCategory = useMemo(() => {
     const q = skillSearch.toLowerCase();
@@ -366,7 +368,7 @@ export default function DomainDetailPage() {
             <Users size={14} /> Users ({domainUsers.length})
           </TabsTrigger>
           <TabsTrigger value="skills" className="gap-1.5">
-            <FolderOpen size={14} /> Skills ({currentMappings.length})
+            <FolderOpen size={14} /> Skills ({eligibleCount})
           </TabsTrigger>
         </TabsList>
 

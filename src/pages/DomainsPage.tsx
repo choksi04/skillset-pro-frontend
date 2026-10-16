@@ -1,3 +1,4 @@
+import { eligibleDomainSkillIds } from "@/lib/domainSkillCount";
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDomainStore, Domain } from "@/stores/domainStore";
@@ -66,7 +67,7 @@ export default function DomainsPage() {
     [domains, search, statusFilter],
   );
 
-  const getSkillCount = (domainId: string) => mappings.filter((m) => m.domain_id === domainId).length;
+  const getSkillCount = (domainId: string) => eligibleDomainSkillIds(domainId, mappings, skills).size;
 
   const handleCreated = (newId: string) => {
     navigate(`/domains/${newId}`);
