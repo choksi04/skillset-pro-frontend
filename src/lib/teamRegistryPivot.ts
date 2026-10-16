@@ -14,8 +14,10 @@ export function buildAdminPivot(args: {
   longRows: CsvCell[][];
   skills: { id: string; skill_name: string; status: string }[];
   mappings: { domain_id: string; skill_id: string }[];
+  /** Internal user ID -> email; shown in the Employee Email column (blank if missing). */
+  emails?: Record<string, string>;
 }): CsvCell[][] {
-  const { longRows, skills, mappings } = args;
+  const { longRows, skills, mappings, emails = {} } = args;
   const skillById = new Map(skills.map((s) => [s.id, s]));
   type Dom = { name: string; emps: Map<string, { name: string; cells: Map<string, number> }>; skillIds: Set<string> };
   const doms = new Map<string, Dom>();
@@ -54,14 +56,12 @@ export function buildAdminPivot(args: {
       return peers > 1 ? `${base} [${id.slice(-6)}]` : base;
     };
     const emps = [...d.emps.entries()];
-    const nameCount = new Map<string, number>();
-    emps.forEach(([, e]) => nameCount.set(e.name, (nameCount.get(e.name) ?? 0) + 1));
     emps.sort((a, b) => a[1].name.localeCompare(b[1].name) || a[0].localeCompare(b[0]));
 
     const block: CsvCell[][] = [
       [d.name.toUpperCase()],
-      ['Sum of Self Rating (Level)', 'Skills'],
-      ['Row Labels', ...cols.map(label), 'Average Rating'],
+      ['Sum of Self Rating (Level)', null, 'Skills'],
+      ['Row Labels', 'Employee Email', ...cols.map(label), 'Average Rating'],
     ];
     const colTotals = cols.map(() => 0);
     let grand = 0;
@@ -75,9 +75,9 @@ export function buildAdminPivot(args: {
         rowTotal += v; rowCount += 1; colTotals[i] += v; return v;
       });
       grand += rowTotal; grandCount += rowCount;
-      block.push([(nameCount.get(e.name) ?? 0) > 1 ? `${e.name} [${empId}]` : e.name, ...cells, avg2(rowTotal, rowCount)]);
+      block.push([e.name, emails[empId] || null, ...cells, avg2(rowTotal, rowCount)]);
     }
-    block.push(['Grand Total', ...colTotals, avg2(grand, grandCount)]);
+    block.push(['Grand Total', null, ...colTotals, avg2(grand, grandCount)]);
     blocks.push(block);
   }
   const width = Math.max(0, ...blocks.flat().map((r) => r.length));
