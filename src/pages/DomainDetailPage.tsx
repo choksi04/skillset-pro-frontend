@@ -67,7 +67,7 @@ export default function DomainDetailPage() {
   const [leadChangeOpen, setLeadChangeOpen] = useState(false);
   const [pendingLeadChange, setPendingLeadChange] = useState<string | null>(null);
 
-  useEffect(() => { fetchDomains(); fetchSkills(); }, [fetchDomains, fetchSkills]);
+  useEffect(() => { fetchDomains({ force: true }); fetchSkills({ force: true }); }, [fetchDomains, fetchSkills]);
 
   const fetchDomainUsers = useCallback(async () => {
     if (!id) return;
