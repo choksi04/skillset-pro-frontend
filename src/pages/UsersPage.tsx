@@ -460,6 +460,9 @@ export default function UsersPage() {
                   <AlertTriangle size={12} /> Domain is required for {form.role}s.
                 </p>
               )}
+              {form.role === 'manager' && (
+                <p className="text-xs text-muted-foreground">Managers see team members in this domain.</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
