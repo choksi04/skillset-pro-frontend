@@ -506,10 +506,12 @@ export default function DomainDetailPage() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search skills..." value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} className="pl-8 h-9 text-sm" />
               </div>
-              {canManage && (
+              {canManage ? (
                 <Button variant="outline" size="sm" onClick={() => setManageSkillsOpen(true)} className="gap-1.5">
                   <Settings2 size={14} /> Manage Skills
                 </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Only an Admin or this domain's Domain Lead can link skills.</p>
               )}
             </div>
 
