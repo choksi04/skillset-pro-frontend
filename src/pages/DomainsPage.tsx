@@ -27,8 +27,8 @@ export default function DomainsPage() {
   const { currentRole } = useAuth();
   const isAdmin = currentRole === "admin";
   useEffect(() => {
-    fetchDomains();
-    fetchSkills();
+    fetchDomains({ force: true });
+    fetchSkills({ force: true });
   }, [fetchDomains, fetchSkills]);
 
   const [search, setSearch] = useState("");
