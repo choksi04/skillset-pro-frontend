@@ -63,21 +63,16 @@ export function buildAdminPivot(args: {
       ['Sum of Self Rating (Level)', null, 'Skills'],
       ['Row Labels', 'Employee Email', ...cols.map(label), 'Average Rating'],
     ];
-    const colTotals = cols.map(() => 0);
-    let grand = 0;
-    let grandCount = 0;
     for (const [empId, e] of emps) {
       let rowTotal = 0;
       let rowCount = 0;
-      const cells = cols.map((c, i) => {
+      const cells = cols.map((c) => {
         const v = e.cells.get(c);
         if (v == null) return null;
-        rowTotal += v; rowCount += 1; colTotals[i] += v; return v;
+        rowTotal += v; rowCount += 1; return v;
       });
-      grand += rowTotal; grandCount += rowCount;
       block.push([e.name, emails[empId] || null, ...cells, avg2(rowTotal, rowCount)]);
     }
-    block.push(['Grand Total', null, ...colTotals, avg2(grand, grandCount)]);
     blocks.push(block);
   }
   const width = Math.max(0, ...blocks.flat().map((r) => r.length));

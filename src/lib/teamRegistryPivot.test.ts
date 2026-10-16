@@ -32,14 +32,13 @@ describe('buildAdminPivot', () => {
     expect(out[3].slice(0, 7)).toEqual(['Amy', 'amy@x.com', 5, 4, 1, null, 3.33]);
     expect(out[4].slice(0, 7)).toEqual(['Zed', 'zed@x.com', null, 3, null, 2, 2.5]);
   });
-  it('bottom row has blank email, per-skill sums, cell-weighted mean', () => {
-    expect(out[5].slice(0, 7)).toEqual(['Grand Total', null, 5, 7, 1, 2, 3]);
+  it('has no Grand Total summary row', () => {
+    expect(out.flat().some((c) => c === 'Grand Total')).toBe(false);
   });
   it('adds a separate padded block per domain', () => {
-    expect(out[6].every((c) => c === null)).toBe(true);
-    expect(out[7][0]).toBe('JAVA');
-    expect(out[10].slice(0, 2)).toEqual(['Bo', 'bo@x.com']);
-    expect(out[11].slice(0, 4)).toEqual(['Grand Total', null, 2, 2]);
+    expect(out[5].every((c) => c === null)).toBe(true);
+    expect(out[6][0]).toBe('JAVA');
+    expect(out[9].slice(0, 2)).toEqual(['Bo', 'bo@x.com']);
     expect(new Set(out.map((r) => r.length)).size).toBe(1);
   });
 });
@@ -71,6 +70,14 @@ describe('Average Rating edge cases', () => {
     ], skills: sk.slice(0, 2), mappings: mp });
     expect(o[3][4]).toBeNull();
     expect(o[4].slice(2, 5)).toEqual([0, 4, 2]);
-    expect(o[5][4]).toBe(2);
+    expect(o.flat().some((c) => c === 'Grand Total')).toBe(false);
+  });
+});
+
+describe('employee named Grand Total', () => {
+  it('keeps the employee row; summaries are removed by purpose, not name', () => {
+    const o = buildAdminPivot({ longRows: [row('g', 'Grand Total', 'd1', 's1', 3)], skills, mappings });
+    expect(o[3][0]).toBe('Grand Total');
+    expect(o.length).toBe(4);
   });
 });
