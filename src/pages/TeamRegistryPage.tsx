@@ -272,7 +272,14 @@ export default function TeamRegistryPage() {
       const data = await buildTeamRegistryExport({ rows: exportRows, mappings, skills, maxLevel });
       if (currentRole === 'admin') {
         // Admin: HR pivot matrix (self-rating levels per employee x skill, per domain).
-        const pivot = buildAdminPivot({ longRows: data, skills, mappings });
+        const ids = [...new Set(exportRows.map((r) => r.empId))];
+        const emails: Record<string, string> = {};
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data: us, error } = await supabase.from('users').select('id, email').in('id', ids.slice(i, i + 200));
+          if (error) throw error;
+          (us ?? []).forEach((u: any) => { if (u.email) emails[u.id] = u.email; });
+        }
+        const pivot = buildAdminPivot({ longRows: data, skills, mappings, emails });
         downloadCsv(rowsToCsv(pivot), timestampedFilename('Team_Registry'));
       } else {
         downloadCsv(toCsv(TEAM_REGISTRY_HEADER, data), timestampedFilename('Team_Registry'));

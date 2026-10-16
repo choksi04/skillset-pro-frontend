@@ -20,27 +20,40 @@ describe('buildAdminPivot', () => {
       row('e2', 'Zed', 'd1', 's1', 3), row('e2', 'Zed', 'd1', 's2', null), row('e2', 'Zed', 'd1', 's4', 2),
       row('e1', 'Amy', 'd1', 's1', 4), row('e1', 'Amy', 'd1', 's2', 5), row('e1', 'Amy', 'd1', 's3', 1),
       row('e3', 'Bo', 'd2', 's1', 2),
-    ], skills, mappings,
+    ], skills, mappings, emails: { e1: 'amy@x.com', e2: 'zed@x.com', e3: 'bo@x.com' },
   });
 
-  it('builds template header rows and column order (current A-Z, then others)', () => {
+  it('builds header rows with Employee Email after Row Labels', () => {
     expect(out[0][0]).toBe('DATA');
-    expect(out[1].slice(0, 2)).toEqual(['Sum of Self Rating (Level)', 'Skills']);
-    expect(out[2].slice(0, 6)).toEqual(['Row Labels', 'A Skill', 'B Skill', 'A Skill (inactive)', 'Old', 'Average Rating']);
+    expect(out[1].slice(0, 3)).toEqual(['Sum of Self Rating (Level)', null, 'Skills']);
+    expect(out[2].slice(0, 7)).toEqual(['Row Labels', 'Employee Email', 'A Skill', 'B Skill', 'A Skill (inactive)', 'Old', 'Average Rating']);
   });
   it('sorts employees, keeps blanks, averages only rated cells', () => {
-    expect(out[3].slice(0, 6)).toEqual(['Amy', 5, 4, 1, null, 3.33]);
-    expect(out[4].slice(0, 6)).toEqual(['Zed', null, 3, null, 2, 2.5]);
+    expect(out[3].slice(0, 7)).toEqual(['Amy', 'amy@x.com', 5, 4, 1, null, 3.33]);
+    expect(out[4].slice(0, 7)).toEqual(['Zed', 'zed@x.com', null, 3, null, 2, 2.5]);
   });
-  it('bottom row keeps per-skill sums; last cell is cell-weighted overall mean', () => {
-    // 15 / 5 cells = 3 (mean of employee averages would be 2.92)
-    expect(out[5].slice(0, 6)).toEqual(['Grand Total', 5, 7, 1, 2, 3]);
+  it('bottom row has blank email, per-skill sums, cell-weighted mean', () => {
+    expect(out[5].slice(0, 7)).toEqual(['Grand Total', null, 5, 7, 1, 2, 3]);
   });
   it('adds a separate padded block per domain', () => {
     expect(out[6].every((c) => c === null)).toBe(true);
     expect(out[7][0]).toBe('JAVA');
-    expect(out[11].slice(0, 3)).toEqual(['Grand Total', 2, 2]);
+    expect(out[10].slice(0, 2)).toEqual(['Bo', 'bo@x.com']);
+    expect(out[11].slice(0, 4)).toEqual(['Grand Total', null, 2, 2]);
     expect(new Set(out.map((r) => r.length)).size).toBe(1);
+  });
+});
+
+describe('same-name employees', () => {
+  it('stay separate, show emails, never internal IDs; missing email is blank', () => {
+    const o = buildAdminPivot({ longRows: [
+      row('919ccabc-uuid', 'Dhruv Patel', 'd1', 's1', 4), row('d40a110d-uuid', 'Dhruv Patel', 'd1', 's1', 2),
+      row('zz', 'Zoe', 'd1', 's1', 1),
+    ], skills, mappings, emails: { '919ccabc-uuid': 'dhruv.patel@x.com', 'd40a110d-uuid': 'dhruv.n.patel@x.com' } });
+    expect(o[3].slice(0, 3)).toEqual(['Dhruv Patel', 'dhruv.patel@x.com', 4]);
+    expect(o[4].slice(0, 3)).toEqual(['Dhruv Patel', 'dhruv.n.patel@x.com', 2]);
+    expect(o[5].slice(0, 3)).toEqual(['Zoe', null, 1]);
+    expect(o.flat().some((c) => typeof c === 'string' && c.includes('uuid'))).toBe(false);
   });
 });
 
@@ -50,14 +63,14 @@ describe('Average Rating edge cases', () => {
   it('61 across 21 rated skills gives 2.90', () => {
     const vals = [2,2,2,2,2,2,2,2,4,3,4,3,4,3,3,3,4,3,4,3,4];
     const o = buildAdminPivot({ longRows: vals.map((v, i) => row('e', 'Abhijit', 'd1', `k${i}`, v)), skills: sk, mappings: mp });
-    expect(o[3][22]).toBe(2.9);
+    expect(o[3][23]).toBe(2.9);
   });
   it('no ratings gives blank; zero is a valid rating', () => {
     const o = buildAdminPivot({ longRows: [
       row('a', 'A', 'd1', 'k0', null), row('b', 'B', 'd1', 'k0', 0), row('b', 'B', 'd1', 'k1', 4),
     ], skills: sk.slice(0, 2), mappings: mp });
-    expect(o[3][3]).toBeNull();
-    expect(o[4].slice(1, 4)).toEqual([0, 4, 2]);
-    expect(o[5][3]).toBe(2);
+    expect(o[3][4]).toBeNull();
+    expect(o[4].slice(2, 5)).toEqual([0, 4, 2]);
+    expect(o[5][4]).toBe(2);
   });
 });
