@@ -109,6 +109,7 @@ const adminGuide: GuideStep[] = [
     steps: [
       'Navigate to Settings > Domains from the sidebar.',
       'Click "Add Domain" to create a new functional domain.',
+      'Skill count: a domain counts the active skills linked to it. Creating a skill in the Skill Library (even in a same-named category) does not link it — open the domain, go to Skills, and click "Manage Skills". Disabled linked skills are listed with their status but not counted.',
       'Click a domain to view details and manage skill mappings.',
       'Each skill can belong to multiple domains — skills are reusable.',
     ],
