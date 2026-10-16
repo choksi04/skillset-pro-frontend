@@ -291,7 +291,7 @@ export default function TeamRegistryPage() {
   const pageStart = (safePage - 1) * PAGE_SIZE;
   const pagedRows = sortedRows.slice(pageStart, pageStart + PAGE_SIZE);
 
-  const isLoading = !initialized || namesLoading || (currentRole === 'manager' && domains.length === 0);
+  const isLoading = !initialized || namesLoading || membersLoading || (currentRole === 'manager' && domains.length === 0);
   const filtersActive = statusFilter !== 'all' || domainFilter !== 'all' || includeArchived;
 
   // Domains visible in filter dropdown
