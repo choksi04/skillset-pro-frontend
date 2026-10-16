@@ -26,17 +26,38 @@ describe('buildAdminPivot', () => {
   it('builds template header rows and column order (current A-Z, then others)', () => {
     expect(out[0][0]).toBe('DATA');
     expect(out[1].slice(0, 2)).toEqual(['Sum of Self Rating (Level)', 'Skills']);
-    expect(out[2].slice(0, 6)).toEqual(['Row Labels', 'A Skill', 'B Skill', 'A Skill (inactive)', 'Old', 'Grand Total']);
+    expect(out[2].slice(0, 6)).toEqual(['Row Labels', 'A Skill', 'B Skill', 'A Skill (inactive)', 'Old', 'Average Rating']);
   });
-  it('sorts employees, keeps blanks, totals reconcile', () => {
-    expect(out[3].slice(0, 6)).toEqual(['Amy', 5, 4, 1, null, 10]);
-    expect(out[4].slice(0, 6)).toEqual(['Zed', null, 3, null, 2, 5]);
-    expect(out[5].slice(0, 6)).toEqual(['Grand Total', 5, 7, 1, 2, 15]);
+  it('sorts employees, keeps blanks, averages only rated cells', () => {
+    expect(out[3].slice(0, 6)).toEqual(['Amy', 5, 4, 1, null, 3.33]);
+    expect(out[4].slice(0, 6)).toEqual(['Zed', null, 3, null, 2, 2.5]);
+  });
+  it('bottom row keeps per-skill sums; last cell is cell-weighted overall mean', () => {
+    // 15 / 5 cells = 3 (mean of employee averages would be 2.92)
+    expect(out[5].slice(0, 6)).toEqual(['Grand Total', 5, 7, 1, 2, 3]);
   });
   it('adds a separate padded block per domain', () => {
     expect(out[6].every((c) => c === null)).toBe(true);
     expect(out[7][0]).toBe('JAVA');
     expect(out[11].slice(0, 3)).toEqual(['Grand Total', 2, 2]);
     expect(new Set(out.map((r) => r.length)).size).toBe(1);
+  });
+});
+
+describe('Average Rating edge cases', () => {
+  const sk = Array.from({ length: 21 }, (_, i) => ({ id: `k${i}`, skill_name: `S${String(i).padStart(2, '0')}`, status: 'active' }));
+  const mp = sk.map((s) => ({ domain_id: 'd1', skill_id: s.id }));
+  it('61 across 21 rated skills gives 2.90', () => {
+    const vals = [2,2,2,2,2,2,2,2,4,3,4,3,4,3,3,3,4,3,4,3,4];
+    const o = buildAdminPivot({ longRows: vals.map((v, i) => row('e', 'Abhijit', 'd1', `k${i}`, v)), skills: sk, mappings: mp });
+    expect(o[3][22]).toBe(2.9);
+  });
+  it('no ratings gives blank; zero is a valid rating', () => {
+    const o = buildAdminPivot({ longRows: [
+      row('a', 'A', 'd1', 'k0', null), row('b', 'B', 'd1', 'k0', 0), row('b', 'B', 'd1', 'k1', 4),
+    ], skills: sk.slice(0, 2), mappings: mp });
+    expect(o[3][3]).toBeNull();
+    expect(o[4].slice(1, 4)).toEqual([0, 4, 2]);
+    expect(o[5][3]).toBe(2);
   });
 });

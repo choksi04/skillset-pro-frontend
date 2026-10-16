@@ -1,5 +1,10 @@
 import type { CsvCell } from '@/lib/csv';
 
+/** Mean of valid ratings, rounded once to 2 decimals; blank when none. */
+export function avg2(sum: number, count: number): number | null {
+  return count > 0 ? Math.round((sum / count) * 100) / 100 : null;
+}
+
 /**
  * Admin HR pivot: per domain, one row per employee, one column per skill (by ID),
  * cells = self-rating level of the exported registry version; blanks for unrated.
@@ -18,7 +23,7 @@ export function buildAdminPivot(args: {
     const empId = String(r[0]); const empName = String(r[1] ?? '');
     const domId = String(r[3]); const domName = String(r[4] ?? domId);
     const skillId = r[14] == null ? null : String(r[14]);
-    const self = typeof r[17] === 'number' && r[17] > 0 ? r[17] : null;
+    const self = typeof r[17] === 'number' && Number.isFinite(r[17]) && r[17] >= 0 ? r[17] : null;
     if (!doms.has(domId)) doms.set(domId, { name: domName, emps: new Map(), skillIds: new Set() });
     const d = doms.get(domId)!;
     if (!d.emps.has(empId)) d.emps.set(empId, { name: empName, cells: new Map() });
@@ -56,21 +61,23 @@ export function buildAdminPivot(args: {
     const block: CsvCell[][] = [
       [d.name.toUpperCase()],
       ['Sum of Self Rating (Level)', 'Skills'],
-      ['Row Labels', ...cols.map(label), 'Grand Total'],
+      ['Row Labels', ...cols.map(label), 'Average Rating'],
     ];
     const colTotals = cols.map(() => 0);
     let grand = 0;
+    let grandCount = 0;
     for (const [empId, e] of emps) {
       let rowTotal = 0;
+      let rowCount = 0;
       const cells = cols.map((c, i) => {
         const v = e.cells.get(c);
         if (v == null) return null;
-        rowTotal += v; colTotals[i] += v; return v;
+        rowTotal += v; rowCount += 1; colTotals[i] += v; return v;
       });
-      grand += rowTotal;
-      block.push([(nameCount.get(e.name) ?? 0) > 1 ? `${e.name} [${empId}]` : e.name, ...cells, rowTotal]);
+      grand += rowTotal; grandCount += rowCount;
+      block.push([(nameCount.get(e.name) ?? 0) > 1 ? `${e.name} [${empId}]` : e.name, ...cells, avg2(rowTotal, rowCount)]);
     }
-    block.push(['Grand Total', ...colTotals, grand]);
+    block.push(['Grand Total', ...colTotals, avg2(grand, grandCount)]);
     blocks.push(block);
   }
   const width = Math.max(0, ...blocks.flat().map((r) => r.length));
