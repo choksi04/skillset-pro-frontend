@@ -61,4 +61,3 @@ describe('Average Rating edge cases', () => {
     expect(o[5][3]).toBe(2);
   });
 });
-});
