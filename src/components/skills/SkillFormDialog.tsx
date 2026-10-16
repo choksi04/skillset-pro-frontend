@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useSkillStore, Skill } from '@/stores/skillStore';
@@ -90,6 +91,7 @@ export default function SkillFormDialog({ open, onOpenChange, editSkill, categor
           skill_name: result.data.skill_name, skill_description: result.data.skill_description,
           category_id: resolvedCategoryId, skill_category: resolvedCategory, tags, status,
         });
+        if (newId) toast.info('Not linked to any domain yet — add it from Domains > Skills.');
         if (newId && onCreated) onCreated(newId);
       }
       onOpenChange(false);
