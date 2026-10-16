@@ -74,6 +74,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchUser]);
 
+  // Re-read role/domain when the tab regains focus, so role changes apply without a reload.
+  useEffect(() => {
+    let last = 0;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 15000) return;
+      const id = localStorage.getItem('siap_user_id');
+      if (!id) return;
+      last = Date.now();
+      fetchUser(id);
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [fetchUser]);
+
   // Azure AD SSO login
   const loginWithAzure = async (): Promise<{ success: boolean; error?: string }> => {
     try {
