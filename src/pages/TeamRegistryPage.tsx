@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { getManagerDomainIds } from "@/lib/managerScope";
+import { getManagerDomainIds, getNotStartedMembers } from "@/lib/managerScope";
 import { useSkillRegistryStore } from '@/stores/skillRegistryStore';
 import { useDomainStore } from '@/stores/domainStore';
 import { useSkillStore } from '@/stores/skillStore';
@@ -116,6 +116,35 @@ export default function TeamRegistryPage() {
 
   const notDomainLead = currentRole === 'manager' && ledDomainIds.size === 0;
 
+  // Active/archived people in scope (used to list members who haven't started a registry)
+  const [scopeMembers, setScopeMembers] = useState<{ id: string; full_name: string; designation: string | null; status: string; domain_id: string | null }[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const scopeKey = currentRole === 'admin' ? 'admin' : [...ledDomainIds].sort().join(',');
+  useEffect(() => {
+    if (currentRole !== 'admin' && currentRole !== 'manager') { setScopeMembers([]); setMembersLoading(false); return; }
+    if (currentRole === 'manager' && domains.length === 0) return;
+    if (currentRole === 'manager' && ledDomainIds.size === 0) { setScopeMembers([]); setMembersLoading(false); return; }
+    let cancelled = false;
+    setMembersLoading(true);
+    (async () => {
+      const all: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        let q = supabase.from('users').select('id, full_name, designation, status, domain_id').is('deleted_on', null).not('domain_id', 'is', null);
+        if (currentRole === 'manager') q = q.in('domain_id', [...ledDomainIds]);
+        const { data, error } = await q.order('id').range(from, from + 999);
+        if (error) break;
+        all.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      if (cancelled) return;
+      setScopeMembers(all);
+      setUserStatus((prev) => { const next = { ...prev }; all.forEach((u) => { if (!(u.id in next)) next[u.id] = u.status; }); return next; });
+      setMembersLoading(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRole, scopeKey, domains.length]);
+
   // Group by employee → latest version
   const groupedByEmployee = useMemo(() => {
     const map = new Map<string, typeof teamRegistries>();
@@ -167,7 +196,7 @@ export default function TeamRegistryPage() {
 
   // Build display rows
   const rows = useMemo(() => {
-    return Array.from(groupedByEmployee.entries()).map(([empId, regs]) => {
+    const withRegistry = Array.from(groupedByEmployee.entries()).map(([empId, regs]) => {
       const latest = regs[0];
       const domain = domains.find((d) => d.id === latest.domain_id);
       // Shared metric rules (see src/lib/registryMetrics.ts) — active domain skills only.
@@ -207,7 +236,32 @@ export default function TeamRegistryPage() {
         updatedAt,
       };
     });
-  }, [groupedByEmployee, domains, mappings, skills, items, userMeta, maxLevel, reviewStatuses]);
+    // In-scope team members who have not started a registry yet.
+    const scope = currentRole === 'admin' ? null : ledDomainIds;
+    const notStarted = getNotStartedMembers(scopeMembers, scope, new Set(groupedByEmployee.keys())).map((m) => {
+      const domain = domains.find((d) => d.id === m.domain_id);
+      const totalSkills = mappings
+        .filter((mp) => mp.domain_id === m.domain_id)
+        .filter((mp) => skills.some((s) => s.id === mp.skill_id && s.status === 'active')).length;
+      return {
+        empId: m.id,
+        latestId: '',
+        fullName: m.full_name ?? '',
+        designation: m.designation ?? '',
+        domainName: domain?.name ?? 'Unknown domain',
+        domainId: m.domain_id as string,
+        status: 'not_started' as RegistryStatus,
+        ratedCount: 0,
+        totalSkills,
+        completionPct: 0,
+        avgOnFive: null as number | null,
+        metricsLoading: false,
+        hasRatings: false,
+        updatedAt: null as string | null,
+      };
+    });
+    return [...withRegistry, ...notStarted];
+  }, [groupedByEmployee, domains, mappings, skills, items, userMeta, maxLevel, reviewStatuses, scopeMembers, currentRole, ledDomainIds]);
 
   // Filter + search
   const filteredRows = useMemo(() => {
@@ -248,20 +302,22 @@ export default function TeamRegistryPage() {
 
   // Status filter dropdown only needs to show statuses that actually appear in the data,
   // plus the canonical order.
-  const statusFilterOptions: RegistryStatus[] = ['draft', 'incomplete', 'review_pending', 'approved'];
+  const statusFilterOptions: RegistryStatus[] = ['not_started', 'draft', 'incomplete', 'review_pending', 'approved'];
 
   // Export: Admin / Manager only, scoped to the same filtered rows the table shows.
+  // "Not Started" rows have no registry and are excluded so exports stay unchanged.
   const canExport = currentRole === 'admin' || currentRole === 'manager';
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
     if (!canExport || exporting) return;
-    if (filteredRows.length === 0) {
+    const registryRows = sortedRows.filter((r) => !!r.latestId);
+    if (registryRows.length === 0) {
       toast({ title: 'Nothing to export', description: 'No team registries match the current search and filters.' });
       return;
     }
     setExporting(true);
     try {
-      const exportRows = sortedRows.map((r) => {
+      const exportRows = registryRows.map((r) => {
         const reg = groupedByEmployee.get(r.empId)![0];
         return {
           empId: r.empId, fullName: r.fullName, designation: r.designation,
@@ -436,12 +492,12 @@ export default function TeamRegistryPage() {
                     <div className="flex flex-col items-center text-center">
                       <Users size={28} className="text-muted-foreground mb-3" />
                       <h3 className="text-base font-semibold text-foreground mb-1">
-                        {notDomainLead ? 'No Domain Assigned' : 'No Registries Yet'}
+                        {notDomainLead ? 'No Domain Assigned' : 'No Team Members Yet'}
                       </h3>
                       <p className="text-sm text-muted-foreground max-w-md">
                         {notDomainLead
                           ? "You're not assigned to a domain yet. Ask an admin to assign you."
-                          : 'No team members have submitted their skill registries yet.'}
+                          : 'No team members in your domains yet.'}
                       </p>
                     </div>
                   ) : (
@@ -453,8 +509,8 @@ export default function TeamRegistryPage() {
               pagedRows.map((r) => (
                 <TableRow
                   key={r.empId}
-                  className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => navigate(`/team-registry/${r.latestId}`)}
+                  className={`border-border transition-colors ${r.latestId ? 'cursor-pointer hover:bg-muted/30' : ''}`}
+                  onClick={() => { if (r.latestId) navigate(`/team-registry/${r.latestId}`); }}
                 >
                   {/* Team Member */}
                   <TableCell className="py-4 px-5">
@@ -514,13 +570,17 @@ export default function TeamRegistryPage() {
 
                   {/* Actions */}
                   <TableCell className="py-4 px-5 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/team-registry/${r.latestId}`); }}
-                      className="inline-flex items-center gap-0.5 text-sm font-medium text-primary hover:underline"
-                    >
-                      Review <ChevronRight size={14} />
-                    </button>
+                    {r.latestId ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/team-registry/${r.latestId}`); }}
+                        className="inline-flex items-center gap-0.5 text-sm font-medium text-primary hover:underline"
+                      >
+                        Review <ChevronRight size={14} />
+                      </button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
