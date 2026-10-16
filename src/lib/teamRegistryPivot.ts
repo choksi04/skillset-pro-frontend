@@ -69,7 +69,7 @@ export function buildAdminPivot(args: {
       const cells = cols.map((c) => {
         const v = e.cells.get(c);
         if (v == null) return null;
-        rowTotal += v; return v;
+        rowTotal += v; rowCount += 1; return v;
       });
       block.push([e.name, emails[empId] || null, ...cells, avg2(rowTotal, rowCount)]);
     }
